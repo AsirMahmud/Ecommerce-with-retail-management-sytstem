@@ -537,6 +537,10 @@ class PublicProductDetailByColorView(APIView):
                 'name': product.name,
                 'price': str(product.selling_price),
                 'category': product.category.name if product.category else None,
+                'online_categories': [
+                    {'id': cat.id, 'name': cat.name, 'slug': cat.slug}
+                    for cat in product.online_categories.all()
+                ],
             },
             'discount_info': discount_info if discount_info['discount_type'] else None,
             'color': {

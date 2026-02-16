@@ -102,7 +102,7 @@ export function ProductInfo({ productId, product, colorLinks, onAddToCart, onBuy
   return (
     <div className="flex flex-col gap-3 lg:gap-5">
       <div>
-        <h1 className="font-serif text-2xl lg:text-[40px] font-bold mb-2 lg:mb-3 leading-tight">{toTitleCase(product.name)}</h1>
+        <h1 className="text-2xl lg:text-[40px] font-bold mb-2 lg:mb-3 leading-tight">{toTitleCase(product.name)}</h1>
 
         {/* Stock Information Badge */}
 

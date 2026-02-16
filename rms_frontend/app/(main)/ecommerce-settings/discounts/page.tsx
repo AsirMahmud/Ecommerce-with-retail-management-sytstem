@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -70,6 +70,8 @@ import {
   useUpdateDiscount,
   useDeleteDiscount
 } from "@/hooks/queries/useEcommerce";
+import { useInfiniteProducts } from "@/hooks/queries/useInventory";
+import { useDebounce } from "@/hooks/use-debounce";
 import { Discount } from "@/lib/api/ecommerce";
 import { categoriesApi, onlineCategoriesApi, productsApi } from "@/lib/api/inventory";
 import { Category, Product } from "@/types/inventory";
@@ -90,37 +92,56 @@ export default function DiscountManagementPage() {
     products: [] as string[],
   });
 
+  const [productSearch, setProductSearch] = useState("");
+  const [selectedProductsDetails, setSelectedProductsDetails] = useState<Product[]>([]);
+  const debouncedProductSearch = useDebounce(productSearch, 500);
+  const observerTarget = useRef<HTMLDivElement>(null);
+
   // Data for selectors
   const [categories, setCategories] = useState<Category[]>([]);
   const [onlineCategories, setOnlineCategories] = useState<Category[]>([]);
-  const [products, setProducts] = useState<Product[]>([]);
   const [loadingOptions, setLoadingOptions] = useState(false);
 
   // Use React Query hooks
-  const { data: discounts = [], isLoading, refetch } = useDiscounts();
+  const { data: discounts = [], isLoading: isLoadingDiscounts, refetch } = useDiscounts();
   const createDiscountMutation = useCreateDiscount();
   const updateDiscountMutation = useUpdateDiscount();
   const deleteDiscountMutation = useDeleteDiscount();
 
-  // Load categories and products for selectors
+  const {
+    data: productsData,
+    fetchNextPage: fetchNextProducts,
+    hasNextPage: hasMoreProducts,
+    isFetchingNextPage: isFetchingMoreProducts,
+    isLoading: isLoadingProducts,
+    isFetching: isFetchingProducts,
+  } = useInfiniteProducts(
+    { search: debouncedProductSearch },
+    {
+      placeholderData: (previousData: any) => previousData,
+      enabled: true
+    }
+  );
+
+  const allProducts = productsData?.pages.flatMap(page => page.results) || [];
+  const isLoading = isLoadingDiscounts;
+
+  // Load categories for selectors
   useEffect(() => {
     const loadOptions = async () => {
       setLoadingOptions(true);
       try {
-        const [cats, onlineCats, prods] = await Promise.all([
+        const [cats, onlineCats] = await Promise.all([
           categoriesApi.getAll(),
           onlineCategoriesApi.getAll(),
-          productsApi.getAll(),
         ]);
 
         // Handle potential paginated responses
         const catsData = Array.isArray(cats) ? cats : (cats as any).results || [];
         const onlineCatsData = Array.isArray(onlineCats) ? onlineCats : (onlineCats as any).results || [];
-        const prodsData = Array.isArray(prods) ? prods : (prods as any).results || [];
 
         setCategories(catsData);
         setOnlineCategories(onlineCatsData);
-        setProducts(prodsData);
       } catch (error) {
         console.error('Error loading options:', error);
       } finally {
@@ -129,6 +150,28 @@ export default function DiscountManagementPage() {
     };
     loadOptions();
   }, []);
+
+  // Set up infinite scroll observer for products
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting && hasMoreProducts && !isFetchingMoreProducts) {
+          fetchNextProducts();
+        }
+      },
+      { threshold: 0.1 }
+    );
+
+    if (observerTarget.current) {
+      observer.observe(observerTarget.current);
+    }
+
+    return () => {
+      if (observerTarget.current) {
+        observer.unobserve(observerTarget.current);
+      }
+    };
+  }, [hasMoreProducts, isFetchingMoreProducts, fetchNextProducts]);
 
   const resetForm = () => {
     setFormData({
@@ -142,6 +185,7 @@ export default function DiscountManagementPage() {
       onlineCategories: [],
       products: [],
     });
+    setSelectedProductsDetails([]);
   };
 
   const handleCreateDiscount = async () => {
@@ -204,7 +248,14 @@ export default function DiscountManagementPage() {
         onlineCategories: discount.online_categories?.map(id => id.toString()) || [],
         products: discount.products?.map(id => id.toString()) || [],
       });
+
+      // Seed selectedProductsDetails with already existing details if available
+      if ((discount as any).products_detail) {
+        setSelectedProductsDetails((discount as any).products_detail);
+      }
+
       setEditingId(id);
+      setProductSearch("");
     }
   };
 
@@ -230,6 +281,7 @@ export default function DiscountManagementPage() {
 
       resetForm();
       setEditingId(null);
+      setSelectedProductsDetails([]);
       toast.success("Discount updated successfully!");
     } catch (error) {
       console.error('Error updating discount:', error);
@@ -286,6 +338,25 @@ export default function DiscountManagementPage() {
     }
   };
 
+  // Merge selected products with search results to ensure they are available for display
+  const displayProducts = [...allProducts];
+  formData.products.forEach(id => {
+    if (!displayProducts.find(p => p.id.toString() === id)) {
+      // 1. Check selectedProductsDetails (newly selected in this session)
+      const detail = selectedProductsDetails.find(p => p.id.toString() === id);
+      if (detail) {
+        displayProducts.push(detail);
+      } else {
+        // 2. Check the existing discount details (if editing)
+        const discount = editingId ? (discounts as any).find((d: any) => d.id === editingId) : null;
+        const existingDetail = discount?.products_detail?.find((pd: any) => pd.id.toString() === id);
+        if (existingDetail) {
+          displayProducts.push(existingDetail);
+        }
+      }
+    }
+  });
+
   const getTargetName = (discount: any) => {
     if (discount.discount_type === "APP_WIDE") return "All Products";
 
@@ -320,7 +391,8 @@ export default function DiscountManagementPage() {
         discount.products_detail.forEach((p: any) => names.push(p.name));
       } else if (discount.products && discount.products.length > 0) {
         discount.products.forEach((id: number) => {
-          const prod = products.find((p) => p.id === id);
+          // Check displayProducts first, then fall back to ID
+          const prod = displayProducts.find((p) => p.id === id);
           names.push(prod?.name || `Product #${id}`);
         });
       }
@@ -559,12 +631,10 @@ export default function DiscountManagementPage() {
                                       </Badge>
                                     ) : (
                                       formData.products.map((id) => {
-                                        const prod = products.find((p) => p.id.toString() === id);
-                                        const editingDiscount = editingId ? (discounts as any).find((d: any) => d.id === editingId) : null;
-                                        const detail = prod || (editingDiscount as any)?.products_detail?.find((pd: any) => pd.id.toString() === id);
+                                        const prod = displayProducts.find((p) => p.id.toString() === id);
                                         return (
                                           <Badge variant="secondary" key={id} className="rounded-sm px-1 font-normal max-w-[150px] truncate">
-                                            {detail?.name || `Product #${id}`}
+                                            {prod?.name || `Product #${id}`}
                                           </Badge>
                                         );
                                       })
@@ -578,22 +648,42 @@ export default function DiscountManagementPage() {
                             </Button>
                           </PopoverTrigger>
                           <PopoverContent className="w-[450px] p-0" align="start">
-                            <Command>
-                              <CommandInput placeholder="Search product by name or SKU..." />
+                            <Command shouldFilter={false}>
+                              <CommandInput
+                                placeholder="Search product by name or SKU..."
+                                value={productSearch}
+                                onValueChange={setProductSearch}
+                              />
                               <CommandList>
-                                <CommandEmpty>No product found.</CommandEmpty>
+                                <CommandEmpty>
+                                  {isFetchingProducts && !allProducts.length ? (
+                                    <div className="flex items-center justify-center p-4">
+                                      <RefreshCw className="h-4 w-4 animate-spin mr-2" />
+                                      Searching...
+                                    </div>
+                                  ) : (
+                                    "No product found."
+                                  )}
+                                </CommandEmpty>
                                 <CommandGroup>
-                                  {products.map((product) => (
+                                  {displayProducts.map((product) => (
                                     <CommandItem
                                       key={product.id}
-                                      value={`${product.name} ${product.sku}`}
+                                      value={`${product.name} ${product.sku} ${product.id}`}
                                       onSelect={() => {
                                         const current = [...formData.products];
                                         const index = current.indexOf(product.id.toString());
                                         if (index > -1) {
                                           current.splice(index, 1);
+                                          setSelectedProductsDetails(prev => prev.filter(p => p.id !== product.id));
                                         } else {
                                           current.push(product.id.toString());
+                                          setSelectedProductsDetails(prev => {
+                                            if (!prev.find(p => p.id === product.id)) {
+                                              return [...prev, product];
+                                            }
+                                            return prev;
+                                          });
                                         }
                                         setFormData({ ...formData, products: current });
                                       }}
@@ -651,6 +741,11 @@ export default function DiscountManagementPage() {
                                     </CommandItem>
                                   ))}
                                 </CommandGroup>
+                                {hasMoreProducts && (
+                                  <div ref={observerTarget} className="flex justify-center p-4">
+                                    <RefreshCw className="h-4 w-4 animate-spin text-muted-foreground" />
+                                  </div>
+                                )}
                               </CommandList>
                             </Command>
                           </PopoverContent>

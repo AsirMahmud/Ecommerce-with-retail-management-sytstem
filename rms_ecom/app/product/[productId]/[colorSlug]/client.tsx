@@ -51,30 +51,23 @@ export default function ProductByColorPage() {
                     features: showcase.product.features,
                 })
 
-                // Fetch random products for "YOU MIGHT ALSO LIKE" section
-                // Fetch a sample pool of products to randomize from (more efficient than fetching all)
-                // Use pagination to get a good sample size (50-100 products)
+                // Fetch products from the same category for "YOU MIGHT ALSO LIKE" section
+                // Try to find a primary category slug from the product details
+                const categorySlug = response.product.online_categories?.[0]?.slug;
+
                 const paginatedResponse = await ecommerceApi.getProductsByColorPaginated({
                     only_in_stock: true,
-                    page_size: 100, // Fetch up to 100 products for randomization
-                    page: 1
+                    page_size: 8,
+                    page: 1,
+                    online_category: categorySlug, // Filter by category if available
                 })
 
-                // Filter out the current product and shuffle the rest
+                // Filter out the current product
                 const filteredProducts = paginatedResponse.results.filter(
                     entry => entry.product_id !== productId
                 )
 
-                // Shuffle array using Fisher-Yates algorithm for true randomization
-                const shuffled = [...filteredProducts]
-                for (let i = shuffled.length - 1; i > 0; i--) {
-                    const j = Math.floor(Math.random() * (i + 1));
-                    [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]]
-                }
-
-                // Take first 8 products (or less if not enough available)
-                const randomProducts = shuffled.slice(0, 8)
-                setSuggested(randomProducts)
+                setSuggested(filteredProducts.slice(0, 8))
             } catch (e) {
                 console.error(e)
                 // Redirect to Not Available page if the color/product is not found
