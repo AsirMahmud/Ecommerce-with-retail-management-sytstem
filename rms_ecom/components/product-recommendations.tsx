@@ -19,7 +19,7 @@ interface ProductRecommendationsProps {
 export function ProductRecommendations({ products, isLoading = false }: ProductRecommendationsProps) {
   return (
     <section className="container px-4 py-12 lg:py-16">
-      <h2 className="font-serif text-3xl lg:text-5xl font-bold text-center mb-10 lg:mb-14">YOU MIGHT ALSO LIKE</h2>
+      <h2 className="text-3xl lg:text-5xl font-bold text-center mb-10 lg:mb-14">YOU MIGHT ALSO LIKE</h2>
 
       <div className="grid grid-cols-2 gap-4 lg:gap-6 sm:grid-cols-2 lg:grid-cols-4">
         {isLoading

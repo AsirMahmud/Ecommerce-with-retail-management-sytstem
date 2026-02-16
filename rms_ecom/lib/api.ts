@@ -83,6 +83,7 @@ export interface ProductDetailByColorResponse {
     name: string;
     price: string;
     category?: string | null;
+    online_categories?: Array<{ id: number; name: string; slug: string }>;
   };
   discount_info?: DiscountInfo | null;
   color: {

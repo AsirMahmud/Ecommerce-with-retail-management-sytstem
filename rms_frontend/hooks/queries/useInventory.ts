@@ -230,7 +230,7 @@ export const useProductStats = (params?: any) => {
     });
 };
 
-export const useInfiniteProducts = (params?: any) => {
+export const useInfiniteProducts = (params?: any, options?: any) => {
     return useInfiniteQuery({
         queryKey: [...inventoryKeys.products.lists(), 'infinite', { params }],
         queryFn: ({ pageParam = 1 }) => productsApi.getAll({ ...params, page: pageParam }),
@@ -242,6 +242,7 @@ export const useInfiniteProducts = (params?: any) => {
             return undefined;
         },
         initialPageParam: 1,
+        ...options,
     });
 };
 

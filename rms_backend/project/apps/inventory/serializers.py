@@ -142,7 +142,7 @@ class EcommerceProductSerializer(serializers.ModelSerializer):
     
     def get_online_categories(self, obj):
         return [
-            {'id': cat.id, 'name': cat.name} 
+            {'id': cat.id, 'name': cat.name, 'slug': cat.slug} 
             for cat in obj.online_categories.all()
         ]
 

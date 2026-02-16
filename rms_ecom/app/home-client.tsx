@@ -44,26 +44,9 @@ export default function HomePageClient() {
     discountInfo: entry.discount_info,  // Pass backend discount info
   })
 
-  // Get sections as an array, sorted by a predefined order or alphabetically
+  // Get sections as an array, respecting the order from the API
   const getSortedSections = (data: ShowcaseResponse): Array<{ key: string; section: ShowcaseSection }> => {
-    const entries = Object.entries(data).map(([key, section]) => ({ key, section }));
-
-    // Define a preferred order for known sections
-    const preferredOrder = ['new-arrivals', 'top-selling', 'trending', 'featured'];
-
-    return entries.sort((a, b) => {
-      const aIndex = preferredOrder.indexOf(a.key);
-      const bIndex = preferredOrder.indexOf(b.key);
-
-      // If both are in preferred order, sort by index
-      if (aIndex !== -1 && bIndex !== -1) return aIndex - bIndex;
-      // If only a is in preferred order, it comes first
-      if (aIndex !== -1) return -1;
-      // If only b is in preferred order, it comes first
-      if (bIndex !== -1) return 1;
-      // Otherwise, sort alphabetically
-      return a.key.localeCompare(b.key);
-    });
+    return Object.entries(data).map(([key, section]) => ({ key, section }));
   };
 
   return (
