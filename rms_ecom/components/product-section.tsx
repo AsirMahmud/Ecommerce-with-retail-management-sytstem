@@ -28,14 +28,14 @@ export function ProductSection({ title, products, viewAllHref = "/products", isL
         <h2 className="text-3xl md:text-4xl font-bold text-center mb-12 tracking-tight">{title}</h2>
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 md:gap-6">
           {isLoading
-            ? Array.from({ length: 4 }).map((_, i) => <ProductCardSkeleton key={i} />)
-            : products.map((product) => (
+            ? Array.from({ length: 8 }).map((_, i) => <ProductCardSkeleton key={i} />)
+            : products.slice(0, 8).map((product) => (
               <ProductCard key={product.id} {...product} />
             ))}
         </div>
-        <div className="flex justify-center mt-10">
+        <div className="flex justify-center mt-12">
           <Link href={viewAllHref}>
-            <Button variant="outline" size="lg" className="rounded-full px-12 bg-transparent">
+            <Button variant="outline" size="lg" className="rounded-full px-12 bg-transparent hover:bg-primary hover:text-primary-foreground transition-all">
               View All
             </Button>
           </Link>

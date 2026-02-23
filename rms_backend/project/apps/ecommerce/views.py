@@ -315,6 +315,7 @@ class PublicProductsByColorView(APIView):
         only_in_stock = str(request.query_params.get('only_in_stock', 'false')).lower() == 'true'
         product_id = request.query_params.get('product_id')
         product_ids_csv = request.query_params.get('product_ids')
+        status_slug = request.query_params.get('status')
         # Color and size filters (support both singular and plural names)
         colors_csv = request.query_params.get('colors') or request.query_params.get('color') or ''
         sizes_csv = request.query_params.get('sizes') or request.query_params.get('size') or ''
@@ -387,6 +388,9 @@ class PublicProductsByColorView(APIView):
                     products = products.filter(id__in=ids)
             except Exception:
                 pass
+        
+        if status_slug:
+            products = products.filter(ecommerce_statuses__slug=status_slug)
 
         products = products.distinct()
 

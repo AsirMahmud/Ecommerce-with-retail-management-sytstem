@@ -52,7 +52,12 @@ interface ProductInfo {
   updated_at: string
 }
 
-export function CheckoutSummary() {
+interface CheckoutSummaryProps {
+  className?: string
+  showTitle?: boolean
+}
+
+export function CheckoutSummary({ className, showTitle = true }: CheckoutSummaryProps) {
   const cartStoreItems = useCartStore((s) => s.items)
   const { deliveryMethod, setDeliveryMethod } = useCheckoutStore()
   const [cartPricing, setCartPricing] = useState<CartPricing | null>(null)
@@ -198,8 +203,8 @@ export function CheckoutSummary() {
   }
 
   return (
-    <div className="border rounded-lg p-6 bg-card sticky top-24">
-      <h2 className="text-xl font-bold mb-6">Order Summary</h2>
+    <div className={className || "border rounded-lg p-6 bg-card sticky top-24"}>
+      {showTitle && <h2 className="text-xl font-bold mb-6">Order Summary</h2>}
 
       {/* Cart Items */}
       <div className="space-y-4 mb-6 max-h-64 overflow-y-auto">

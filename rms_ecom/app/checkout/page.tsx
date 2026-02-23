@@ -23,7 +23,7 @@ export default function CheckoutPage() {
             </div>
 
             {/* Order Summary - Takes 1 column. Order 1 on mobile (before form), Order 2 on desktop (after form) */}
-            <div className="lg:col-span-1 order-1 lg:order-2">
+            <div className="lg:col-span-1 order-1 lg:order-2 hidden lg:block">
               <CheckoutSummary />
             </div>
           </div>

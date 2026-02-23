@@ -21,6 +21,7 @@ import { ecommerceApi } from "@/lib/api"
 import { useCheckoutStore } from "@/hooks/useCheckoutStore"
 import { useBdAddress } from "@/hooks/useBdAddress"
 import { useLoading } from "@/hooks/useLoading"
+import { CheckoutSummary } from "./checkout-summary"
 import dhakaThanasData from "../dhaka_thanas_structure.json"
 
 interface Place {
@@ -71,17 +72,17 @@ export function CheckoutForm() {
   const [selectedUnion, setSelectedUnion] = useState<string>("")
 
   const checkoutPlaceholderClass = "placeholder:text-muted-foreground/70"
-  
+
   // Dhaka address states
   const [selectedCityCorp, setSelectedCityCorp] = useState<string>("")
   const [selectedThana, setSelectedThana] = useState<string>("")
   const [selectedPlace, setSelectedPlace] = useState<string>("")
-  
+
   const cityCorporations: CityCorporation[] = dhakaThanasData.city_corporations || []
-  
+
   // Get available thanas based on selected city corporation
   const availableThanas = cityCorporations.find(cc => cc.name === selectedCityCorp)?.thanas || []
-  
+
   // Get available places based on selected thana
   const availablePlaces: Place[] = availableThanas.find(t => t.name === selectedThana)?.places || []
 
@@ -120,23 +121,23 @@ export function CheckoutForm() {
       const customer_name = `${firstName} ${lastName}`.trim()
       const customer_phone = String(formData.get("phone") || "").trim()
       const customer_email = String(formData.get("email") || "").trim()
-      
+
       // Validate required fields
       if (!customer_name || customer_name.length === 0) {
         throw new Error("Customer name is required. Please fill in first name and last name.")
       }
-      
+
       if (!customer_phone || customer_phone.length === 0) {
         throw new Error("Phone number is required.")
       }
-      
+
       // Validate phone number format (basic validation)
       if (customer_phone.length < 10) {
         throw new Error("Please enter a valid phone number.")
       }
       // Build shipping address based on delivery method
       let shipping_address: any = {}
-      
+
       if (deliveryMethod === 'inside') {
         // Inside Dhaka address structure
         shipping_address = {
@@ -162,7 +163,7 @@ export function CheckoutForm() {
 
       // Fetch authoritative prices and delivery charges
       const pricingResponse = await ecommerceApi.priceCart(cartItems)
-      
+
       // Helper function to extract numeric product ID (handles cases like "141/blue")
       const extractNumericProductId = (productId: string | number): number => {
         if (typeof productId === 'number') {
@@ -194,11 +195,11 @@ export function CheckoutForm() {
 
       const items = cartItems.map((it) => {
         const pid = extractNumericProductId(it.productId)
-        
+
         // Find matching priced item from pricing response
         const itemColor = normalizeValue(it.variations?.color)
         const itemSize = normalizeValue(it.variations?.size)
-        
+
         const pricedItem = pricingResponse.items?.find((pi) => {
           if (pi.productId !== pid) return false
           const piColor = normalizeValue(pi.variant?.color)
@@ -232,7 +233,7 @@ export function CheckoutForm() {
           // No discount, use the unit_price from pricing response (already discounted if applicable)
           unit_price = pricedItem.unit_price
         }
-        
+
         const size = it.variations?.size || ""
         const color = it.variations?.color || ""
         return {
@@ -263,7 +264,7 @@ export function CheckoutForm() {
       if (!customer_name || customer_name.length === 0) {
         throw new Error("Customer name is required. Please fill in first name and last name.")
       }
-      
+
       if (!customer_phone || customer_phone.length === 0) {
         throw new Error("Phone number is required.")
       }
@@ -278,7 +279,7 @@ export function CheckoutForm() {
         delivery_charge: deliveryCharge,
         delivery_method: deliveryMethodName,
       }
-      
+
       console.log('Submitting payload:', { ...payload, items: items.length }) // Debug log
       const created = await ecommerceApi.createOnlinePreorder(payload)
       clearDirectCheckoutItems() // Clear direct checkout items first
@@ -332,8 +333,8 @@ export function CheckoutForm() {
       {/* Shipping Address */}
       <div className="space-y-4">
         <h2 className="text-2xl font-bold">Shipping Address</h2>
-           {/* Delivery Location Toggle - Bottom Right */}
-           <div className="flex justify-end pt-4">
+        {/* Delivery Location Toggle - Bottom Right */}
+        <div className="flex justify-end pt-4">
           <div className="inline-flex rounded-lg border border-input bg-background p-1">
             <button
               type="button"
@@ -344,11 +345,10 @@ export function CheckoutForm() {
                 setSelectedThana("")
                 setSelectedPlace("")
               }}
-              className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-                deliveryMethod === 'inside'
+              className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${deliveryMethod === 'inside'
                   ? 'bg-primary text-primary-foreground shadow-sm'
                   : 'text-muted-foreground hover:text-foreground'
-              }`}
+                }`}
             >
               Inside Dhaka
             </button>
@@ -364,11 +364,10 @@ export function CheckoutForm() {
                 setSelectedUnion("")
                 // Division and district will be auto-selected via useEffect
               }}
-              className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-                deliveryMethod === 'gazipur'
+              className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${deliveryMethod === 'gazipur'
                   ? 'bg-primary text-primary-foreground shadow-sm'
                   : 'text-muted-foreground hover:text-foreground'
-              }`}
+                }`}
             >
               Inside Gazipur
             </button>
@@ -386,17 +385,16 @@ export function CheckoutForm() {
                 setSelectedThana("")
                 setSelectedPlace("")
               }}
-              className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-                deliveryMethod === 'outside'
+              className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${deliveryMethod === 'outside'
                   ? 'bg-primary text-primary-foreground shadow-sm'
                   : 'text-muted-foreground hover:text-foreground'
-              }`}
+                }`}
             >
               Outside Dhaka
             </button>
           </div>
         </div>
-        
+
         {/* Hidden inputs for form submission */}
         {deliveryMethod === 'inside' ? (
           <>
@@ -412,7 +410,7 @@ export function CheckoutForm() {
             <input type="hidden" name="union" value={selectedUnion} />
           </>
         )}
-        
+
         {deliveryMethod === 'inside' ? (
           /* Inside Dhaka Address Fields */
           <>
@@ -637,7 +635,7 @@ export function CheckoutForm() {
           />
         </div>
 
-     
+
       </div>
 
       {/* Payment Method (COD-only) */}
@@ -671,6 +669,11 @@ export function CheckoutForm() {
           {error}
         </div>
       )}
+
+      {/* Mobile-only Order Summary */}
+      <div className="lg:hidden">
+        <CheckoutSummary className="border rounded-lg p-6 bg-card" />
+      </div>
 
       {/* Submit Button */}
       <Button type="submit" size="lg" className="w-full h-12 text-base">

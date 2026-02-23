@@ -22,7 +22,8 @@ export default function HomePageClient() {
     const fetchShowcaseData = async () => {
       try {
         startLoading();
-        const data = await ecommerceApi.getShowcase({ limit: 4 });
+        // Remove artificial limit to fetch all products according to status
+        const data = await ecommerceApi.getShowcase({ limit: 50 });
         setShowcaseData(data);
       } catch (error) {
         console.error('Failed to fetch showcase data:', error);
@@ -68,6 +69,7 @@ export default function HomePageClient() {
                     title={section.name.toUpperCase()}
                     baseProducts={section.products}
                     toCard={toCard}
+                    statusSlug={key}
                   />
                 )}
               </div>
@@ -88,7 +90,12 @@ export default function HomePageClient() {
   )
 }
 
-function ColorSection({ title, baseProducts, toCard }: { title: string; baseProducts: EcommerceProduct[]; toCard: (e: ProductByColorEntry) => { id: string; name: string; price: number; rating: number; image: string } }) {
+function ColorSection({ title, baseProducts, toCard, statusSlug }: {
+  title: string;
+  baseProducts: EcommerceProduct[];
+  toCard: (e: ProductByColorEntry) => { id: string; name: string; price: number; rating: number; image: string };
+  statusSlug: string;
+}) {
   const [entries, setEntries] = useState<ProductByColorEntry[]>([])
   useEffect(() => {
     const load = async () => {
@@ -107,8 +114,8 @@ function ColorSection({ title, baseProducts, toCard }: { title: string; baseProd
   return (
     <ProductSection
       title={title}
-      products={entries.slice(0, 8).map(toCard)}
-      viewAllHref="/products"
+      products={entries.map(toCard)}
+      viewAllHref={`/products?status=${statusSlug}`}
       isLoading={entries.length === 0}
     />
   )
