@@ -183,6 +183,7 @@ export const ecommerceApi = {
     only_in_stock?: boolean;
     product_id?: number;
     product_ids?: number[];
+    status?: string;
   }): Promise<ProductByColorEntry[]> => {
     const searchParams = new URLSearchParams()
     if (params?.search) searchParams.set('search', params.search)
@@ -191,6 +192,7 @@ export const ecommerceApi = {
     if (typeof params?.only_in_stock !== 'undefined') searchParams.set('only_in_stock', String(params.only_in_stock))
     if (params?.product_id) searchParams.set('product_id', String(params.product_id))
     if (params?.product_ids && params.product_ids.length > 0) searchParams.set('product_ids', params.product_ids.join(','))
+    if (params?.status) searchParams.set('status', params.status)
     const response = await fetch(`${API_BASE_URL}/ecommerce/public/products-by-color/?${searchParams}`)
     if (!response.ok) throw new Error('Failed to fetch products by color')
     const data = await response.json()
@@ -209,6 +211,7 @@ export const ecommerceApi = {
     only_in_stock?: boolean;
     product_id?: number;
     product_ids?: number[];
+    status?: string;
     page?: number;
     page_size?: number;
     price_min?: number;
@@ -226,6 +229,7 @@ export const ecommerceApi = {
     if (typeof params?.only_in_stock !== 'undefined') searchParams.set('only_in_stock', String(params.only_in_stock))
     if (params?.product_id) searchParams.set('product_id', String(params.product_id))
     if (params?.product_ids && params.product_ids.length > 0) searchParams.set('product_ids', params.product_ids.join(','))
+    if (params?.status) searchParams.set('status', params.status)
     if (params?.page) searchParams.set('page', String(params.page))
     if (params?.page_size) searchParams.set('page_size', String(params.page_size))
     if (typeof params?.price_min !== 'undefined') searchParams.set('price_min', String(params.price_min))

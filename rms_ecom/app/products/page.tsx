@@ -1,13 +1,14 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useState, Suspense } from "react"
+import { useSearchParams } from "next/navigation"
 import { SiteHeader } from "@/components/site-header"
 import { SiteFooter } from "@/components/site-footer"
 import { Breadcrumb } from "@/components/breadcrumb"
 import { ProductGrid } from "@/components/product-grid"
 import { CategoryFilters } from "@/components/category-filters"
 import { NewsletterSection } from "@/components/newsletter-section"
-import { ecommerceApi, EcommerceProduct, ProductByColorEntry } from "@/lib/api"
+import { ecommerceApi, ProductByColorEntry } from "@/lib/api"
 import { Button } from "@/components/ui/button"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Input } from "@/components/ui/input"
@@ -18,7 +19,10 @@ import { generateBreadcrumbStructuredData } from "@/lib/seo"
 import { useLoading } from "@/hooks/useLoading"
 import { ActiveFilters } from "@/components/active-filters"
 
-export default function AllProductsPage() {
+function AllProductsContent() {
+  const searchParams = useSearchParams()
+  const statusFilter = searchParams.get('status')
+
   const [products, setProducts] = useState<ProductByColorEntry[]>([])
   const { isLoading, startLoading, stopLoading } = useLoading()
   const [searchTerm, setSearchTerm] = useState("")
@@ -48,6 +52,7 @@ export default function AllProductsPage() {
           price_max: priceRange[1],
           colors: selectedColor ? [selectedColor] : undefined,
           sizes: selectedSize ? [selectedSize] : undefined,
+          status: statusFilter || undefined,
         })
         setProducts(res.results)
         setTotalCount(res.count)
@@ -58,16 +63,16 @@ export default function AllProductsPage() {
       }
     }
     fetchProducts()
-  }, [page, pageSize, searchTerm, sortBy, selectedCategorySlug, selectedGender, selectedColor, selectedSize, priceRange, startLoading, stopLoading])
+  }, [page, pageSize, searchTerm, sortBy, selectedCategorySlug, selectedGender, selectedColor, selectedSize, priceRange, statusFilter, startLoading, stopLoading])
 
   // Reset to first page on key changes
   useEffect(() => {
     setPage(1)
-  }, [searchTerm, sortBy, selectedCategorySlug, selectedGender, selectedColor, selectedSize, priceRange])
+  }, [searchTerm, sortBy, selectedCategorySlug, selectedGender, selectedColor, selectedSize, priceRange, statusFilter])
 
   const breadcrumbItems = [
     { label: "Home", href: "/" },
-    { label: "All Products", href: "/products" }
+    { label: statusFilter ? statusFilter.replace(/-/g, ' ').toUpperCase() : "All Products", href: "/products" }
   ]
 
   const activeFiltersCount = [
@@ -75,7 +80,8 @@ export default function AllProductsPage() {
     selectedGender,
     selectedColor,
     selectedSize,
-    (priceRange[0] > 0 || priceRange[1] < 10000)
+    (priceRange[0] > 0 || priceRange[1] < 10000),
+    statusFilter
   ].filter(Boolean).length
 
   const handleResetFilters = () => {
@@ -84,7 +90,12 @@ export default function AllProductsPage() {
     setSelectedColor(null)
     setSelectedSize(null)
     setPriceRange([0, 10000])
+    // Note: statusFilter usually comes from URL, resetting might need a router push if we wanted to clear it here.
   }
+
+  const pageTitle = statusFilter
+    ? `SHOP ${statusFilter.replace(/-/g, ' ').toUpperCase()}`
+    : "SHOP ALL"
 
   return (
     <div className="min-h-screen flex flex-col bg-[#F9FBFC]">
@@ -97,7 +108,7 @@ export default function AllProductsPage() {
           {/* Page Header */}
           <div className="mt-8 mb-10 flex flex-col md:flex-row md:items-end justify-between gap-4">
             <div>
-              <h1 className="text-4xl font-extrabold tracking-tight mb-2">SHOP ALL</h1>
+              <h1 className="text-4xl font-extrabold tracking-tight mb-2 uppercase">{pageTitle}</h1>
               <p className="text-muted-foreground font-medium">
                 {totalCount} premium products found
               </p>
@@ -255,5 +266,13 @@ export default function AllProductsPage() {
       </main>
       <SiteFooter />
     </div>
+  )
+}
+
+export default function AllProductsPage() {
+  return (
+    <Suspense fallback={<div>Loading products...</div>}>
+      <AllProductsContent />
+    </Suspense>
   )
 }
