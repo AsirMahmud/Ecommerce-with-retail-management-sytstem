@@ -12,11 +12,35 @@ export interface Category {
     description?: string;
     parent?: number;
     product_count?: number;
+    total_stock?: number;
     children?: Category[];
     order?: number;
     gender?: string;
     created_at: string;
     updated_at: string;
+    detailed_stats?: {
+        color_breakdown: { color: string; total_stock: number }[];
+        size_breakdown: { size: string; total_stock: number }[];
+        max_inventory: { name: string | null; stock: number };
+        min_inventory: { name: string | null; stock: number };
+        performance: {
+            total_sold: number;
+            total_revenue: number;
+            best_selling_color: string | null;
+        };
+        products_detail?: {
+            id: number;
+            name: string;
+            total_stock: number;
+            size_breakdown: { size: string; total_stock: number }[];
+            color_breakdown: { color: string; total_stock: number }[];
+        }[];
+        financials?: {
+            total_investment: number;
+            expected_revenue: number;
+            potential_profit: number;
+        };
+    };
 }
 
 export interface Supplier {

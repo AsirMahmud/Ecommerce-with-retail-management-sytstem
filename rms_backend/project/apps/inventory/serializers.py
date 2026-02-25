@@ -6,12 +6,14 @@ from apps.supplier.models import Supplier
 from apps.supplier.serializers import SupplierSerializer
 
 class CategorySerializer(serializers.ModelSerializer):
+    detailed_stats = serializers.SerializerMethodField()
     product_count = serializers.SerializerMethodField()
+    total_stock = serializers.SerializerMethodField()
     children = serializers.SerializerMethodField()
 
     class Meta:
         model = Category
-        fields = ['id', 'name', 'slug', 'description', 'parent', 'created_at', 'updated_at', 'product_count', 'children']
+        fields = ['id', 'name', 'slug', 'description', 'parent', 'created_at', 'updated_at', 'product_count', 'total_stock', 'children', 'detailed_stats']
         extra_kwargs = {
             'slug': {'read_only': True},
             'parent': {'required': False, 'allow_null': True},
@@ -19,7 +21,104 @@ class CategorySerializer(serializers.ModelSerializer):
         }
 
     def get_product_count(self, obj):
-        return obj.products.count()
+        # Recursive product count including subcategories
+        all_categories = [obj.id]
+        def get_all_child_ids(cat):
+            for child in cat.children.all():
+                all_categories.append(child.id)
+                get_all_child_ids(child)
+        get_all_child_ids(obj)
+        return Product.objects.filter(category_id__in=all_categories).count()
+
+    def get_total_stock(self, obj):
+        # Recursive total stock including subcategories
+        all_categories = [obj.id]
+        def get_all_child_ids(cat):
+            for child in cat.children.all():
+                all_categories.append(child.id)
+                get_all_child_ids(child)
+        get_all_child_ids(obj)
+        from django.db.models import Sum
+        return ProductVariation.objects.filter(product__category_id__in=all_categories).aggregate(total=Sum('stock'))['total'] or 0
+
+    def get_detailed_stats(self, obj):
+        from django.db.models import Sum, Max, Min
+        from apps.sales.models import SaleItem
+        
+        # Get all products in this category (and subcategories)
+        all_categories = [obj.id]
+        def get_all_child_ids(cat):
+            for child in cat.children.all():
+                all_categories.append(child.id)
+                get_all_child_ids(child)
+        get_all_child_ids(obj)
+        
+        products = Product.objects.filter(category_id__in=all_categories)
+        
+        # Color breakdown
+        color_stats = ProductVariation.objects.filter(product__in=products).values('color').annotate(total_stock=Sum('stock')).order_by('-total_stock')
+        
+        # Size breakdown
+        size_stats = ProductVariation.objects.filter(product__in=products).values('size').annotate(total_stock=Sum('stock')).order_by('-total_stock')
+        
+        # Max/Min inventory products
+        max_stock_product = products.order_by('-stock_quantity').first()
+        min_stock_product = products.filter(stock_quantity__gt=0).order_by('stock_quantity').first()
+        
+        # Performance
+        sales = SaleItem.objects.filter(product__in=products, sale__status='completed')
+        performance = sales.aggregate(
+            total_sold=Sum('quantity'),
+            total_revenue=Sum('total')
+        )
+        
+        best_selling_color = sales.values('color').annotate(sold_qty=Sum('quantity')).order_by('-sold_qty').first()
+        
+        # Financials (new)
+        total_investment = 0
+        total_expected_revenue = 0
+        for p in products:
+            total_investment += float(p.cost_price) * p.stock_quantity
+            total_expected_revenue += float(p.selling_price) * p.stock_quantity
+            
+        financials = {
+            'total_investment': total_investment,
+            'expected_revenue': total_expected_revenue,
+            'potential_profit': total_expected_revenue - total_investment
+        }
+
+        # Product details (new)
+        product_details = []
+        for p in products.prefetch_related('variations'):
+            p_size_stats = p.variations.values('size').annotate(total_stock=Sum('stock')).order_by('size')
+            p_color_stats = p.variations.values('color').annotate(total_stock=Sum('stock')).order_by('color')
+            product_details.append({
+                'id': p.id,
+                'name': p.name,
+                'total_stock': p.stock_quantity,
+                'size_breakdown': list(p_size_stats),
+                'color_breakdown': list(p_color_stats)
+            })
+            
+        return {
+            'color_breakdown': list(color_stats),
+            'size_breakdown': list(size_stats),
+            'max_inventory': {
+                'name': max_stock_product.name if max_stock_product else None,
+                'stock': max_stock_product.stock_quantity if max_stock_product else 0
+            },
+            'min_inventory': {
+                'name': min_stock_product.name if min_stock_product else None,
+                'stock': min_stock_product.stock_quantity if min_stock_product else 0
+            },
+            'performance': {
+                'total_sold': performance['total_sold'] or 0,
+                'total_revenue': float(performance['total_revenue'] or 0),
+                'best_selling_color': best_selling_color['color'] if best_selling_color else None
+            },
+            'products_detail': product_details,
+            'financials': financials
+        }
 
     def get_children(self, obj):
         try:
@@ -829,18 +928,121 @@ class OnlineCategorySerializer(serializers.ModelSerializer):
     Serializer for OnlineCategory model.
     """
     parent_name = serializers.CharField(source='parent.name', read_only=True)
+    detailed_stats = serializers.SerializerMethodField()
+    product_count = serializers.SerializerMethodField()
+    total_stock = serializers.SerializerMethodField()
     children_count = serializers.SerializerMethodField()
     
     class Meta:
         model = OnlineCategory
         fields = [
             'id', 'name', 'slug', 'description', 'parent', 'parent_name',
-            'children_count', 'order', 'gender', 'created_at', 'updated_at'
+            'children_count', 'product_count', 'total_stock', 'order', 'gender', 'created_at', 'updated_at', 'detailed_stats'
         ]
         read_only_fields = ['id', 'slug', 'created_at', 'updated_at']
     
     def get_children_count(self, obj):
         return obj.children.count()
+
+    def get_product_count(self, obj):
+        # Recursive product count including subcategories
+        all_categories = [obj.id]
+        def get_all_child_ids(cat):
+            for child in cat.children.all():
+                all_categories.append(child.id)
+                get_all_child_ids(child)
+        get_all_child_ids(obj)
+        return Product.objects.filter(online_categories__id__in=all_categories).count()
+
+    def get_total_stock(self, obj):
+        # Recursive total stock including subcategories
+        all_categories = [obj.id]
+        def get_all_child_ids(cat):
+            for child in cat.children.all():
+                all_categories.append(child.id)
+                get_all_child_ids(child)
+        get_all_child_ids(obj)
+        from django.db.models import Sum
+        return ProductVariation.objects.filter(product__online_categories__id__in=all_categories).aggregate(total=Sum('stock'))['total'] or 0
+
+    def get_detailed_stats(self, obj):
+        from django.db.models import Sum, Max, Min
+        from apps.sales.models import SaleItem
+        
+        # Get all products in this online category (and subcategories)
+        all_categories = [obj.id]
+        def get_all_child_ids(cat):
+            for child in cat.children.all():
+                all_categories.append(child.id)
+                get_all_child_ids(child)
+        get_all_child_ids(obj)
+        
+        products = Product.objects.filter(online_categories__id__in=all_categories)
+        
+        # Color breakdown
+        color_stats = ProductVariation.objects.filter(product__in=products).values('color').annotate(total_stock=Sum('stock')).order_by('-total_stock')
+        
+        # Size breakdown
+        size_stats = ProductVariation.objects.filter(product__in=products).values('size').annotate(total_stock=Sum('stock')).order_by('-total_stock')
+        
+        # Max/Min inventory products
+        max_stock_product = products.order_by('-stock_quantity').first()
+        min_stock_product = products.filter(stock_quantity__gt=0).order_by('stock_quantity').first()
+        
+        # Performance
+        sales = SaleItem.objects.filter(product__in=products, sale__status='completed')
+        performance = sales.aggregate(
+            total_sold=Sum('quantity'),
+            total_revenue=Sum('total')
+        )
+        
+        best_selling_color = sales.values('color').annotate(sold_qty=Sum('quantity')).order_by('-sold_qty').first()
+        
+        # Financials (new)
+        total_investment = 0
+        total_expected_revenue = 0
+        for p in products:
+            total_investment += float(p.cost_price) * p.stock_quantity
+            total_expected_revenue += float(p.selling_price) * p.stock_quantity
+            
+        financials = {
+            'total_investment': total_investment,
+            'expected_revenue': total_expected_revenue,
+            'potential_profit': total_expected_revenue - total_investment
+        }
+
+        # Product details (new)
+        product_details = []
+        for p in products.prefetch_related('variations'):
+            p_size_stats = p.variations.values('size').annotate(total_stock=Sum('stock')).order_by('size')
+            p_color_stats = p.variations.values('color').annotate(total_stock=Sum('stock')).order_by('color')
+            product_details.append({
+                'id': p.id,
+                'name': p.name,
+                'total_stock': p.stock_quantity,
+                'size_breakdown': list(p_size_stats),
+                'color_breakdown': list(p_color_stats)
+            })
+            
+        return {
+            'color_breakdown': list(color_stats),
+            'size_breakdown': list(size_stats),
+            'max_inventory': {
+                'name': max_stock_product.name if max_stock_product else None,
+                'stock': max_stock_product.stock_quantity if max_stock_product else 0
+            },
+            'min_inventory': {
+                'name': min_stock_product.name if min_stock_product else None,
+                'stock': min_stock_product.stock_quantity if min_stock_product else 0
+            },
+            'performance': {
+                'total_sold': performance['total_sold'] or 0,
+                'total_revenue': float(performance['total_revenue'] or 0),
+                'best_selling_color': best_selling_color['color'] if best_selling_color else None
+            },
+            'products_detail': product_details,
+            'financials': financials
+        }
     
     def create(self, validated_data):
         # Generate slug if not provided
