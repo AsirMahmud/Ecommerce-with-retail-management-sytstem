@@ -59,6 +59,13 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
   HoverCard,
   HoverCardContent,
   HoverCardTrigger,
@@ -79,6 +86,7 @@ import { Category, Product } from "@/types/inventory";
 export default function DiscountManagementPage() {
   const [isCreating, setIsCreating] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
   const [openProductCombobox, setOpenProductCombobox] = useState(false);
   const [formData, setFormData] = useState({
     name: "",
@@ -186,6 +194,7 @@ export default function DiscountManagementPage() {
       products: [],
     });
     setSelectedProductsDetails([]);
+    setIsModalOpen(false);
   };
 
   const handleCreateDiscount = async () => {
@@ -255,6 +264,7 @@ export default function DiscountManagementPage() {
       }
 
       setEditingId(id);
+      setIsModalOpen(true);
       setProductSearch("");
     }
   };
@@ -444,406 +454,427 @@ export default function DiscountManagementPage() {
         </Alert>
 
         <div className="grid gap-8">
-          {/* Create/Edit Discount Form */}
+          {/* Discount Actions & Info */}
           <Card className="shadow-lg border-0 bg-white/80 backdrop-blur-sm">
-            <CardHeader>
-              <CardTitle className="text-2xl font-bold text-gray-900">
-                {editingId ? "Edit Discount" : isCreating ? "Create New Discount" : "Discount Management"}
-              </CardTitle>
-              <CardDescription>
-                {editingId ? "Update discount details" : isCreating ? "Add a new discount campaign" : "Manage your discount campaigns"}
-              </CardDescription>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <div>
+                <CardTitle className="text-2xl font-bold text-gray-900">
+                  Discount Overview
+                </CardTitle>
+                <CardDescription>
+                  View and manage your active discount campaigns
+                </CardDescription>
+              </div>
+              <Button
+                onClick={() => {
+                  resetForm();
+                  setIsCreating(true);
+                  setIsModalOpen(true);
+                }}
+                className="bg-gradient-to-r from-blue-500 to-indigo-500 hover:from-blue-600 hover:to-indigo-600 text-white shadow-lg"
+              >
+                <Plus className="mr-2 h-4 w-4" />
+                Create New Discount
+              </Button>
             </CardHeader>
-            <CardContent>
-              {isCreating || editingId ? (
-                <div className="space-y-6">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div className="space-y-2">
-                      <Label htmlFor="name">Discount Name</Label>
-                      <Input
-                        id="name"
-                        value={formData.name}
-                        onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                        placeholder="Enter discount name"
-                      />
-                    </div>
+          </Card>
 
-                    <div className="space-y-2">
-                      <Label htmlFor="type">Discount Type</Label>
-                      <Select
-                        value={formData.type}
-                        onValueChange={(value) => setFormData({
-                          ...formData,
-                          type: value,
-                          categories: [],
-                          onlineCategories: [],
-                          products: []
-                        })}
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select type..." />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="APP_WIDE">🌐 Global (App-Wide)</SelectItem>
-                          <SelectItem value="CATEGORY">📁 Category Discount</SelectItem>
-                          <SelectItem value="PRODUCT">📦 Product Discount</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
+          {/* Discount Form Modal */}
+          <Dialog open={isModalOpen} onOpenChange={(open) => {
+            setIsModalOpen(open);
+            if (!open) {
+              setEditingId(null);
+              setIsCreating(false);
+              resetForm();
+            }
+          }}>
+            <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+              <DialogHeader>
+                <DialogTitle className="text-2xl font-bold">
+                  {editingId ? "Edit Discount" : "Create New Discount"}
+                </DialogTitle>
+                <DialogDescription>
+                  {editingId ? "Update the details of your discount campaign." : "Fill in the details to create a new discount campaign."}
+                </DialogDescription>
+              </DialogHeader>
 
-                    {/* Category Selector - shown only for CATEGORY type */}
-                    {formData.type === "CATEGORY" && (
-                      <>
-                        <div className="space-y-2">
-                          <Label htmlFor="online-category">
-                            <FolderTree className="inline h-4 w-4 mr-1" />
-                            Online Categories
-                          </Label>
-                          <Popover>
-                            <PopoverTrigger asChild>
-                              <Button variant="outline" className="w-full justify-between h-10">
-                                {formData.onlineCategories.length > 0
-                                  ? `${formData.onlineCategories.length} selected`
-                                  : "Select online categories..."}
-                                <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                              </Button>
-                            </PopoverTrigger>
-                            <PopoverContent className="w-[300px] p-0" align="start">
-                              <Command>
-                                <CommandInput placeholder="Search online categories..." />
-                                <CommandList>
-                                  <CommandEmpty>No category found.</CommandEmpty>
-                                  <CommandGroup>
-                                    {onlineCategories.map((cat) => (
-                                      <CommandItem
-                                        key={cat.id}
-                                        onSelect={() => {
-                                          const current = [...formData.onlineCategories];
-                                          const index = current.indexOf(cat.id.toString());
-                                          if (index > -1) {
-                                            current.splice(index, 1);
-                                          } else {
-                                            current.push(cat.id.toString());
-                                          }
-                                          setFormData({ ...formData, onlineCategories: current });
-                                        }}
-                                      >
-                                        <div className="flex items-center gap-2 w-full">
-                                          <div className={cn(
-                                            "flex h-4 w-4 items-center justify-center rounded-sm border border-primary",
-                                            formData.onlineCategories.includes(cat.id.toString())
-                                              ? "bg-primary text-primary-foreground"
-                                              : "opacity-50 [&_svg]:invisible"
-                                          )}>
-                                            <Check className="h-4 w-4" />
-                                          </div>
-                                          <span>{cat.name}</span>
-                                        </div>
-                                      </CommandItem>
-                                    ))}
-                                  </CommandGroup>
-                                </CommandList>
-                              </Command>
-                            </PopoverContent>
-                          </Popover>
-                        </div>
+              <div className="space-y-6 py-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="space-y-2">
+                    <Label htmlFor="name">Discount Name</Label>
+                    <Input
+                      id="name"
+                      value={formData.name}
+                      onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                      placeholder="Enter discount name"
+                    />
+                  </div>
 
-                        <div className="space-y-2">
-                          <Label htmlFor="category">
-                            <FolderTree className="inline h-4 w-4 mr-1" />
-                            Inventory Categories
-                          </Label>
-                          <Popover>
-                            <PopoverTrigger asChild>
-                              <Button variant="outline" className="w-full justify-between h-10">
-                                {formData.categories.length > 0
-                                  ? `${formData.categories.length} selected`
-                                  : "Select inventory categories..."}
-                                <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                              </Button>
-                            </PopoverTrigger>
-                            <PopoverContent className="w-[300px] p-0" align="start">
-                              <Command>
-                                <CommandInput placeholder="Search inventory categories..." />
-                                <CommandList>
-                                  <CommandEmpty>No category found.</CommandEmpty>
-                                  <CommandGroup>
-                                    {categories.map((cat) => (
-                                      <CommandItem
-                                        key={cat.id}
-                                        onSelect={() => {
-                                          const current = [...formData.categories];
-                                          const index = current.indexOf(cat.id.toString());
-                                          if (index > -1) {
-                                            current.splice(index, 1);
-                                          } else {
-                                            current.push(cat.id.toString());
-                                          }
-                                          setFormData({ ...formData, categories: current });
-                                        }}
-                                      >
-                                        <div className="flex items-center gap-2 w-full">
-                                          <div className={cn(
-                                            "flex h-4 w-4 items-center justify-center rounded-sm border border-primary",
-                                            formData.categories.includes(cat.id.toString())
-                                              ? "bg-primary text-primary-foreground"
-                                              : "opacity-50 [&_svg]:invisible"
-                                          )}>
-                                            <Check className="h-4 w-4" />
-                                          </div>
-                                          <span>{cat.name}</span>
-                                        </div>
-                                      </CommandItem>
-                                    ))}
-                                  </CommandGroup>
-                                </CommandList>
-                              </Command>
-                            </PopoverContent>
-                          </Popover>
-                        </div>
-                      </>
-                    )}
+                  <div className="space-y-2">
+                    <Label htmlFor="type">Discount Type</Label>
+                    <Select
+                      value={formData.type}
+                      onValueChange={(value) => setFormData({
+                        ...formData,
+                        type: value,
+                        categories: [],
+                        onlineCategories: [],
+                        products: []
+                      })}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select type..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="APP_WIDE">🌐 Global (App-Wide)</SelectItem>
+                        <SelectItem value="CATEGORY">📁 Category Discount</SelectItem>
+                        <SelectItem value="PRODUCT">📦 Product Discount</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
 
-                    {/* Product Selector - Searchable Multi-select Combobox */}
-                    {formData.type === "PRODUCT" && (
-                      <div className="space-y-2 md:col-span-2">
-                        <Label htmlFor="product">
-                          <Package className="inline h-4 w-4 mr-1" />
-                          Select Products (Searchable)
+                  {/* Category Selector - shown only for CATEGORY type */}
+                  {formData.type === "CATEGORY" && (
+                    <>
+                      <div className="space-y-2">
+                        <Label htmlFor="online-category">
+                          <FolderTree className="inline h-4 w-4 mr-1" />
+                          Online Categories
                         </Label>
-                        <Popover open={openProductCombobox} onOpenChange={setOpenProductCombobox}>
+                        <Popover>
                           <PopoverTrigger asChild>
-                            <Button
-                              variant="outline"
-                              role="combobox"
-                              aria-expanded={openProductCombobox}
-                              className="w-full justify-between h-14"
-                            >
-                              {formData.products.length > 0 ? (
-                                <div className="flex items-center gap-2">
-                                  <Badge variant="secondary" className="rounded-sm px-1 font-normal lg:hidden">
-                                    {formData.products.length} selected
-                                  </Badge>
-                                  <div className="hidden space-x-1 lg:flex">
-                                    {formData.products.length > 2 ? (
-                                      <Badge variant="secondary" className="rounded-sm px-1 font-normal">
-                                        {formData.products.length} selected
-                                      </Badge>
-                                    ) : (
-                                      formData.products.map((id) => {
-                                        const prod = displayProducts.find((p) => p.id.toString() === id);
-                                        return (
-                                          <Badge variant="secondary" key={id} className="rounded-sm px-1 font-normal max-w-[150px] truncate">
-                                            {prod?.name || `Product #${id}`}
-                                          </Badge>
-                                        );
-                                      })
-                                    )}
-                                  </div>
-                                </div>
-                              ) : (
-                                "Select products..."
-                              )}
+                            <Button variant="outline" className="w-full justify-between h-10">
+                              {formData.onlineCategories.length > 0
+                                ? `${formData.onlineCategories.length} selected`
+                                : "Select online categories..."}
                               <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                             </Button>
                           </PopoverTrigger>
-                          <PopoverContent className="w-[450px] p-0" align="start">
-                            <Command shouldFilter={false}>
-                              <CommandInput
-                                placeholder="Search product by name or SKU..."
-                                value={productSearch}
-                                onValueChange={setProductSearch}
-                              />
+                          <PopoverContent className="w-[300px] p-0" align="start">
+                            <Command>
+                              <CommandInput placeholder="Search online categories..." />
                               <CommandList>
-                                <CommandEmpty>
-                                  {isFetchingProducts && !allProducts.length ? (
-                                    <div className="flex items-center justify-center p-4">
-                                      <RefreshCw className="h-4 w-4 animate-spin mr-2" />
-                                      Searching...
-                                    </div>
-                                  ) : (
-                                    "No product found."
-                                  )}
-                                </CommandEmpty>
+                                <CommandEmpty>No category found.</CommandEmpty>
                                 <CommandGroup>
-                                  {displayProducts.map((product) => (
+                                  {onlineCategories.map((cat) => (
                                     <CommandItem
-                                      key={product.id}
-                                      value={`${product.name} ${product.sku} ${product.id}`}
+                                      key={cat.id}
                                       onSelect={() => {
-                                        const current = [...formData.products];
-                                        const index = current.indexOf(product.id.toString());
+                                        const current = [...formData.onlineCategories];
+                                        const index = current.indexOf(cat.id.toString());
                                         if (index > -1) {
                                           current.splice(index, 1);
-                                          setSelectedProductsDetails(prev => prev.filter(p => p.id !== product.id));
                                         } else {
-                                          current.push(product.id.toString());
-                                          setSelectedProductsDetails(prev => {
-                                            if (!prev.find(p => p.id === product.id)) {
-                                              return [...prev, product];
-                                            }
-                                            return prev;
-                                          });
+                                          current.push(cat.id.toString());
                                         }
-                                        setFormData({ ...formData, products: current });
+                                        setFormData({ ...formData, onlineCategories: current });
                                       }}
                                     >
-                                      <HoverCard openDelay={200} closeDelay={100}>
-                                        <HoverCardTrigger asChild>
-                                          <div className="flex items-center gap-2 w-full cursor-pointer">
-                                            <div className={cn(
-                                              "flex h-4 w-4 items-center justify-center rounded-sm border border-primary",
-                                              formData.products.includes(product.id.toString())
-                                                ? "bg-primary text-primary-foreground"
-                                                : "opacity-50 [&_svg]:invisible"
-                                            )}>
-                                              <Check className="h-4 w-4" />
-                                            </div>
-                                            <div className="h-8 w-8 relative rounded overflow-hidden border shrink-0">
-                                              <img
-                                                src={getProductImage(product)}
-                                                alt={product.name}
-                                                className="h-full w-full object-cover"
-                                              />
-                                            </div>
-                                            <div className="flex flex-col">
-                                              <span className="font-medium text-sm">{product.name}</span>
-                                              <span className="text-xs text-muted-foreground">SKU: {product.sku}</span>
-                                            </div>
-                                          </div>
-                                        </HoverCardTrigger>
-                                        <HoverCardContent className="w-80 p-0" side="right" align="start">
-                                          <div className="flex flex-col">
-                                            <div className="relative w-full aspect-square overflow-hidden bg-white rounded-t-md">
-                                              <img
-                                                src={getProductImage(product)}
-                                                alt={product.name}
-                                                className="w-full h-full object-contain p-2"
-                                              />
-                                            </div>
-                                            <div className="p-4 bg-slate-50 border-t">
-                                              <h4 className="font-semibold text-sm">{product.name}</h4>
-                                              <p className="text-xs text-muted-foreground mb-2">SKU: {product.sku}</p>
-                                              <div className="grid grid-cols-2 gap-2 text-xs">
-                                                <div className="flex flex-col">
-                                                  <span className="text-muted-foreground">Price</span>
-                                                  <span className="font-medium">৳{product.selling_price}</span>
-                                                </div>
-                                                <div className="flex flex-col">
-                                                  <span className="text-muted-foreground">Stock</span>
-                                                  <span className="font-medium">{product.stock_quantity}</span>
-                                                </div>
-                                              </div>
-                                            </div>
-                                          </div>
-                                        </HoverCardContent>
-                                      </HoverCard>
+                                      <div className="flex items-center gap-2 w-full">
+                                        <div className={cn(
+                                          "flex h-4 w-4 items-center justify-center rounded-sm border border-primary",
+                                          formData.onlineCategories.includes(cat.id.toString())
+                                            ? "bg-primary text-primary-foreground"
+                                            : "opacity-50 [&_svg]:invisible"
+                                        )}>
+                                          <Check className="h-4 w-4" />
+                                        </div>
+                                        <span>{cat.name}</span>
+                                      </div>
                                     </CommandItem>
                                   ))}
                                 </CommandGroup>
-                                {hasMoreProducts && (
-                                  <div ref={observerTarget} className="flex justify-center p-4">
-                                    <RefreshCw className="h-4 w-4 animate-spin text-muted-foreground" />
-                                  </div>
-                                )}
                               </CommandList>
                             </Command>
                           </PopoverContent>
                         </Popover>
                       </div>
-                    )}
 
-                    <div className="space-y-2">
-                      <Label htmlFor="value">Discount Value (%)</Label>
-                      <div className="relative">
-                        <Input
-                          id="value"
-                          type="number"
-                          value={formData.value}
-                          onChange={(e) => setFormData({ ...formData, value: e.target.value })}
-                          placeholder="Enter discount percentage"
-                          className="pl-10"
-                          min="1"
-                          max="100"
-                        />
-                        <Percent className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                      <div className="space-y-2">
+                        <Label htmlFor="category">
+                          <FolderTree className="inline h-4 w-4 mr-1" />
+                          Inventory Categories
+                        </Label>
+                        <Popover>
+                          <PopoverTrigger asChild>
+                            <Button variant="outline" className="w-full justify-between h-10">
+                              {formData.categories.length > 0
+                                ? `${formData.categories.length} selected`
+                                : "Select inventory categories..."}
+                              <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                            </Button>
+                          </PopoverTrigger>
+                          <PopoverContent className="w-[300px] p-0" align="start">
+                            <Command>
+                              <CommandInput placeholder="Search inventory categories..." />
+                              <CommandList>
+                                <CommandEmpty>No category found.</CommandEmpty>
+                                <CommandGroup>
+                                  {categories.map((cat) => (
+                                    <CommandItem
+                                      key={cat.id}
+                                      onSelect={() => {
+                                        const current = [...formData.categories];
+                                        const index = current.indexOf(cat.id.toString());
+                                        if (index > -1) {
+                                          current.splice(index, 1);
+                                        } else {
+                                          current.push(cat.id.toString());
+                                        }
+                                        setFormData({ ...formData, categories: current });
+                                      }}
+                                    >
+                                      <div className="flex items-center gap-2 w-full">
+                                        <div className={cn(
+                                          "flex h-4 w-4 items-center justify-center rounded-sm border border-primary",
+                                          formData.categories.includes(cat.id.toString())
+                                            ? "bg-primary text-primary-foreground"
+                                            : "opacity-50 [&_svg]:invisible"
+                                        )}>
+                                          <Check className="h-4 w-4" />
+                                        </div>
+                                        <span>{cat.name}</span>
+                                      </div>
+                                    </CommandItem>
+                                  ))}
+                                </CommandGroup>
+                              </CommandList>
+                            </Command>
+                          </PopoverContent>
+                        </Popover>
                       </div>
+                    </>
+                  )}
+
+                  {/* Product Selector - Searchable Multi-select Combobox */}
+                  {formData.type === "PRODUCT" && (
+                    <div className="space-y-2 md:col-span-2">
+                      <Label htmlFor="product">
+                        <Package className="inline h-4 w-4 mr-1" />
+                        Select Products (Searchable)
+                      </Label>
+                      <Popover open={openProductCombobox} onOpenChange={setOpenProductCombobox}>
+                        <PopoverTrigger asChild>
+                          <Button
+                            variant="outline"
+                            role="combobox"
+                            aria-expanded={openProductCombobox}
+                            className="w-full justify-between h-14"
+                          >
+                            {formData.products.length > 0 ? (
+                              <div className="flex items-center gap-2">
+                                <Badge variant="secondary" className="rounded-sm px-1 font-normal lg:hidden">
+                                  {formData.products.length} selected
+                                </Badge>
+                                <div className="hidden space-x-1 lg:flex">
+                                  {formData.products.length > 2 ? (
+                                    <Badge variant="secondary" className="rounded-sm px-1 font-normal">
+                                      {formData.products.length} selected
+                                    </Badge>
+                                  ) : (
+                                    formData.products.map((id) => {
+                                      const prod = displayProducts.find((p) => p.id.toString() === id);
+                                      return (
+                                        <Badge variant="secondary" key={id} className="rounded-sm px-1 font-normal max-w-[150px] truncate">
+                                          {prod?.name || `Product #${id}`}
+                                        </Badge>
+                                      );
+                                    })
+                                  )}
+                                </div>
+                              </div>
+                            ) : (
+                              "Select products..."
+                            )}
+                            <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-[450px] p-0" align="start">
+                          <Command shouldFilter={false}>
+                            <CommandInput
+                              placeholder="Search product by name or SKU..."
+                              value={productSearch}
+                              onValueChange={setProductSearch}
+                            />
+                            <CommandList>
+                              <CommandEmpty>
+                                {isFetchingProducts && !allProducts.length ? (
+                                  <div className="flex items-center justify-center p-4">
+                                    <RefreshCw className="h-4 w-4 animate-spin mr-2" />
+                                    Searching...
+                                  </div>
+                                ) : (
+                                  "No product found."
+                                )}
+                              </CommandEmpty>
+                              <CommandGroup>
+                                {displayProducts.map((product) => (
+                                  <CommandItem
+                                    key={product.id}
+                                    value={`${product.name} ${product.sku} ${product.id}`}
+                                    onSelect={() => {
+                                      const current = [...formData.products];
+                                      const index = current.indexOf(product.id.toString());
+                                      if (index > -1) {
+                                        current.splice(index, 1);
+                                        setSelectedProductsDetails(prev => prev.filter(p => p.id !== product.id));
+                                      } else {
+                                        current.push(product.id.toString());
+                                        setSelectedProductsDetails(prev => {
+                                          if (!prev.find(p => p.id === product.id)) {
+                                            return [...prev, product];
+                                          }
+                                          return prev;
+                                        });
+                                      }
+                                      setFormData({ ...formData, products: current });
+                                    }}
+                                  >
+                                    <HoverCard openDelay={200} closeDelay={100}>
+                                      <HoverCardTrigger asChild>
+                                        <div className="flex items-center gap-2 w-full cursor-pointer">
+                                          <div className={cn(
+                                            "flex h-4 w-4 items-center justify-center rounded-sm border border-primary",
+                                            formData.products.includes(product.id.toString())
+                                              ? "bg-primary text-primary-foreground"
+                                              : "opacity-50 [&_svg]:invisible"
+                                          )}>
+                                            <Check className="h-4 w-4" />
+                                          </div>
+                                          <div className="h-8 w-8 relative rounded overflow-hidden border shrink-0">
+                                            <img
+                                              src={getProductImage(product)}
+                                              alt={product.name}
+                                              className="h-full w-full object-cover"
+                                            />
+                                          </div>
+                                          <div className="flex flex-col">
+                                            <span className="font-medium text-sm">{product.name}</span>
+                                            <span className="text-xs text-muted-foreground">SKU: {product.sku}</span>
+                                          </div>
+                                        </div>
+                                      </HoverCardTrigger>
+                                      <HoverCardContent className="w-80 p-0" side="right" align="start">
+                                        <div className="flex flex-col">
+                                          <div className="relative w-full aspect-square overflow-hidden bg-white rounded-t-md">
+                                            <img
+                                              src={getProductImage(product)}
+                                              alt={product.name}
+                                              className="w-full h-full object-contain p-2"
+                                            />
+                                          </div>
+                                          <div className="p-4 bg-slate-50 border-t">
+                                            <h4 className="font-semibold text-sm">{product.name}</h4>
+                                            <p className="text-xs text-muted-foreground mb-2">SKU: {product.sku}</p>
+                                            <div className="grid grid-cols-2 gap-2 text-xs">
+                                              <div className="flex flex-col">
+                                                <span className="text-muted-foreground">Price</span>
+                                                <span className="font-medium">৳{product.selling_price}</span>
+                                              </div>
+                                              <div className="flex flex-col">
+                                                <span className="text-muted-foreground">Stock</span>
+                                                <span className="font-medium">{product.stock_quantity}</span>
+                                              </div>
+                                            </div>
+                                          </div>
+                                        </div>
+                                      </HoverCardContent>
+                                    </HoverCard>
+                                  </CommandItem>
+                                ))}
+                              </CommandGroup>
+                              {hasMoreProducts && (
+                                <div ref={observerTarget} className="flex justify-center p-4">
+                                  <RefreshCw className="h-4 w-4 animate-spin text-muted-foreground" />
+                                </div>
+                              )}
+                            </CommandList>
+                          </Command>
+                        </PopoverContent>
+                      </Popover>
                     </div>
+                  )}
 
-                    <div className="space-y-2">
-                      <Label htmlFor="start-date">Start Date</Label>
-                      <div className="relative">
-                        <Input
-                          id="start-date"
-                          type="date"
-                          value={formData.startDate}
-                          onChange={(e) => setFormData({ ...formData, startDate: e.target.value })}
-                          className="pl-10"
-                        />
-                        <Calendar className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-                      </div>
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label htmlFor="end-date">End Date</Label>
-                      <div className="relative">
-                        <Input
-                          id="end-date"
-                          type="date"
-                          value={formData.endDate}
-                          onChange={(e) => setFormData({ ...formData, endDate: e.target.value })}
-                          className="pl-10"
-                        />
-                        <Calendar className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-                      </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="value">Discount Value (%)</Label>
+                    <div className="relative">
+                      <Input
+                        id="value"
+                        type="number"
+                        value={formData.value}
+                        onChange={(e) => setFormData({ ...formData, value: e.target.value })}
+                        placeholder="Enter discount percentage"
+                        className="pl-10"
+                        min="1"
+                        max="100"
+                      />
+                      <Percent className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
                     </div>
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="description">Description</Label>
-                    <Textarea
-                      id="description"
-                      value={formData.description}
-                      onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                      placeholder="Enter discount description"
-                      rows={3}
-                    />
+                    <Label htmlFor="start-date">Start Date</Label>
+                    <div className="relative">
+                      <Input
+                        id="start-date"
+                        type="date"
+                        value={formData.startDate}
+                        onChange={(e) => setFormData({ ...formData, startDate: e.target.value })}
+                        className="pl-10"
+                      />
+                      <Calendar className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                    </div>
                   </div>
 
-                  <div className="flex justify-end space-x-2">
-                    <Button
-                      variant="outline"
-                      onClick={() => {
-                        setIsCreating(false);
-                        setEditingId(null);
-                        resetForm();
-                      }}
-                    >
-                      <X className="mr-2 h-4 w-4" />
-                      Cancel
-                    </Button>
-                    <Button
-                      onClick={editingId ? handleUpdateDiscount : handleCreateDiscount}
-                      className="bg-gradient-to-r from-blue-500 to-indigo-500 hover:from-blue-600 hover:to-indigo-600 text-white shadow-lg"
-                    >
-                      <Save className="mr-2 h-4 w-4" />
-                      {editingId ? "Update Discount" : "Create Discount"}
-                    </Button>
+                  <div className="space-y-2">
+                    <Label htmlFor="end-date">End Date</Label>
+                    <div className="relative">
+                      <Input
+                        id="end-date"
+                        type="date"
+                        value={formData.endDate}
+                        onChange={(e) => setFormData({ ...formData, endDate: e.target.value })}
+                        className="pl-10"
+                      />
+                      <Calendar className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                    </div>
                   </div>
                 </div>
-              ) : (
-                <div className="flex justify-end">
+
+                <div className="space-y-2">
+                  <Label htmlFor="description">Description</Label>
+                  <Textarea
+                    id="description"
+                    value={formData.description}
+                    onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                    placeholder="Enter discount description"
+                    rows={3}
+                  />
+                </div>
+
+                <div className="flex justify-end space-x-2 pt-4 border-t">
                   <Button
-                    onClick={() => setIsCreating(true)}
+                    variant="outline"
+                    onClick={() => {
+                      setIsCreating(false);
+                      setEditingId(null);
+                      resetForm();
+                    }}
+                  >
+                    <X className="mr-2 h-4 w-4" />
+                    Cancel
+                  </Button>
+                  <Button
+                    onClick={editingId ? handleUpdateDiscount : handleCreateDiscount}
                     className="bg-gradient-to-r from-blue-500 to-indigo-500 hover:from-blue-600 hover:to-indigo-600 text-white shadow-lg"
                   >
-                    <Plus className="mr-2 h-4 w-4" />
-                    Create New Discount
+                    <Save className="mr-2 h-4 w-4" />
+                    {editingId ? "Update Discount" : "Create Discount"}
                   </Button>
                 </div>
-              )}
-            </CardContent>
-          </Card>
+              </div>
+            </DialogContent>
+          </Dialog>
 
           {/* Discounts List */}
           <Card className="shadow-lg border-0 bg-white/80 backdrop-blur-sm">
