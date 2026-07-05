@@ -184,6 +184,8 @@ export function OrderDetailsSheet({ order, isOpen, onClose, onRefresh, onEdit, o
                                 Billing details
                             </div>
                             <div className="space-y-2">
+                                {Number(order.automatic_discount_amount || 0) > 0 && <div className="flex justify-between text-sm text-red-600"><span>Automatic discount</span><span>-৳{Number(order.automatic_discount_amount).toLocaleString()}</span></div>}
+                                {Number(order.coupon_discount_amount || 0) > 0 && <div className="flex justify-between text-sm text-green-700"><span>Coupon ({order.coupon_code})</span><span>-৳{Number(order.coupon_discount_amount).toLocaleString()}</span></div>}
                                 <div className="flex justify-between text-sm">
                                     <span className="text-slate-500">Subtotal</span>
                                     <span className="font-medium">৳{(Number(order.total_amount) - Number(order.delivery_charge || 0)).toLocaleString()}</span>

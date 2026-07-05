@@ -21,6 +21,12 @@ export interface OnlinePreorder {
   delivery_charge?: number | string;
   delivery_method?: string;
   total_amount: number | string;
+  coupon_code?: string;
+  coupon_interaction_mode?: string;
+  original_subtotal?: number | string;
+  automatic_discount_amount?: number | string;
+  coupon_discount_amount?: number | string;
+  final_merchandise_subtotal?: number | string;
   status: string;
   notes?: string;
   expected_delivery_date?: string;

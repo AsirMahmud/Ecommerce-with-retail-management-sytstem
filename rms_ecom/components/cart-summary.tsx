@@ -9,6 +9,8 @@ import { useCartStore } from "@/hooks/useCartStore"
 import { ecommerceApi, EcommerceProduct } from "@/lib/api"
 import { useLoading } from "@/hooks/useLoading"
 import { sendGTMEvent, normalizeProductId } from "@/lib/gtm"
+import { useCheckoutStore } from "@/hooks/useCheckoutStore"
+import { CouponInput } from "@/components/coupon-input"
 
 interface CartPricing {
   subtotal: number
@@ -26,6 +28,10 @@ interface CartPricing {
     variant?: { color?: string | null; size?: string | null };
   }>
   products: EcommerceProduct[]
+  original_subtotal: number
+  automatic_discount_amount: number
+  coupon_discount_amount: number
+  coupon: { code: string } | null
 }
 
 export function CartSummary() {
@@ -34,6 +40,8 @@ export function CartSummary() {
   const [cartPricing, setCartPricing] = useState<CartPricing | null>(null)
   const [localLoading, setLocalLoading] = useState(false)
   const { startLoading, stopLoading } = useLoading()
+  const { couponCode, clearCoupon } = useCheckoutStore()
+  const [couponError, setCouponError] = useState<string | null>(null)
 
   const itemCount = useMemo(() => items.reduce((n, it) => n + it.quantity, 0), [items])
 
@@ -71,7 +79,8 @@ export function CartSummary() {
           }
         })
 
-        const response = await ecommerceApi.priceCart(normalizedItems)
+        const response = await ecommerceApi.priceCart(normalizedItems, couponCode)
+        if (couponCode) setCouponError(null)
         // Convert all values to numbers to ensure proper type handling
         // Note: subtotal from backend is already discounted (sum of final prices)
         setCartPricing({
@@ -83,10 +92,18 @@ export function CartSummary() {
             updated_at: response.delivery.updated_at || ""
           },
           items: response.items,
-          products: (response.products || []) as unknown as EcommerceProduct[]
+          products: (response.products || []) as unknown as EcommerceProduct[],
+          original_subtotal: Number(response.original_subtotal) || 0,
+          automatic_discount_amount: Number(response.automatic_discount_amount) || 0,
+          coupon_discount_amount: Number(response.coupon_discount_amount) || 0,
+          coupon: response.coupon,
         })
       } catch (error) {
         console.error("Failed to fetch cart pricing:", error)
+        if (couponCode) {
+          setCouponError(error instanceof Error ? error.message : "Invalid coupon")
+          clearCoupon()
+        }
       } finally {
         stopLoading()
         setLocalLoading(false)
@@ -94,7 +111,7 @@ export function CartSummary() {
     }
 
     fetchCartPricing()
-  }, [items])
+  }, [items, couponCode])
 
   // Helper function to safely format numbers
   const formatPrice = (value: number | string | null | undefined): string => {
@@ -176,6 +193,9 @@ export function CartSummary() {
   return (
     <div className="border rounded-lg p-6 bg-card">
       <h2 className="text-xl font-bold mb-6">Cart summary</h2>
+      <div className="mb-6">
+        <CouponInput appliedCode={cartPricing?.coupon?.code} error={couponError} />
+      </div>
 
       {/* Delivery Options */}
       <div className="mb-6">
@@ -227,6 +247,18 @@ export function CartSummary() {
 
       {/* Price Summary */}
       <div className="space-y-3 pt-4 border-t">
+        {(cartPricing?.automatic_discount_amount || 0) > 0 && (
+          <div className="flex justify-between text-base text-red-600">
+            <span>Automatic discount</span>
+            <span>-৳{formatPrice(cartPricing?.automatic_discount_amount)}</span>
+          </div>
+        )}
+        {(cartPricing?.coupon_discount_amount || 0) > 0 && (
+          <div className="flex justify-between text-base text-green-700">
+            <span>Coupon ({cartPricing?.coupon?.code})</span>
+            <span>-৳{formatPrice(cartPricing?.coupon_discount_amount)}</span>
+          </div>
+        )}
         <div className="flex justify-between text-base">
           <span className="text-muted-foreground">Subtotal</span>
           {localLoading ? (
@@ -236,7 +268,7 @@ export function CartSummary() {
           )}
         </div>
 
-        {discountTotal > 0 && (
+        {false && discountTotal > 0 && (
           <div className="flex justify-between text-base text-red-600">
             <span className="font-medium">Discount</span>
             {localLoading ? (

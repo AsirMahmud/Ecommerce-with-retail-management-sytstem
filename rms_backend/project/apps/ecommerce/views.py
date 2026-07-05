@@ -6,13 +6,13 @@ from rest_framework.views import APIView
 from rest_framework.parsers import MultiPartParser, FormParser
 from django.utils import timezone
 from django.db.models import Q
-from django.db import IntegrityError
+from django.db import IntegrityError, transaction
 from datetime import datetime
-from .models import Discount, Brand, HomePageSettings, DeliverySettings, HeroSlide, PromotionalModal, ProductStatus
+from .models import Discount, Coupon, CouponRedemption, Brand, HomePageSettings, DeliverySettings, HeroSlide, PromotionalModal, ProductStatus
 from .serializers import (
     DiscountSerializer, DiscountListSerializer, BrandSerializer, 
     HomePageSettingsSerializer, DeliverySettingsSerializer, 
-    HeroSlideSerializer, PromotionalModalSerializer, ProductStatusSerializer
+    HeroSlideSerializer, PromotionalModalSerializer, ProductStatusSerializer, CouponSerializer
 )
 from django.utils.text import slugify
 from apps.inventory.models import Product, ProductVariation, Gallery, Image, OnlineCategory
@@ -23,6 +23,27 @@ from apps.online_preorder.serializers import OnlinePreorderSerializer, OnlinePre
 from django.db.models import Sum
 from decimal import Decimal
 from .discount_utils import calculate_discounted_price
+from .pricing import price_cart, PricingError
+
+
+class CouponViewSet(viewsets.ModelViewSet):
+    queryset = Coupon.objects.all()
+    serializer_class = CouponSerializer
+    permission_classes = [IsAuthenticated]
+
+    @action(detail=True, methods=['post'])
+    def activate(self, request, pk=None):
+        coupon = self.get_object()
+        coupon.is_active = True
+        coupon.save(update_fields=['is_active', 'updated_at'])
+        return Response(self.get_serializer(coupon).data)
+
+    @action(detail=True, methods=['post'])
+    def deactivate(self, request, pk=None):
+        coupon = self.get_object()
+        coupon.is_active = False
+        coupon.save(update_fields=['is_active', 'updated_at'])
+        return Response(self.get_serializer(coupon).data)
 
 
 class DiscountViewSet(viewsets.ModelViewSet):
@@ -657,6 +678,22 @@ class PublicCartPriceView(APIView):
         items = request.data.get('items') or []
         if not isinstance(items, list):
             return Response({'detail': 'Invalid items'}, status=status.HTTP_400_BAD_REQUEST)
+        try:
+            pricing = price_cart(items, request.data.get('coupon_code'))
+        except PricingError as exc:
+            return Response({'detail': str(exc), 'coupon': {'valid': False, 'error': str(exc)}}, status=status.HTTP_400_BAD_REQUEST)
+        delivery = DeliverySettings.load()
+        product_ids = [item['productId'] for item in pricing['items']]
+        products = Product.objects.filter(id__in=product_ids).prefetch_related(
+            'online_categories', 'galleries__images', 'variations'
+        )
+        public_pricing = {key: value for key, value in pricing.items() if key != 'coupon_object'}
+        public_pricing['items'] = [
+            {**item, 'unit_price': item['final_unit_price']} for item in pricing['items']
+        ]
+        public_pricing['products'] = EcommerceProductSerializer(products, many=True, context={'request': request}).data
+        public_pricing['delivery'] = DeliverySettingsSerializer(delivery).data
+        return Response(public_pricing)
 
         product_ids = []
         normalized = []
@@ -842,7 +879,7 @@ class CreateOnlinePreorderView(APIView):
 
         # Validate each item
         for item in items:
-            required_fields = ['product_id', 'size', 'color', 'quantity', 'unit_price', 'discount']
+            required_fields = ['product_id', 'size', 'color', 'quantity']
             for field in required_fields:
                 if field not in item:
                     return Response(
@@ -916,45 +953,54 @@ class CreateOnlinePreorderView(APIView):
         # Build shipping address JSON
         shipping_address_data = request.data.get('shipping_address', {})
         
-        # Calculate total amount
-        items_subtotal = sum(
-            float(item.get('quantity', 0)) * float(item.get('unit_price', 0)) - float(item.get('discount', 0) or 0)
-            for item in items
-        )
-        delivery_charge = float(request.data.get('delivery_charge', 0) or 0)
-        total_amount = Decimal(str(items_subtotal + delivery_charge))
-
-        # Create online preorder (standalone model)
-        preorder_data = {
-            'customer_name': customer_name,
-            'customer_phone': customer_phone,
-            'customer_email': customer_email if customer_email else '',
-            'items': items,
-            'shipping_address': shipping_address_data if shipping_address_data else None,
-            'delivery_charge': Decimal(str(delivery_charge)),
-            'delivery_method': request.data.get('delivery_method', ''),
-            'total_amount': total_amount,
-            'notes': request.data.get('notes', '') or '',
-            'status': 'PENDING',
-        }
+        delivery = DeliverySettings.load()
+        delivery_method = request.data.get('delivery_method', '')
+        if delivery_method == 'Inside Dhaka':
+            delivery_charge = Decimal(str(delivery.inside_dhaka_charge))
+        elif delivery_method == 'Inside Gazipur':
+            delivery_charge = Decimal(str(delivery.inside_gazipur_charge))
+        else:
+            delivery_charge = Decimal(str(delivery.outside_dhaka_charge))
 
         # Handle expected_delivery_date if provided
         expected_delivery_date = request.data.get('expected_delivery_date')
         if expected_delivery_date:
             try:
-                # Parse date string if it's a string
                 if isinstance(expected_delivery_date, str):
-                    preorder_data['expected_delivery_date'] = datetime.strptime(expected_delivery_date, '%Y-%m-%d').date()
-                else:
-                    preorder_data['expected_delivery_date'] = expected_delivery_date
+                    expected_delivery_date = datetime.strptime(expected_delivery_date, '%Y-%m-%d').date()
             except (ValueError, TypeError):
-                # Invalid date format, skip it
-                pass
+                expected_delivery_date = None
 
-        serializer = OnlinePreorderCreateSerializer(data=preorder_data)
-        if not serializer.is_valid():
-            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-        online_preorder = serializer.save()
+        try:
+            with transaction.atomic():
+                pricing = price_cart(items, request.data.get('coupon_code'), lock_coupon=True)
+                coupon = pricing['coupon_object']
+                preorder_data = {
+                    'customer_name': customer_name, 'customer_phone': customer_phone,
+                    'customer_email': customer_email if customer_email else '',
+                    'items': pricing['items'],
+                    'shipping_address': shipping_address_data if shipping_address_data else None,
+                    'delivery_charge': delivery_charge, 'delivery_method': delivery_method,
+                    'total_amount': pricing['subtotal'] + delivery_charge,
+                    'notes': request.data.get('notes', '') or '', 'status': 'PENDING',
+                    'coupon': coupon.pk if coupon else None,
+                    'coupon_code': coupon.code if coupon else '',
+                    'coupon_interaction_mode': coupon.interaction_mode if coupon else '',
+                    'original_subtotal': pricing['original_subtotal'],
+                    'automatic_discount_amount': pricing['automatic_discount_amount'],
+                    'coupon_discount_amount': pricing['coupon_discount_amount'],
+                    'final_merchandise_subtotal': pricing['subtotal'],
+                }
+                if expected_delivery_date:
+                    preorder_data['expected_delivery_date'] = expected_delivery_date
+                serializer = OnlinePreorderCreateSerializer(data=preorder_data)
+                if not serializer.is_valid():
+                    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+                online_preorder = serializer.save()
+                if coupon:
+                    CouponRedemption.objects.create(coupon=coupon, order=online_preorder)
+        except PricingError as exc:
+            return Response({'detail': str(exc), 'coupon': {'valid': False, 'error': str(exc)}}, status=status.HTTP_400_BAD_REQUEST)
         
         # Send notification alerts
         try:

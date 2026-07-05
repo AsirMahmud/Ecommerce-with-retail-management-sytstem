@@ -107,6 +107,7 @@ const mainNavItems = [
       { title: "Home Page Settings", href: "/ecommerce-settings/home-page" },
       { title: "Hero Settings", href: "/ecommerce-settings/hero-slides" },
       { title: "Discount Management", href: "/ecommerce-settings/discounts" },
+      { title: "Coupon Management", href: "/ecommerce-settings/coupons" },
       { title: "Product Status", href: "/ecommerce-settings/product-status" },
       { title: "Delivery Charges", href: "/ecommerce-settings/delivery-charges" },
       { title: "Promotional Modals", href: "/ecommerce-settings/promotional-modals" },

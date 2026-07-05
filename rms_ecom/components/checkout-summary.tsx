@@ -9,9 +9,14 @@ import { sendGTMEvent, normalizeProductId } from "@/lib/gtm"
 import { getImageUrl } from "@/lib/utils"
 import { getCheckoutItems, type CartItem } from "@/lib/cart"
 import { useLoading } from "@/hooks/useLoading"
+import { CouponInput } from "@/components/coupon-input"
 
 interface CartPricing {
   subtotal: number
+  original_subtotal: number
+  automatic_discount_amount: number
+  coupon_discount_amount: number
+  coupon: { code: string } | null
   delivery: {
     inside_dhaka_charge: number
     inside_gazipur_charge: number
@@ -59,7 +64,7 @@ interface CheckoutSummaryProps {
 
 export function CheckoutSummary({ className, showTitle = true }: CheckoutSummaryProps) {
   const cartStoreItems = useCartStore((s) => s.items)
-  const { deliveryMethod, setDeliveryMethod } = useCheckoutStore()
+  const { deliveryMethod, setDeliveryMethod, couponCode, clearCoupon } = useCheckoutStore()
   const [cartPricing, setCartPricing] = useState<CartPricing | null>(null)
   const [pricedItems, setPricedItems] = useState<PricedCartItem[]>([])
   const [products, setProducts] = useState<ProductInfo[]>([])
@@ -67,6 +72,7 @@ export function CheckoutSummary({ className, showTitle = true }: CheckoutSummary
   const hasSentGTM = useRef(false)
   const { startLoading, stopLoading } = useLoading()
   const [items, setItems] = useState<CartItem[]>([])
+  const [couponError, setCouponError] = useState<string | null>(null)
 
   // Get checkout items (direct checkout or cart)
   useEffect(() => {
@@ -110,15 +116,24 @@ export function CheckoutSummary({ className, showTitle = true }: CheckoutSummary
           }
         })
 
-        const response = await ecommerceApi.priceCart(normalizedItems)
+        const response = await ecommerceApi.priceCart(normalizedItems, couponCode)
+        if (couponCode) setCouponError(null)
         setCartPricing({
           subtotal: response.subtotal,
+          original_subtotal: response.original_subtotal,
+          automatic_discount_amount: response.automatic_discount_amount,
+          coupon_discount_amount: response.coupon_discount_amount,
+          coupon: response.coupon,
           delivery: response.delivery
         })
         setPricedItems(response.items || [])
         setProducts(response.products || [])
       } catch (error) {
         console.error("Failed to fetch cart pricing:", error)
+        if (couponCode) {
+          setCouponError(error instanceof Error ? error.message : "Invalid coupon")
+          clearCoupon()
+        }
         setPricedItems([])
       } finally {
         stopLoading()
@@ -127,7 +142,7 @@ export function CheckoutSummary({ className, showTitle = true }: CheckoutSummary
     }
 
     fetchCartPricing()
-  }, [items, startLoading, stopLoading])
+  }, [items, couponCode, startLoading, stopLoading])
 
   // GTM Begin Checkout Event
   useEffect(() => {
@@ -205,6 +220,9 @@ export function CheckoutSummary({ className, showTitle = true }: CheckoutSummary
   return (
     <div className={className || "border rounded-lg p-6 bg-card sticky top-24"}>
       {showTitle && <h2 className="text-xl font-bold mb-6">Order Summary</h2>}
+      <div className="mb-6">
+        <CouponInput appliedCode={cartPricing?.coupon?.code} error={couponError} />
+      </div>
 
       {/* Cart Items */}
       <div className="space-y-4 mb-6 max-h-64 overflow-y-auto">
@@ -378,6 +396,18 @@ export function CheckoutSummary({ className, showTitle = true }: CheckoutSummary
 
       {/* Price Summary */}
       <div className="space-y-3 pt-4 border-t">
+        {(cartPricing?.automatic_discount_amount || 0) > 0 && (
+          <div className="flex justify-between text-base text-red-600">
+            <span>Automatic discount</span>
+            <span>-৳{formatPrice(cartPricing?.automatic_discount_amount)}</span>
+          </div>
+        )}
+        {(cartPricing?.coupon_discount_amount || 0) > 0 && (
+          <div className="flex justify-between text-base text-green-700">
+            <span>Coupon ({cartPricing?.coupon?.code})</span>
+            <span>-৳{formatPrice(cartPricing?.coupon_discount_amount)}</span>
+          </div>
+        )}
         <div className="flex justify-between text-base">
           <span className="text-muted-foreground">Subtotal</span>
           {localLoading ? (

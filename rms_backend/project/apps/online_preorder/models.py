@@ -21,6 +21,13 @@ class OnlinePreorder(models.Model):
     delivery_charge = models.DecimalField(max_digits=10, decimal_places=2, default=Decimal('0.00'))
     delivery_method = models.CharField(max_length=30, null=True, blank=True)
     total_amount = models.DecimalField(max_digits=10, decimal_places=2, default=Decimal('0.00'))
+    coupon = models.ForeignKey('ecommerce.Coupon', on_delete=models.SET_NULL, null=True, blank=True, related_name='orders')
+    coupon_code = models.CharField(max_length=50, blank=True)
+    coupon_interaction_mode = models.CharField(max_length=10, blank=True)
+    original_subtotal = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal('0.00'))
+    automatic_discount_amount = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal('0.00'))
+    coupon_discount_amount = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal('0.00'))
+    final_merchandise_subtotal = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal('0.00'))
     status = models.CharField(max_length=12, choices=STATUS_CHOICES, default='PENDING')
     notes = models.TextField(blank=True)
     expected_delivery_date = models.DateField(null=True, blank=True)
@@ -44,7 +51,10 @@ class OnlinePreorder(models.Model):
                 for item in self.items
             )
             delivery = float(self.delivery_charge or 0)
-            self.total_amount = Decimal(str(items_subtotal + delivery))
+            merchandise_total = self.final_merchandise_subtotal if (
+                self.coupon_id or self.final_merchandise_subtotal > 0
+            ) else Decimal(str(items_subtotal))
+            self.total_amount = merchandise_total + Decimal(str(delivery))
             # Best-effort denormalization without inventory dependency
             total_qty = 0
             for item in self.items:

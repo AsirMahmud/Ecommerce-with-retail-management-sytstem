@@ -128,6 +128,51 @@ class Discount(models.Model):
             raise ValidationError("End date must be after start date")
 
 
+class Coupon(models.Model):
+    DISCOUNT_TYPE_CHOICES = [('PERCENTAGE', 'Percentage'), ('FIXED', 'Fixed amount')]
+    INTERACTION_CHOICES = [
+        ('STACK', 'Stack after automatic discounts'),
+        ('BEST', 'Best discount only'),
+        ('REPLACE', 'Replace automatic discounts'),
+    ]
+
+    name = models.CharField(max_length=200)
+    code = models.CharField(max_length=50, unique=True)
+    discount_type = models.CharField(max_length=12, choices=DISCOUNT_TYPE_CHOICES)
+    value = models.DecimalField(max_digits=12, decimal_places=2, validators=[MinValueValidator(Decimal('0.01'))])
+    interaction_mode = models.CharField(max_length=10, choices=INTERACTION_CHOICES, default='STACK')
+    start_date = models.DateTimeField()
+    end_date = models.DateTimeField()
+    minimum_spend = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal('0.00'))
+    maximum_discount = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
+    usage_limit = models.PositiveIntegerField(null=True, blank=True)
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['-created_at']
+
+    def save(self, *args, **kwargs):
+        self.code = self.code.strip().upper()
+        super().save(*args, **kwargs)
+
+    @property
+    def used_count(self):
+        return self.redemptions.filter(is_active=True).count()
+
+    def __str__(self):
+        return self.code
+
+
+class CouponRedemption(models.Model):
+    coupon = models.ForeignKey(Coupon, on_delete=models.SET_NULL, null=True, related_name='redemptions')
+    order = models.OneToOneField('online_preorder.OnlinePreorder', on_delete=models.CASCADE, related_name='coupon_redemption')
+    is_active = models.BooleanField(default=True)
+    redeemed_at = models.DateTimeField(auto_now_add=True)
+    released_at = models.DateTimeField(null=True, blank=True)
+
+
 class Brand(models.Model):
     """Brand model for showcasing brands on home page"""
     name = models.CharField(max_length=200, unique=True)

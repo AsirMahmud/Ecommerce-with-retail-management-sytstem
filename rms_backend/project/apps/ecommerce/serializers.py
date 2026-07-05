@@ -1,6 +1,52 @@
 from rest_framework import serializers
-from .models import Discount, Brand, HomePageSettings, DeliverySettings, HeroSlide, PromotionalModal, ProductStatus
+from .models import Discount, Coupon, Brand, HomePageSettings, DeliverySettings, HeroSlide, PromotionalModal, ProductStatus
 from apps.inventory.serializers import ProductSerializer, CategorySerializer, OnlineCategorySerializer
+
+
+class CouponSerializer(serializers.ModelSerializer):
+    used_count = serializers.IntegerField(read_only=True)
+
+    class Meta:
+        model = Coupon
+        fields = [
+            'id', 'name', 'code', 'discount_type', 'value', 'interaction_mode',
+            'start_date', 'end_date', 'minimum_spend', 'maximum_discount',
+            'usage_limit', 'used_count', 'is_active', 'created_at', 'updated_at',
+        ]
+        read_only_fields = ['used_count', 'created_at', 'updated_at']
+
+    def validate_code(self, value):
+        value = value.strip().upper()
+        queryset = Coupon.objects.filter(code__iexact=value)
+        if self.instance:
+            queryset = queryset.exclude(pk=self.instance.pk)
+        if queryset.exists():
+            raise serializers.ValidationError('A coupon with this code already exists.')
+        return value
+
+    def validate(self, data):
+        start = data.get('start_date', getattr(self.instance, 'start_date', None))
+        end = data.get('end_date', getattr(self.instance, 'end_date', None))
+        discount_type = data.get('discount_type', getattr(self.instance, 'discount_type', None))
+        value = data.get('value', getattr(self.instance, 'value', None))
+        maximum = data.get('maximum_discount', getattr(self.instance, 'maximum_discount', None))
+        if start and end and start >= end:
+            raise serializers.ValidationError({'end_date': 'End date must be after start date.'})
+        if value is not None and value <= 0:
+            raise serializers.ValidationError({'value': 'Discount value must be greater than zero.'})
+        minimum = data.get('minimum_spend', getattr(self.instance, 'minimum_spend', 0))
+        usage_limit = data.get('usage_limit', getattr(self.instance, 'usage_limit', None))
+        if minimum is not None and minimum < 0:
+            raise serializers.ValidationError({'minimum_spend': 'Minimum spend cannot be negative.'})
+        if maximum is not None and maximum <= 0:
+            raise serializers.ValidationError({'maximum_discount': 'Maximum discount must be greater than zero.'})
+        if usage_limit is not None and usage_limit < 1:
+            raise serializers.ValidationError({'usage_limit': 'Usage limit must be at least one.'})
+        if discount_type == 'PERCENTAGE' and value and value > 100:
+            raise serializers.ValidationError({'value': 'Percentage cannot exceed 100.'})
+        if discount_type == 'FIXED' and maximum is not None:
+            raise serializers.ValidationError({'maximum_discount': 'Only percentage coupons can have a maximum discount.'})
+        return data
 
 
 class ProductStatusSerializer(serializers.ModelSerializer):

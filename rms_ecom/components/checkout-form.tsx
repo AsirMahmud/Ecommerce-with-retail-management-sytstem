@@ -46,7 +46,7 @@ export function CheckoutForm() {
   const router = useRouter()
   const [paymentMethod] = useState("cod")
   const [error, setError] = useState<string | null>(null)
-  const { deliveryMethod, setDeliveryMethod } = useCheckoutStore()
+  const { deliveryMethod, setDeliveryMethod, couponCode, clearCoupon } = useCheckoutStore()
   const { startLoading, stopLoading } = useLoading()
   const {
     divisions,
@@ -162,7 +162,7 @@ export function CheckoutForm() {
       if (!cartItems.length) throw new Error("Your cart is empty.")
 
       // Fetch authoritative prices and delivery charges
-      const pricingResponse = await ecommerceApi.priceCart(cartItems)
+      const pricingResponse = await ecommerceApi.priceCart(cartItems, couponCode)
 
       // Helper function to extract numeric product ID (handles cases like "141/blue")
       const extractNumericProductId = (productId: string | number): number => {
@@ -278,12 +278,14 @@ export function CheckoutForm() {
         items,
         delivery_charge: deliveryCharge,
         delivery_method: deliveryMethodName,
+        coupon_code: couponCode || undefined,
       }
 
       console.log('Submitting payload:', { ...payload, items: items.length }) // Debug log
       const created = await ecommerceApi.createOnlinePreorder(payload)
       clearDirectCheckoutItems() // Clear direct checkout items first
       clearCart() // Also clear regular cart
+      clearCoupon()
       router.push(`/order-complete?preorder_id=${created.id}`)
     } catch (err: any) {
       setError(err?.message || "Failed to place order. Please try again.")

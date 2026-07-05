@@ -5,6 +5,7 @@ from rest_framework.permissions import AllowAny
 from rest_framework.decorators import action
 from django.db import models, transaction
 from django.utils import timezone
+from rest_framework.exceptions import ValidationError
 
 from apps.inventory.models import Product
 from .models import (
@@ -69,7 +70,23 @@ class OnlinePreorderViewSet(
     def perform_update(self, serializer):
         instance = serializer.instance
         old_status = instance.status
-        updated_instance = serializer.save()
+        with transaction.atomic():
+            if old_status == 'CANCELLED' and serializer.validated_data.get('status', old_status) != 'CANCELLED' and instance.coupon_id:
+                from apps.ecommerce.models import Coupon, CouponRedemption
+                coupon = Coupon.objects.select_for_update().get(pk=instance.coupon_id)
+                redemption = CouponRedemption.objects.filter(order=instance).first()
+                if coupon.usage_limit is not None and coupon.used_count >= coupon.usage_limit:
+                    raise ValidationError({'status': 'The coupon usage limit is full; this order cannot be reactivated.'})
+                if redemption:
+                    redemption.is_active = True
+                    redemption.released_at = None
+                    redemption.save(update_fields=['is_active', 'released_at'])
+            updated_instance = serializer.save()
+            if old_status != 'CANCELLED' and updated_instance.status == 'CANCELLED' and instance.coupon_id:
+                from apps.ecommerce.models import CouponRedemption
+                CouponRedemption.objects.filter(order=instance, is_active=True).update(
+                    is_active=False, released_at=timezone.now()
+                )
         new_status = updated_instance.status
 
         # Check for status changes

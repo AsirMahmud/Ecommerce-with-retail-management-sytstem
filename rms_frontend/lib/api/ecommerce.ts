@@ -21,6 +21,48 @@ export interface Discount {
   updated_at: string;
 }
 
+export interface Coupon {
+  id: number;
+  name: string;
+  code: string;
+  discount_type: 'PERCENTAGE' | 'FIXED';
+  value: number;
+  interaction_mode: 'STACK' | 'BEST' | 'REPLACE';
+  start_date: string;
+  end_date: string;
+  minimum_spend: number;
+  maximum_discount?: number | null;
+  usage_limit?: number | null;
+  used_count: number;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export type CouponDTO = Omit<Coupon, 'id' | 'used_count' | 'created_at' | 'updated_at'>;
+
+export const couponsApi = {
+  getAll: async (): Promise<Coupon[]> => {
+    const { data } = await axiosInstance.get('/ecommerce/coupons/');
+    return data.results || data;
+  },
+  create: async (coupon: CouponDTO): Promise<Coupon> => {
+    const { data } = await axiosInstance.post('/ecommerce/coupons/', coupon);
+    return data;
+  },
+  update: async ({ id, ...coupon }: Partial<CouponDTO> & { id: number }): Promise<Coupon> => {
+    const { data } = await axiosInstance.patch(`/ecommerce/coupons/${id}/`, coupon);
+    return data;
+  },
+  delete: async (id: number): Promise<void> => {
+    await axiosInstance.delete(`/ecommerce/coupons/${id}/`);
+  },
+  setActive: async ({ id, active }: { id: number; active: boolean }): Promise<Coupon> => {
+    const { data } = await axiosInstance.post(`/ecommerce/coupons/${id}/${active ? 'activate' : 'deactivate'}/`);
+    return data;
+  },
+};
+
 export interface Brand {
   id: number;
   name: string;

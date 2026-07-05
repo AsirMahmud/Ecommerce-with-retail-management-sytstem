@@ -400,7 +400,7 @@ export const ecommerceApi = {
   },
 
   // Public: Price cart items on the server
-  priceCart: async (items: Array<{ productId: string | number; quantity: number; variations?: Record<string, string> }>): Promise<{
+  priceCart: async (items: Array<{ productId: string | number; quantity: number; variations?: Record<string, string> }>, couponCode?: string): Promise<{
     items: Array<{ productId: number; name: string; image_url?: string | null; unit_price: number; quantity: number; line_total: number; max_stock?: number; variant?: { color?: string | null; size?: string | null } }>
     products: Array<{
       id: number
@@ -424,14 +424,21 @@ export const ecommerceApi = {
       updated_at: string
     }>
     subtotal: number
+    original_subtotal: number
+    automatic_discount_amount: number
+    coupon_discount_amount: number
+    coupon: { valid: boolean; code: string; name: string; interaction_mode: 'STACK' | 'BEST' | 'REPLACE'; discount_amount: number } | null
     delivery: { inside_dhaka_charge: number; inside_gazipur_charge: number; outside_dhaka_charge: number; updated_at: string }
   }> => {
     const response = await fetch(`${API_BASE_URL}/ecommerce/public/cart/price/`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ items }),
+      body: JSON.stringify({ items, coupon_code: couponCode || undefined }),
     })
-    if (!response.ok) throw new Error('Failed to price cart')
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({}))
+      throw new Error(error.detail || 'Failed to price cart')
+    }
     return response.json()
   },
 
@@ -451,6 +458,7 @@ export const ecommerceApi = {
       unit_price: number;
       discount?: number;
     }>;
+    coupon_code?: string;
     delivery_charge?: number;
     delivery_method?: string;
     expected_delivery_date?: string; // ISO date
@@ -461,13 +469,8 @@ export const ecommerceApi = {
       body: JSON.stringify(payload),
     })
     if (!response.ok) {
-      // Try to get error message from response
-      try {
-        const errorData = await response.json()
-        throw new Error(errorData.error || errorData.detail || 'Failed to create online preorder')
-      } catch {
-        throw new Error(`Failed to create online preorder (${response.status})`)
-      }
+      const errorData = await response.json().catch(() => null)
+      throw new Error(errorData?.error || errorData?.detail || `Failed to create online preorder (${response.status})`)
     }
     return response.json()
   },

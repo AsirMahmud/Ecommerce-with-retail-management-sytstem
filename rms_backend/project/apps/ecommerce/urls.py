@@ -17,10 +17,12 @@ from .views import (
     PromotionalModalViewSet,
     PublicPromotionalModalView,
     ProductStatusViewSet,
+    CouponViewSet,
 )
 
 router = DefaultRouter()
 router.register(r'discounts', DiscountViewSet, basename='discount')
+router.register(r'coupons', CouponViewSet, basename='coupon')
 router.register(r'brands', BrandViewSet, basename='brand')
 router.register(r'home-page-settings', HomePageSettingsViewSet, basename='home-page-settings')
 router.register(r'hero-slides', HeroSlideViewSet, basename='hero-slide')

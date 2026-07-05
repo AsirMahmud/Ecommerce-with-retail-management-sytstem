@@ -1,5 +1,13 @@
 from django.contrib import admin
-from .models import Discount, Brand, HomePageSettings, ProductStatus
+from .models import Discount, Coupon, Brand, HomePageSettings, ProductStatus
+
+
+@admin.register(Coupon)
+class CouponAdmin(admin.ModelAdmin):
+    list_display = ('code', 'name', 'discount_type', 'value', 'interaction_mode', 'used_count', 'usage_limit', 'is_active')
+    list_filter = ('discount_type', 'interaction_mode', 'is_active')
+    search_fields = ('code', 'name')
+    readonly_fields = ('created_at', 'updated_at')
 
 
 @admin.register(Discount)

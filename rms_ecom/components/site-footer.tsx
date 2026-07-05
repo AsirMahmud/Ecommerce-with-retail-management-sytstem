@@ -190,7 +190,7 @@ export function SiteFooter() {
             </p>
             <div className="relative rounded-2xl overflow-hidden border border-white/10 bg-white/5 min-h-[220px] lg:min-h-[260px]">
               {hasMap ? (
-               <iframe className="w-full" src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3641.769855107538!2d90.56586267216797!3d24.109587640110483!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x3755d50026e8dab7%3A0x293e9aa168441689!2sRAW%20STITCH!5e0!3m2!1sen!2sbd!4v1764396002808!5m2!1sen!2sbd" width="600" height="450"  allowfullscreen="" loading="lazy" referrerpolicy="no-referrer-when-downgrade"></iframe>
+               <iframe className="w-full" src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3641.769855107538!2d90.56586267216797!3d24.109587640110483!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x3755d50026e8dab7%3A0x293e9aa168441689!2sRAW%20STITCH!5e0!3m2!1sen!2sbd!4v1764396002808!5m2!1sen!2sbd" width="600" height="450" allowFullScreen loading="lazy" referrerPolicy="no-referrer-when-downgrade"></iframe>
               ) : (
                 <div className="flex h-full w-full items-center justify-center text-sm text-white/60">
                   Map preview will appear here when you add a Google Map embed URL in Home Page Settings.

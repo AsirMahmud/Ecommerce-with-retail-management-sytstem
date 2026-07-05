@@ -2,6 +2,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   discountsApi,
+  couponsApi,
   brandsApi,
   homePageSettingsApi,
   productEcommerceApi,
@@ -33,6 +34,9 @@ export const ecommerceKeys = {
     details: () => [...ecommerceKeys.discounts.all(), 'detail'] as const,
     detail: (id: number) => [...ecommerceKeys.discounts.details(), id] as const,
   },
+  coupons: {
+    all: () => [...ecommerceKeys.all, 'coupons'] as const,
+  },
   brands: {
     all: () => [...ecommerceKeys.all, 'brands'] as const,
     lists: () => [...ecommerceKeys.brands.all(), 'list'] as const,
@@ -61,6 +65,31 @@ export const ecommerceKeys = {
     details: () => [...ecommerceKeys.productStatuses.all(), 'detail'] as const,
     detail: (id: number) => [...ecommerceKeys.productStatuses.details(), id] as const,
   },
+};
+
+export const useCoupons = () => useQuery({
+  queryKey: ecommerceKeys.coupons.all(),
+  queryFn: couponsApi.getAll,
+});
+
+export const useCreateCoupon = () => {
+  const queryClient = useQueryClient();
+  return useMutation({ mutationFn: couponsApi.create, onSuccess: () => queryClient.invalidateQueries({ queryKey: ecommerceKeys.coupons.all() }) });
+};
+
+export const useUpdateCoupon = () => {
+  const queryClient = useQueryClient();
+  return useMutation({ mutationFn: couponsApi.update, onSuccess: () => queryClient.invalidateQueries({ queryKey: ecommerceKeys.coupons.all() }) });
+};
+
+export const useDeleteCoupon = () => {
+  const queryClient = useQueryClient();
+  return useMutation({ mutationFn: couponsApi.delete, onSuccess: () => queryClient.invalidateQueries({ queryKey: ecommerceKeys.coupons.all() }) });
+};
+
+export const useSetCouponActive = () => {
+  const queryClient = useQueryClient();
+  return useMutation({ mutationFn: couponsApi.setActive, onSuccess: () => queryClient.invalidateQueries({ queryKey: ecommerceKeys.coupons.all() }) });
 };
 
 // Discount Hooks
