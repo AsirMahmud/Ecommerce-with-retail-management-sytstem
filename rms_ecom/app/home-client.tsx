@@ -64,10 +64,10 @@ export default function HomePageClient() {
             {getSortedSections(showcaseData).map(({ key, section }, index) => (
               <div key={key}>
                 {index > 0 && <div className="container px-4"><hr className="border-border" /></div>}
-                {section?.products && section?.name && Array.isArray(section.products) && section.products.length > 0 && (
+                {section?.name && (
                   <ColorSection
                     title={section.name.toUpperCase()}
-                    baseProducts={section.products}
+                    baseProducts={section.products || []}
                     toCard={toCard}
                     statusSlug={key}
                   />
@@ -90,6 +90,17 @@ export default function HomePageClient() {
   )
 }
 
+// Fallback: convert base EcommerceProduct to card format when per-color API fails
+function baseProductToCard(p: EcommerceProduct) {
+  return {
+    id: String(p.id),
+    name: p.name,
+    price: Number(p.selling_price),
+    rating: 4.5,
+    image: p.image_url || p.primary_image || p.image || "/placeholder.jpg",
+  }
+}
+
 function ColorSection({ title, baseProducts, toCard, statusSlug }: {
   title: string;
   baseProducts: EcommerceProduct[];
@@ -97,26 +108,40 @@ function ColorSection({ title, baseProducts, toCard, statusSlug }: {
   statusSlug: string;
 }) {
   const [entries, setEntries] = useState<ProductByColorEntry[]>([])
+  const [loading, setLoading] = useState(true)
+  const [failed, setFailed] = useState(false)
   useEffect(() => {
     const load = async () => {
       try {
+        setLoading(true)
+        setFailed(false)
         const ids = baseProducts.map(p => p.id)
         if (ids.length === 0) { setEntries([]); return }
         const data = await ecommerceApi.getProductsByColor({ product_ids: ids })
         setEntries(data)
       } catch (e) {
+        console.error(`Failed to load products for section "${title}":`, e)
+        setFailed(true)
         setEntries([])
+      } finally {
+        setLoading(false)
       }
     }
     load()
-  }, [baseProducts])
+  }, [baseProducts, title])
+
+  // If per-color API failed or returned empty, fall back to base products
+  const showFallback = !loading && entries.length === 0 && baseProducts.length > 0
+  const products = showFallback
+    ? baseProducts.map(baseProductToCard)
+    : entries.map(toCard)
 
   return (
     <ProductSection
       title={title}
-      products={entries.map(toCard)}
+      products={products}
       viewAllHref={`/products?status=${statusSlug}`}
-      isLoading={entries.length === 0}
+      isLoading={loading}
     />
   )
 }
