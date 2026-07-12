@@ -8,8 +8,57 @@ from .models import (
 )
 
 
+import json
+import ast
+
+class RobustJSONField(serializers.JSONField):
+    def to_internal_value(self, data):
+        parsed = None
+        if isinstance(data, str):
+            data = data.strip()
+            if not data:
+                parsed = []
+            else:
+                try:
+                    parsed = json.loads(data)
+                except (TypeError, ValueError):
+                    try:
+                        parsed = ast.literal_eval(data)
+                    except Exception:
+                        self.fail('invalid')
+        elif isinstance(data, list):
+            parsed_list = []
+            for item in data:
+                if isinstance(item, str):
+                    item = item.strip()
+                    try:
+                        parsed_list.append(json.loads(item))
+                    except (TypeError, ValueError):
+                        try:
+                            parsed_list.append(ast.literal_eval(item))
+                        except Exception:
+                            self.fail('invalid')
+                else:
+                    parsed_list.append(item)
+            parsed = parsed_list
+        else:
+            parsed = super().to_internal_value(data)
+
+        def clean_decimals(val):
+            if isinstance(val, dict):
+                return {k: clean_decimals(v) for k, v in val.items()}
+            elif isinstance(val, list):
+                return [clean_decimals(v) for v in val]
+            elif isinstance(val, Decimal):
+                return float(val)
+            return val
+
+        return clean_decimals(parsed)
+
+
+
 class OnlinePreorderCreateSerializer(serializers.ModelSerializer):
-    items = serializers.JSONField()
+    items = RobustJSONField()
 
     class Meta:
         model = OnlinePreorder

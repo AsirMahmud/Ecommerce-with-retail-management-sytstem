@@ -511,7 +511,12 @@ export default function OnlinePreordersPage() {
         order={verificationOrder}
         open={isVerificationOpen}
         onClose={() => setIsVerificationOpen(false)}
-        onCompleted={() => { void loadData(); }}
+        onCompleted={() => {
+          void loadData();
+          if (selectedOrder && selectedOrder.id === verificationOrder?.id) {
+            setSelectedOrder(prev => prev ? { ...prev, status: "DELIVERED" } : null);
+          }
+        }}
       />
 
       {/* Delete Confirmation Dialog */}

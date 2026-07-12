@@ -368,9 +368,11 @@ export function OnlinePreorderVerificationModal({ order, open, onClose, onComple
                         return (
                           <TableRow key={item.id} className={isComplete ? "bg-slate-50/50" : ""}>
                             <TableCell className="font-mono text-xs text-slate-600">{item.sku || "N/A"}</TableCell>
-                            <TableCell>
-                              <div className="font-medium text-slate-900 text-sm">{item.product_name || "Product"}</div>
-                              {isComplete && <div className="text-[10px] text-green-600 flex items-center gap-1"><CheckCircle2 className="w-3 h-3" /> Verified</div>}
+                            <TableCell className="max-w-[200px] md:max-w-[300px]">
+                              <div className="font-medium text-slate-900 text-sm break-words whitespace-normal line-clamp-2" title={item.product_name || "Product"}>
+                                {item.product_name || "Product"}
+                              </div>
+                              {isComplete && <div className="text-[10px] text-green-600 flex items-center gap-1 mt-1"><CheckCircle2 className="w-3 h-3" /> Verified</div>}
                             </TableCell>
                             <TableCell className="text-center text-sm font-medium">
                               <span className={isComplete ? "text-green-600" : "text-slate-900"}>

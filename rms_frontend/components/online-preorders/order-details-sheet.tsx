@@ -103,8 +103,7 @@ export function OrderDetailsSheet({ order, isOpen, onClose, onRefresh, onEdit, o
                                 {["PENDING", "CONFIRMED", "DELIVERED", "COMPLETED", "CANCELLED"].map((statusValue) => {
                                     const isActive = order.status === statusValue;
                                     const isDisabled =
-                                        (statusValue === "COMPLETED" && order.status !== "DELIVERED") ||
-                                        (statusValue === "DELIVERED" && !!onStartVerification); // encourage using Verify Order
+                                        (statusValue === "COMPLETED" && order.status !== "DELIVERED");
 
                                     const baseClasses =
                                         "px-3 py-1.5 text-xs font-semibold rounded-full border transition-colors";
@@ -219,7 +218,7 @@ export function OrderDetailsSheet({ order, isOpen, onClose, onRefresh, onEdit, o
                                             )}
                                         </div>
                                         <div className="flex-1 min-w-0">
-                                            <div className="font-semibold text-slate-900 truncate">
+                                            <div className="font-semibold text-slate-900 break-words whitespace-normal line-clamp-2" title={item.product_name || `Product ID: ${item.product_id}`}>
                                                 {item.product_name || `Product ID: ${item.product_id}`}
                                             </div>
                                             <div className="text-xs text-slate-500 mt-0.5 font-medium">
