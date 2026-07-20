@@ -837,6 +837,16 @@ export default function ProductsPage() {
                   <SelectItem value="in">In Stock</SelectItem>
                 </SelectContent>
               </Select>
+              <Select value={onlineFilter} onValueChange={setOnlineFilter}>
+                <SelectTrigger className="w-[180px] h-12 border-2 border-gray-200 focus:border-blue-500 rounded-xl transition-colors">
+                  <SelectValue placeholder="Online/Offline" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Channels</SelectItem>
+                  <SelectItem value="online">Online Products</SelectItem>
+                  <SelectItem value="offline">Offline Products</SelectItem>
+                </SelectContent>
+              </Select>
               <div className="flex gap-2">
                 <Button
                   variant={viewMode === "table" ? "default" : "outline"}
