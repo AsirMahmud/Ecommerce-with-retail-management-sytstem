@@ -88,6 +88,7 @@ export default function ProductsPage() {
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [stockFilter, setStockFilter] = useState<string>("all");
+  const [onlineFilter, setOnlineFilter] = useState<string>("all");
   const [viewMode, setViewMode] = useState<"table" | "grid">("table");
   const [productToDelete, setProductToDelete] = useState<Product | null>(null);
 
@@ -100,6 +101,7 @@ export default function ProductsPage() {
     category: categoryFilter !== "all" ? parseInt(categoryFilter) : undefined,
     is_active: statusFilter === "all" ? undefined : statusFilter === "active",
     stock_status: stockFilter !== "all" ? stockFilter : undefined,
+    assign_to_online: onlineFilter === "all" ? undefined : onlineFilter === "online",
   };
 
   // Fetch products with infinite scroll
@@ -189,76 +191,124 @@ export default function ProductsPage() {
     }
   };
 
-  const handleDownloadCatalog = () => {
-    // Note: This relies on fetched products. For a full catalog download, 
-    // we should ideally request *all* products from backend, not just the current page.
-    // However, given the requirement, we'll keep it as is or note the limitation.
-    // If the user wants a full catalog, we might need a separate API call.
-    // For now, let's use the current page's products or maybe fetch all if needed?
-    // Let's assume current page for now to avoid massive bandwidth spikes, 
-    // or arguably we should enable a "download all" button that hits a dedicated endpoint.
-    const onlineProducts = products.filter((p: Product) => p.assign_to_online);
+  const handleDownloadCatalog = async () => {
+    const toastId = toast.loading("Preparing catalog download...");
+    try {
+      let allOnlineProducts: Product[] = [];
+      let currentPage = 1;
+      let hasMore = true;
 
-    if (onlineProducts.length === 0) {
-      toast.error("No online products found to download");
-      return;
-    }
+      while (hasMore) {
+        const response = await productsApi.getAll({
+          page: currentPage,
+          page_size: 100, // Fetch in batches of 100
+          assign_to_online: true,
+          is_active: true,
+          ordering: "-created_at"
+        });
 
-    const headers = [
-      "id",
-      "title",
-      "description",
-      "availability",
-      "condition",
-      "price",
-      "link",
-      "image_link",
-      "brand",
-      "google_product_category",
-      "fb_product_category",
-      "quantity_to_sell_on_facebook",
-      "sale_price",
-      "sale_price_effective_date",
-      "item_group_id",
-      "gender",
-      "color",
-      "size",
-      "age_group",
-      "material",
-      "pattern",
-      "shipping",
-      "shipping_weight",
-      "video[0].url",
-      "video[0].tag[0]",
-      "gtin",
-      "product_tags[0]",
-      "product_tags[1]",
-      "style[0]",
-    ];
+        if (response && response.results) {
+          allOnlineProducts = [...allOnlineProducts, ...response.results];
+          if (response.next) {
+            currentPage++;
+          } else {
+            hasMore = false;
+          }
+        } else {
+          hasMore = false;
+        }
+      }
 
-    const rows: string[][] = [];
+      const onlineProducts = allOnlineProducts.filter((p: Product) => p.assign_to_online);
 
-    onlineProducts.forEach((product: Product) => {
-      // Base URL for links
-      const ecomBaseUrl = "https://www.rawstitch.com.bd";
+      if (onlineProducts.length === 0) {
+        toast.dismiss(toastId);
+        toast.error("No online products found to download");
+        return;
+      }
 
-      // If the product has galleries (color variants), create a row for each
-      if (product.galleries && product.galleries.length > 0) {
-        product.galleries.forEach((gallery) => {
-          const colorSlug = gallery.color ? slugify(gallery.color) : "";
-          const variantId = colorSlug ? `${product.id}-${colorSlug}` : product.id.toString();
-          const variantTitle = gallery.color ? `${product.name} - ${gallery.color}` : product.name;
-          const variantImage = gallery.images?.[0]?.image || product.first_variation_image || product.image;
+      const headers = [
+        "id",
+        "title",
+        "description",
+        "availability",
+        "condition",
+        "price",
+        "link",
+        "image_link",
+        "brand",
+        "google_product_category",
+        "fb_product_category",
+        "quantity_to_sell_on_facebook",
+        "sale_price",
+        "sale_price_effective_date",
+        "item_group_id",
+        "gender",
+        "color",
+        "size",
+        "age_group",
+        "material",
+        "pattern",
+        "shipping",
+        "shipping_weight",
+        "video[0].url",
+        "video[0].tag[0]",
+        "gtin",
+        "product_tags[0]",
+        "product_tags[1]",
+        "style[0]",
+      ];
 
+      const rows: string[][] = [];
+
+      onlineProducts.forEach((product: Product) => {
+        // Base URL for links
+        const ecomBaseUrl = "https://www.rawstitch.com.bd";
+
+        // If the product has galleries (color variants), create a row for each
+        if (product.galleries && product.galleries.length > 0) {
+          product.galleries.forEach((gallery) => {
+            const colorSlug = gallery.color ? slugify(gallery.color) : "";
+            const variantId = colorSlug ? `${product.id}-${colorSlug}` : product.id.toString();
+            const variantTitle = gallery.color ? `${product.name} - ${gallery.color}` : product.name;
+            const variantImage = gallery.images?.[0]?.image || product.first_variation_image || product.image;
+
+            const row = [
+              variantId,
+              variantTitle,
+              product.description || "Premium quality clothing from Raw Stitch. Designed for style and comfort.",
+              product.stock_quantity > 0 ? "in stock" : "out of stock",
+              "new",
+              `${product.selling_price} BDT`,
+              `${ecomBaseUrl}/product/${product.id}${colorSlug ? `/${colorSlug}` : ""}`,
+              getImageUrl(variantImage),
+              "Raw Stitch",
+              product.online_categories?.[0]?.name || product.category?.name || "",
+              product.online_categories?.[0]?.name || product.category?.name || "",
+              product.stock_quantity.toString(),
+              product.discount_percentage && product.discount_percentage > 0 ? `${product.sale_price} BDT` : "",
+              product.discount_end_date || "",
+              product.sku,
+              product.gender || "unisex",
+              gallery.color || "",
+              product.first_variation_size || "",
+              "adult",
+              product.material_composition_string || "",
+              "", "", "", "", "", "", "", "", ""
+            ];
+            rows.push(row.map(val => `"${val?.toString().replace(/"/g, '""') || ""}"`));
+          });
+        } else {
+          // Fallback for products without galleries
           const row = [
-            variantId,
-            variantTitle,
-            product.description || "Premium quality clothing from Raw Stitch. Designed for style and comfort.",
+            product.id.toString(),
+            product.name || "Raw Stitch Product",
+            product.description || "Premium quality clothing from Raw Stitch.",
             product.stock_quantity > 0 ? "in stock" : "out of stock",
             "new",
             `${product.selling_price} BDT`,
-            `${ecomBaseUrl}/product/${product.id}${colorSlug ? `/${colorSlug}` : ""}`,
-            getImageUrl(variantImage),
+            `${ecomBaseUrl}/product/${product.id}`,
+            getImageUrl(product.first_variation_image || product.image),
             "Raw Stitch",
             product.online_categories?.[0]?.name || product.category?.name || "",
             product.online_categories?.[0]?.name || product.category?.name || "",
@@ -267,51 +317,30 @@ export default function ProductsPage() {
             product.discount_end_date || "",
             product.sku,
             product.gender || "unisex",
-            gallery.color || "",
+            product.first_variation_color || "",
             product.first_variation_size || "",
             "adult",
             product.material_composition_string || "",
             "", "", "", "", "", "", "", "", ""
           ];
           rows.push(row.map(val => `"${val?.toString().replace(/"/g, '""') || ""}"`));
-        });
-      } else {
-        // Fallback for products without galleries
-        const row = [
-          product.id.toString(),
-          product.name || "Raw Stitch Product",
-          product.description || "Premium quality clothing from Raw Stitch.",
-          product.stock_quantity > 0 ? "in stock" : "out of stock",
-          "new",
-          `${product.selling_price} BDT`,
-          `${ecomBaseUrl}/product/${product.id}`,
-          getImageUrl(product.first_variation_image || product.image),
-          "Raw Stitch",
-          product.online_categories?.[0]?.name || product.category?.name || "",
-          product.online_categories?.[0]?.name || product.category?.name || "",
-          product.stock_quantity.toString(),
-          product.discount_percentage && product.discount_percentage > 0 ? `${product.sale_price} BDT` : "",
-          product.discount_end_date || "",
-          product.sku,
-          product.gender || "unisex",
-          product.first_variation_color || "",
-          product.first_variation_size || "",
-          "adult",
-          product.material_composition_string || "",
-          "", "", "", "", "", "", "", "", ""
-        ];
-        rows.push(row.map(val => `"${val?.toString().replace(/"/g, '""') || ""}"`));
-      }
-    });
+        }
+      });
 
-    const csvContent = [
-      headers.join(","),
-      ...rows.map((row) => row.join(",")),
-    ].join("\n");
+      const csvContent = [
+        headers.join(","),
+        ...rows.map((row) => row.join(",")),
+      ].join("\n");
 
-    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
-    saveAs(blob, "catalog_products.csv");
-    toast.success("Catalog downloaded successfully");
+      const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+      saveAs(blob, "catalog_products.csv");
+      toast.dismiss(toastId);
+      toast.success("Catalog downloaded successfully");
+    } catch (error) {
+      toast.dismiss(toastId);
+      toast.error("Failed to download catalog");
+      console.error("Error downloading catalog:", error);
+    }
   };
 
   // Use backend stats instead of client-side calculations

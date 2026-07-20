@@ -200,6 +200,8 @@ export const productsApi = {
         online_category?: number[];
         supplier?: number;
         is_active?: boolean;
+        assign_to_online?: boolean;
+        ordering?: string;
         stock_status?: string;
         expand?: string;
     }): Promise<PaginatedResponse<Product>> => {

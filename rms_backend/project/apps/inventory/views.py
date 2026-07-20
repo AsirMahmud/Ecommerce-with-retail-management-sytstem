@@ -95,7 +95,7 @@ class ProductViewSet(viewsets.ModelViewSet):
     queryset = Product.objects.all()
     pagination_class = StandardResultsSetPagination
     filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
-    filterset_fields = ['category', 'online_category', 'supplier', 'is_active']
+    filterset_fields = ['category', 'online_category', 'supplier', 'is_active', 'assign_to_online']
     search_fields = ['name', 'sku', 'barcode', 'description']
     ordering_fields = ['name', 'created_at', 'stock_quantity', 'selling_price']
     ordering = ['-created_at']
@@ -119,6 +119,7 @@ class ProductViewSet(viewsets.ModelViewSet):
         online_categories = self.request.query_params.getlist('online_category')
         supplier = self.request.query_params.get('supplier', None)
         is_active = self.request.query_params.get('is_active', None)
+        assign_to_online = self.request.query_params.get('assign_to_online', None)
         stock_status = self.request.query_params.get('stock_status', None)
 
         if search:
@@ -141,6 +142,8 @@ class ProductViewSet(viewsets.ModelViewSet):
             queryset = queryset.filter(online_categories__id__in=online_categories).distinct()
         if is_active is not None:
             queryset = queryset.filter(is_active=is_active)
+        if assign_to_online is not None:
+            queryset = queryset.filter(assign_to_online=assign_to_online.lower() == 'true')
         if stock_status:
             if stock_status == 'low':
                 queryset = queryset.filter(stock_quantity__lte=F('minimum_stock'))
