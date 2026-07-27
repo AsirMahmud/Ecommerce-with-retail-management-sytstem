@@ -265,8 +265,8 @@ export function ManualOrderForm({ onSuccess, onCancel, initialData }: ManualOrde
         setItems(newItems);
     };
 
-    const calculateSubtotal = () => items.reduce((sum, item) => sum + (Number(item.unit_price || 0) * item.quantity) - Number(item.discount || 0), 0);
-    const calculateTotal = () => calculateSubtotal() + Number(deliveryCharge || 0);
+    const calculateSubtotal = () => Math.round(items.reduce((sum, item) => sum + (Number(item.unit_price || 0) * item.quantity) - Number(item.discount || 0), 0));
+    const calculateTotal = () => Math.round(calculateSubtotal() + Number(deliveryCharge || 0));
 
     const handleSubmit = async () => {
         // Prevent double submission
@@ -302,8 +302,8 @@ export function ManualOrderForm({ onSuccess, onCancel, initialData }: ManualOrde
                     size: item.size,
                     color: item.color,
                     quantity: item.quantity,
-                    unit_price: item.unit_price,
-                    discount: item.discount,
+                    unit_price: Math.round(Number(item.unit_price || 0)),
+                    discount: Math.round(Number(item.discount || 0)),
                 })),
                 shipping_address,
                 delivery_charge: deliveryCharge,

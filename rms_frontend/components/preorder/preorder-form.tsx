@@ -143,10 +143,10 @@ export function PreorderForm({
           selectedVariants.includes(`${v.size}-${v.color}`)
         );
 
-    return variantsToCalculate.reduce((sum: number, variant: any) => {
+    return Math.round(variantsToCalculate.reduce((sum: number, variant: any) => {
       const qty = variantQuantities[`${variant.size}-${variant.color}`] || 0;
       return sum + currentProduct.selling_price * qty;
-    }, 0);
+    }, 0));
   }, [
     currentProduct,
     productVariants,
