@@ -209,7 +209,7 @@ class OnlinePreorderCreateSerializer(serializers.ModelSerializer):
 
         except Customer.DoesNotExist:
             # Create new customer
-            email_to_use = customer_email
+            email_to_use = customer_email.strip() if customer_email else None
             
             # If email is provided, check if it's already taken by another phone number
             if email_to_use:
@@ -306,7 +306,7 @@ class OnlinePreorderCreateSerializer(serializers.ModelSerializer):
 
         except Customer.DoesNotExist:
             # Create new customer if phone number changed or customer doesn't exist
-            email_to_use = customer_email
+            email_to_use = customer_email.strip() if customer_email else None
             if email_to_use and Customer.objects.filter(email=email_to_use).exists():
                 email_to_use = None
             

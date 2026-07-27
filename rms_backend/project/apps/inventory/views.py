@@ -141,7 +141,7 @@ class ProductViewSet(viewsets.ModelViewSet):
         if online_categories:
             queryset = queryset.filter(online_categories__id__in=online_categories).distinct()
         if is_active is not None:
-            queryset = queryset.filter(is_active=is_active)
+            queryset = queryset.filter(is_active=is_active.lower() == 'true')
         if assign_to_online is not None:
             queryset = queryset.filter(assign_to_online=assign_to_online.lower() == 'true')
         if stock_status:
