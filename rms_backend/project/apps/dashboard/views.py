@@ -3,7 +3,9 @@ from rest_framework.response import Response
 from rest_framework import status
 from django.db.models import Sum, Count, F, Q, Max
 from django.utils import timezone
-from datetime import timedelta
+from datetime import datetime, time, timedelta
+from zoneinfo import ZoneInfo
+from decimal import Decimal
 from .models import DashboardMetrics
 from apps.sales.models import Sale, SaleItem
 from apps.expenses.models import Expense, ExpenseCategory
@@ -12,15 +14,27 @@ from apps.inventory.models import Product
 from apps.supplier.models import Supplier
 from apps.online_preorder.models import OnlinePreorder
 
+# Store business timezone
+BUSINESS_TIMEZONE = ZoneInfo('Asia/Dhaka')
+
 class DashboardStatsView(APIView):
     def get(self, request):
-        today = timezone.now().date()
-        start_of_month = today.replace(day=1)
+        now_local = datetime.now(BUSINESS_TIMEZONE)
+        today = now_local.date()
 
-        # Get online preorders metrics
-        today_preorders = OnlinePreorder.objects.filter(created_at__date=today)
+        start_of_today = datetime.combine(today, time.min).replace(tzinfo=BUSINESS_TIMEZONE)
+        end_of_today = datetime.combine(today, time.max).replace(tzinfo=BUSINESS_TIMEZONE)
+
+        start_of_month_date = today.replace(day=1)
+        start_of_month = datetime.combine(start_of_month_date, time.min).replace(tzinfo=BUSINESS_TIMEZONE)
+
+        # Get online preorders metrics (filtered by local day range)
+        today_preorders = OnlinePreorder.objects.filter(
+            created_at__gte=start_of_today,
+            created_at__lte=end_of_today
+        )
         today_preorders_count = today_preorders.count()
-        today_preorders_amount = today_preorders.aggregate(total=Sum('total_amount'))['total'] or 0
+        today_preorders_amount = today_preorders.aggregate(total=Sum('total_amount'))['total'] or Decimal('0.00')
 
         # Status counts for today
         today_status_breakdown = {
@@ -47,11 +61,12 @@ class DashboardStatsView(APIView):
                 all_status_breakdown[s_item['status']] = s_item['count']
 
         total_preorders_count = OnlinePreorder.objects.count()
-        total_preorders_amount = OnlinePreorder.objects.aggregate(total=Sum('total_amount'))['total'] or 0
+        total_preorders_amount = OnlinePreorder.objects.aggregate(total=Sum('total_amount'))['total'] or Decimal('0.00')
         
-        # Get today's metrics using Sale model for accurate profit calculation
+        # Get today's metrics using Sale model for accurate profit calculation (filtered by local day range)
         today_sales = Sale.objects.filter(
-            date__date=today,
+            date__gte=start_of_today,
+            date__lte=end_of_today,
             status='completed'
         ).aggregate(
             total=Sum('total'),
@@ -59,12 +74,12 @@ class DashboardStatsView(APIView):
             total_loss=Sum('total_loss')
         )
         
-        today_expenses = Expense.objects.filter(date=today).aggregate(total=Sum('amount'))['total'] or 0
+        today_expenses = Expense.objects.filter(date=today).aggregate(total=Sum('amount'))['total'] or Decimal('0.00')
         
-        # Get monthly metrics using Sale model for accurate profit calculation (current month)
+        # Get monthly metrics using Sale model for accurate profit calculation (current month in local time)
         monthly_sales = Sale.objects.filter(
-            date__date__gte=start_of_month,
-            date__date__lte=today,
+            date__gte=start_of_month,
+            date__lte=end_of_today,
             status='completed'
         ).aggregate(
             total=Sum('total'),
@@ -73,31 +88,49 @@ class DashboardStatsView(APIView):
         )
         
         monthly_expenses = Expense.objects.filter(
-            date__gte=start_of_month,
+            date__gte=start_of_month_date,
             date__lte=today
-        ).aggregate(total=Sum('amount'))['total'] or 0
+        ).aggregate(total=Sum('amount'))['total'] or Decimal('0.00')
         
         # Get counts
         total_customers = Customer.objects.count()
         total_products = Product.objects.count()
         total_suppliers = Supplier.objects.count()
         
-        # Get sales trend using Sale model for accurate profit calculation (current month)
-        sales_trend = Sale.objects.filter(
-            date__date__gte=start_of_month,
-            date__date__lte=today,
+        # Get sales trend using Sale model for accurate profit calculation (current month, grouped by local date)
+        sales_qs = Sale.objects.filter(
+            date__gte=start_of_month,
+            date__lte=end_of_today,
             status='completed'
-        ).values('date__date')\
-            .annotate(
-                total=Sum('total'),
-                profit=Sum('total_profit'),
-                loss=Sum('total_loss')
-            )\
-            .order_by('date__date')
+        ).values('date', 'total', 'total_profit', 'total_loss')
+
+        sales_by_date = {}
+        for sale in sales_qs:
+            local_date_str = sale['date'].astimezone(BUSINESS_TIMEZONE).date().isoformat()
+            if local_date_str not in sales_by_date:
+                sales_by_date[local_date_str] = {
+                    'date__date': local_date_str,
+                    'total': Decimal('0.00'),
+                    'profit': Decimal('0.00'),
+                    'loss': Decimal('0.00'),
+                }
+            sales_by_date[local_date_str]['total'] += sale['total'] or Decimal('0.00')
+            sales_by_date[local_date_str]['profit'] += sale['total_profit'] or Decimal('0.00')
+            sales_by_date[local_date_str]['loss'] += sale['total_loss'] or Decimal('0.00')
+
+        sales_trend = [
+            {
+                'date__date': d,
+                'total': float(data['total']),
+                'profit': float(data['profit']),
+                'loss': float(data['loss']),
+            }
+            for d, data in sorted(sales_by_date.items())
+        ]
             
         # Get expense trend (current month)
         expense_trend = Expense.objects.filter(
-            date__gte=start_of_month,
+            date__gte=start_of_month_date,
             date__lte=today
         ).values('date')\
             .annotate(amount=Sum('amount'))\
