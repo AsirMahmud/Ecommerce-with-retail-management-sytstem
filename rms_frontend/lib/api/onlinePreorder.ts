@@ -52,6 +52,18 @@ export interface OnlinePreorder {
   risk_score?: number;
   risk_level?: 'LOW' | 'MEDIUM' | 'HIGH';
 
+  cancel_reason?: string;
+  is_fake?: boolean;
+  steadfast_consignment_id?: string;
+  steadfast_status?: string;
+  steadfast_tracking_code?: string;
+  courier_partner?: string;
+  courier_consignment_id?: string;
+  courier_tracking_code?: string;
+  courier_status?: string;
+  courier_dispatched_at?: string;
+  courier_response?: any;
+
   fraud_summary?: {
     risk_score: number;
     risk_level: 'LOW' | 'MEDIUM' | 'HIGH';
@@ -78,6 +90,27 @@ export interface OnlinePreorder {
       utm_term?: string;
     };
   };
+}
+
+export interface SteadfastFraudResult {
+  success: boolean;
+  phone: string;
+  total_parcels: number;
+  total_delivered: number;
+  total_cancelled: number;
+  success_rate: number;
+  risk_level: 'SAFE' | 'NORMAL' | 'HIGH_RISK';
+  data?: any;
+  message?: string;
+}
+
+export interface SteadfastDispatchResult {
+  success: boolean;
+  message: string;
+  consignment_id: string;
+  tracking_code: string;
+  status: string;
+  order: OnlinePreorder;
 }
 
 export interface OnlinePreorderVerificationItem {
@@ -135,7 +168,38 @@ export const onlinePreordersApi = {
     api.post<OnlinePreorderVerification>(`/online-preorder/orders/${id}/complete-verification/`),
   skipVerification: (id: number, reason?: string) =>
     api.post<OnlinePreorderVerification>(`/online-preorder/orders/${id}/skip-verification/`, { reason }),
+
+  // Steadfast Courier APIs
+  dispatchSteadfast: (
+    id: number,
+    data?: { cod_amount?: number; note?: string; address?: string; phone?: string }
+  ) =>
+    api.post<SteadfastDispatchResult>(
+      `/online-preorder/orders/${id}/dispatch-steadfast/`,
+      data || {}
+    ),
+  getSteadfastStatus: (id: number) =>
+    api.get<{ success: boolean; status: string; data?: any; order: OnlinePreorder }>(
+      `/online-preorder/orders/${id}/steadfast-status/`
+    ),
+  checkSteadfastFraud: (id?: number, phone?: string) => {
+    if (id) {
+      return api.get<SteadfastFraudResult>(`/online-preorder/orders/${id}/steadfast-fraud-check/`);
+    }
+    return api.get<SteadfastFraudResult>(
+      `/online-preorder/orders/steadfast-fraud-check/?phone=${encodeURIComponent(phone || '')}`
+    );
+  },
+  bulkDispatchSteadfast: (order_ids: number[]) =>
+    api.post<{
+      success: boolean;
+      dispatched_count: number;
+      failed_count: number;
+      dispatched: any[];
+      failed: any[];
+    }>('/online-preorder/orders/bulk-dispatch-steadfast/', { order_ids }),
 };
+
 
 
 

@@ -217,3 +217,190 @@ class OrderTrackingFraudMetaTest(TestCase):
         self.assertIsNone(order.purchase_event_sent_at)
         self.assertEqual(MetaEventLog.objects.filter(online_preorder=order, event_name='Purchase').count(), 0)
 
+    def test_dispatch_steadfast_success(self):
+        from unittest.mock import patch
+        order = OnlinePreorder.objects.create(
+            customer_name="Steadfast Customer",
+            customer_phone="01712345678",
+            total_amount=1500,
+            status="PENDING",
+            shipping_address={"address": "House 1, Road 2", "city": "Dhaka"}
+        )
+
+        with patch('apps.online_preorder.steadfast_service.requests.post') as mock_post:
+            mock_post.return_value.status_code = 200
+            mock_post.return_value.json.return_value = {
+                "status": 200,
+                "message": "Consignment created successfully",
+                "consignment": {
+                    "consignment_id": 998877,
+                    "tracking_code": "STDF998877",
+                    "status": "in_review"
+                }
+            }
+
+            resp = self.client.post(
+                f'/api/online-preorder/orders/{order.id}/dispatch-steadfast/',
+                data={"cod_amount": 1500, "note": "Handle with care"},
+                content_type='application/json'
+            )
+            self.assertEqual(resp.status_code, status.HTTP_200_OK)
+            self.assertTrue(resp.data.get('success'))
+            self.assertEqual(resp.data.get('consignment_id'), "998877")
+            self.assertEqual(resp.data.get('tracking_code'), "STDF998877")
+
+            order.refresh_from_db()
+            self.assertEqual(order.steadfast_consignment_id, "998877")
+            self.assertEqual(order.steadfast_tracking_code, "STDF998877")
+            self.assertEqual(order.steadfast_status, "in_review")
+            self.assertEqual(order.status, "CONFIRMED")
+
+    def test_dispatch_steadfast_cancelled_order_fails(self):
+        order = OnlinePreorder.objects.create(
+            customer_name="Cancelled Customer",
+            customer_phone="01712345678",
+            total_amount=1000,
+            status="CANCELLED"
+        )
+        resp = self.client.post(f'/api/online-preorder/orders/{order.id}/dispatch-steadfast/')
+        self.assertEqual(resp.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("Cannot dispatch a cancelled order", resp.data.get('detail', ''))
+
+    def test_steadfast_fraud_check(self):
+        from unittest.mock import patch
+        order = OnlinePreorder.objects.create(
+            customer_name="Fraud Check Customer",
+            customer_phone="01811223344",
+            total_amount=2000,
+            status="PENDING"
+        )
+
+        with patch('apps.online_preorder.steadfast_service.requests.get') as mock_get:
+            mock_get.return_value.status_code = 200
+            mock_get.return_value.json.return_value = {
+                "status": 200,
+                "total_parcels": 10,
+                "total_delivered": 9,
+                "total_cancelled": 1
+            }
+
+            resp = self.client.get(f'/api/online-preorder/orders/{order.id}/steadfast-fraud-check/')
+            self.assertEqual(resp.status_code, status.HTTP_200_OK)
+            self.assertTrue(resp.data.get('success'))
+            self.assertEqual(resp.data.get('total_parcels'), 10)
+            self.assertEqual(resp.data.get('total_delivered'), 9)
+            self.assertEqual(resp.data.get('risk_level'), 'SAFE')
+
+
+class CourierIntegrationTest(TestCase):
+    def setUp(self):
+        self.client = Client()
+        from apps.online_preorder.models import CourierSetting
+        for code in ['STEADFAST', 'PATHAO', 'REDX', 'CARRYBEE']:
+            CourierSetting.objects.get_or_create(provider=code)
+
+    def test_courier_settings_auto_seed(self):
+        resp = self.client.get('/api/online-preorder/courier-settings/')
+        self.assertEqual(resp.status_code, status.HTTP_200_OK)
+        # Should have seeded 4 default providers: STEADFAST, PATHAO, REDX, CARRYBEE
+        data = resp.data if isinstance(resp.data, list) else resp.data.get('results', [])
+        providers = [c['provider'] for c in data]
+        self.assertIn('STEADFAST', providers)
+        self.assertIn('PATHAO', providers)
+        self.assertIn('REDX', providers)
+        self.assertIn('CARRYBEE', providers)
+
+    def test_active_couriers_endpoint(self):
+        from apps.online_preorder.models import CourierSetting
+        # Initially none have api_key
+        resp = self.client.get('/api/online-preorder/courier-settings/active/')
+        self.assertEqual(resp.status_code, status.HTTP_200_OK)
+        active = resp.data if isinstance(resp.data, list) else resp.data.get('active_couriers', [])
+        self.assertEqual(len(active), 0)
+
+        # Configure Steadfast
+        setting = CourierSetting.objects.get(provider='STEADFAST')
+        setting.api_key = "test_key"
+        setting.secret_key = "test_secret"
+        setting.is_active = True
+        setting.save()
+
+        resp = self.client.get('/api/online-preorder/courier-settings/active/')
+        self.assertEqual(resp.status_code, status.HTTP_200_OK)
+        active = resp.data if isinstance(resp.data, list) else resp.data.get('active_couriers', [])
+        self.assertEqual(len(active), 1)
+        self.assertEqual(active[0]['provider'], 'STEADFAST')
+
+    def test_dispatch_courier_endpoint(self):
+        from unittest.mock import patch
+        from apps.online_preorder.models import CourierSetting
+
+        setting = CourierSetting.objects.get(provider='STEADFAST')
+        setting.api_key = "test_key"
+        setting.secret_key = "test_secret"
+        setting.is_active = True
+        setting.save()
+
+        order = OnlinePreorder.objects.create(
+            customer_name="Test Courier Customer",
+            customer_phone="01799887766",
+            total_amount=2500,
+            status="PENDING",
+            shipping_address={"address": "Banani 11", "city": "Dhaka"}
+        )
+
+        with patch('apps.online_preorder.courier_services.SteadfastService.create_consignment') as mock_create:
+            mock_create.return_value = {
+                "success": True,
+                "provider": "STEADFAST",
+                "consignment_id": "ST1001",
+                "tracking_code": "TRK1001",
+                "status": "in_review",
+                "message": "Order created successfully"
+            }
+
+            resp = self.client.post(
+                f'/api/online-preorder/orders/{order.id}/dispatch-courier/',
+                data={"courier_partner": "STEADFAST", "cod_amount": 2500, "note": "Deliver soon"},
+                content_type='application/json'
+            )
+            self.assertEqual(resp.status_code, status.HTTP_200_OK)
+            self.assertTrue(resp.data.get('success'))
+            self.assertEqual(resp.data.get('consignment_id'), "ST1001")
+
+            order.refresh_from_db()
+            self.assertEqual(order.courier_partner, "STEADFAST")
+            self.assertEqual(order.courier_consignment_id, "ST1001")
+            self.assertEqual(order.courier_tracking_code, "TRK1001")
+            self.assertEqual(order.status, "CONFIRMED")
+
+    def test_courier_fraud_check_respective_method(self):
+        from apps.online_preorder.models import OnlinePreorder
+        order = OnlinePreorder.objects.create(
+            customer_name="Pathao Customer",
+            customer_phone="01811223344",
+            total_amount=1500,
+            status="PENDING",
+            courier_partner="PATHAO"
+        )
+
+        # 1. Test detail endpoint defaulting to order's courier_partner (PATHAO)
+        resp = self.client.get(f'/api/online-preorder/orders/{order.id}/courier-fraud-check/')
+        self.assertEqual(resp.status_code, status.HTTP_200_OK)
+        self.assertTrue(resp.data.get('success'))
+        self.assertEqual(resp.data.get('provider'), 'PATHAO')
+        self.assertEqual(resp.data.get('provider_name'), 'Pathao Courier')
+
+        # 2. Test switching provider to ALL
+        resp_all = self.client.get(f'/api/online-preorder/orders/{order.id}/courier-fraud-check/?provider=ALL')
+        self.assertEqual(resp_all.status_code, status.HTTP_200_OK)
+        self.assertEqual(resp_all.data.get('provider'), 'ALL')
+
+        # 3. Test list endpoint by phone
+        resp_phone = self.client.get('/api/online-preorder/orders/courier-fraud-check/?phone=01811223344&provider=PATHAO')
+        self.assertEqual(resp_phone.status_code, status.HTTP_200_OK)
+        self.assertEqual(resp_phone.data.get('provider'), 'PATHAO')
+
+
+
+

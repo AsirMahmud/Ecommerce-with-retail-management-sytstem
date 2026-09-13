@@ -4,13 +4,40 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { OnlinePreorder, onlinePreordersApi } from "@/lib/api/onlinePreorder";
-import { Package, User, MapPin, CreditCard, Clock, CheckCircle2, Truck, XCircle, AlertCircle, Edit } from "lucide-react";
+import { OnlinePreorder, onlinePreordersApi, type SteadfastFraudResult } from "@/lib/api/onlinePreorder";
+import {
+    Package,
+    User,
+    MapPin,
+    CreditCard,
+    Clock,
+    CheckCircle2,
+    Truck,
+    XCircle,
+    AlertCircle,
+    Edit,
+    Copy,
+    Check,
+    ExternalLink,
+    Zap,
+    RefreshCw,
+    ShieldCheck,
+    ShieldAlert,
+    MoreHorizontal
+} from "lucide-react";
 import { format } from "date-fns";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { toast } from "@/hooks/use-toast";
 import { formatCurrency } from "@/lib/utils";
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuLabel,
+    DropdownMenuSeparator,
+    DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 interface OrderDetailsSheetProps {
     order: OnlinePreorder | null;
@@ -29,10 +56,13 @@ const statusConfig: Record<string, { color: string; icon: any }> = {
     CANCELLED: { color: "bg-red-100 text-red-800", icon: XCircle },
 };
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import Link from "next/link";
+import { courierApi, type ActiveCourier, type CourierFraudResult } from "@/lib/api/courier";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { sendAdminPurchaseConfirmed, sendAdminPurchaseCancelled } from "@/lib/gtm";
 
 export function OrderDetailsSheet({ order, isOpen, onClose, onRefresh, onEdit, onStartVerification }: OrderDetailsSheetProps) {
@@ -40,6 +70,166 @@ export function OrderDetailsSheet({ order, isOpen, onClose, onRefresh, onEdit, o
     const [cancelReason, setCancelReason] = useState("Fake Customer / Fake Order");
     const [isFakeCustomer, setIsFakeCustomer] = useState(true);
     const [isSubmittingCancel, setIsSubmittingCancel] = useState(false);
+
+    // Multi-Courier States
+    const [activeCouriers, setActiveCouriers] = useState<ActiveCourier[]>([]);
+    const [selectedCourierProvider, setSelectedCourierProvider] = useState<string>("STEADFAST");
+    const [steadfastDialogOpen, setSteadfastDialogOpen] = useState(false);
+    const [isDispatchingSteadfast, setIsDispatchingSteadfast] = useState(false);
+    const [isCheckingSteadfastStatus, setIsCheckingSteadfastStatus] = useState(false);
+    const [isCheckingFraud, setIsCheckingFraud] = useState(false);
+    const [fraudData, setFraudData] = useState<CourierFraudResult | null>(null);
+    const [selectedFraudProvider, setSelectedFraudProvider] = useState<string>("ALL");
+    const [copiedTracking, setCopiedTracking] = useState(false);
+    const [codAmount, setCodAmount] = useState("");
+    const [dispatchNote, setDispatchNote] = useState("");
+    const [dispatchAddress, setDispatchAddress] = useState("");
+    const [dispatchPhone, setDispatchPhone] = useState("");
+
+    const fetchCouriers = async () => {
+        try {
+            const res = await courierApi.getActiveCouriers();
+            setActiveCouriers(res.data);
+            if (res.data.length > 0) {
+                setSelectedCourierProvider(prev => {
+                    if (res.data.some(c => c.provider === prev)) return prev;
+                    const def = res.data.find(c => c.is_default);
+                    return def ? def.provider : res.data[0].provider;
+                });
+            }
+            return res.data;
+        } catch (err) {
+            console.error("Failed to load active couriers:", err);
+            return [];
+        }
+    };
+
+    useEffect(() => {
+        if (isOpen) {
+            void fetchCouriers();
+        }
+    }, [isOpen]);
+
+    const formatAddressString = (addr: any): string => {
+        if (!addr) return "";
+        if (typeof addr === "string") return addr;
+        const parts = [
+            addr.address,
+            addr.place,
+            addr.thana,
+            addr.city_corporation,
+            addr.union,
+            addr.upazila,
+            addr.district,
+            addr.division,
+            addr.city,
+            addr.area
+        ].filter(Boolean);
+        return Array.from(new Set(parts)).join(", ");
+    };
+
+    const openFastDispatch = async (courierProvider?: string) => {
+        if (!order) return;
+        setCodAmount(String(order.total_amount || 0));
+        setDispatchNote(order.notes || `Online Preorder #${order.id}`);
+        setDispatchAddress(formatAddressString(order.shipping_address));
+        setDispatchPhone(order.customer_phone || "");
+
+        const fresh = await fetchCouriers();
+        if (courierProvider) {
+            setSelectedCourierProvider(courierProvider);
+        } else if (fresh.length > 0 && !fresh.some(c => c.provider === selectedCourierProvider)) {
+            const def = fresh.find(c => c.is_default);
+            setSelectedCourierProvider(def ? def.provider : fresh[0].provider);
+        }
+        setSteadfastDialogOpen(true);
+    };
+
+    const openFastSteadfastDialog = () => {
+        void openFastDispatch();
+    };
+
+    const handleFastDispatch = async () => {
+        if (!order) return;
+        setIsDispatchingSteadfast(true);
+        try {
+            const res = await courierApi.dispatchOrder(order.id, {
+                courier_partner: selectedCourierProvider,
+                cod_amount: Number(codAmount) >= 0 ? Number(codAmount) : Number(order.total_amount) || 0,
+                note: dispatchNote,
+                address: dispatchAddress,
+                phone: dispatchPhone,
+            });
+            const courierName = activeCouriers.find(c => c.provider === selectedCourierProvider)?.name || selectedCourierProvider;
+            toast({
+                title: `Dispatched to ${courierName}!`,
+                description: `Consignment ID: ${res.data.consignment_id || 'N/A'} | Tracking: ${res.data.tracking_code || 'N/A'}`,
+            });
+            setSteadfastDialogOpen(false);
+            onRefresh();
+        } catch (error: any) {
+            const msg = error?.response?.data?.message || error?.response?.data?.detail || "Failed to dispatch order";
+            toast({
+                title: "Dispatch Failed",
+                description: msg,
+                variant: "destructive",
+            });
+        } finally {
+            setIsDispatchingSteadfast(false);
+        }
+    };
+
+    const handleRefreshSteadfastStatus = async () => {
+        if (!order) return;
+        setIsCheckingSteadfastStatus(true);
+        try {
+            const res = await courierApi.getOrderStatus(order.id);
+            toast({
+                title: "Courier Status Refreshed",
+                description: `Current delivery status: ${res.data.status || 'Updated'}`,
+            });
+            onRefresh();
+        } catch (error: any) {
+            toast({
+                title: "Status Check Failed",
+                description: error?.response?.data?.message || error?.response?.data?.detail || "Failed to fetch courier status",
+                variant: "destructive",
+            });
+        } finally {
+            setIsCheckingSteadfastStatus(false);
+        }
+    };
+
+    const handleCheckCourierFraud = async (provider?: string) => {
+        if (!order) return;
+        const targetProvider = provider || selectedFraudProvider || order.courier_partner || (activeCouriers[0]?.provider) || "ALL";
+        setSelectedFraudProvider(targetProvider);
+        setIsCheckingFraud(true);
+        try {
+            const res = await courierApi.checkCourierFraud({ orderId: order.id, provider: targetProvider });
+            setFraudData(res.data);
+            toast({
+                title: `${res.data.provider_name} Loaded`,
+                description: `Total parcels: ${res.data.total_parcels}, Success rate: ${res.data.success_rate}%`,
+            });
+        } catch (error: any) {
+            toast({
+                title: "Fraud Check Failed",
+                description: error?.response?.data?.message || "Could not retrieve courier record",
+                variant: "destructive",
+            });
+        } finally {
+            setIsCheckingFraud(false);
+        }
+    };
+
+    const copyTrackingCode = (code: string) => {
+        navigator.clipboard.writeText(code);
+        setCopiedTracking(true);
+        toast({ title: "Copied!", description: `Tracking code ${code} copied to clipboard.` });
+        setTimeout(() => setCopiedTracking(false), 2000);
+    };
+
 
     if (!order) return null;
 
@@ -219,6 +409,293 @@ export function OrderDetailsSheet({ order, isOpen, onClose, onRefresh, onEdit, o
                                 </div>
                             </div>
                         </div>
+
+                        {/* Courier Partner Integration Card */}
+                        {(() => {
+                            const partnerKey = (order.courier_partner || (order.steadfast_consignment_id ? "STEADFAST" : "")).toUpperCase();
+                            const consignmentId = order.courier_consignment_id || order.steadfast_consignment_id;
+                            const trackingCode = order.courier_tracking_code || order.steadfast_tracking_code;
+                            const courierStatus = order.courier_status || order.steadfast_status;
+
+                            const courierName =
+                                partnerKey === "STEADFAST"
+                                    ? "Steadfast Courier"
+                                    : partnerKey === "PATHAO"
+                                    ? "Pathao Courier"
+                                    : partnerKey === "REDX"
+                                    ? "RedX Logistics"
+                                    : partnerKey === "CARRYBEE"
+                                    ? "Carrybee Courier"
+                                    : partnerKey || "Delivery Agent";
+
+                            const trackingUrl =
+                                trackingCode || consignmentId
+                                    ? partnerKey === "STEADFAST"
+                                        ? `https://steadfast.com.bd/tracking`
+                                        : partnerKey === "PATHAO"
+                                        ? `https://merchant.pathao.com/tracking?consignment_id=${trackingCode || consignmentId}`
+                                        : partnerKey === "REDX"
+                                        ? `https://redx.com.bd/track-parcel/?trackingId=${trackingCode || consignmentId}`
+                                        : `https://carrybee.com/track`
+                                    : null;
+
+                            return (
+                                <div className="bg-white p-4 sm:p-5 rounded-xl border border-slate-200 shadow-sm space-y-4">
+                                    <div className="flex flex-wrap items-center justify-between gap-2 border-b pb-3">
+                                        <div className="flex items-center gap-2.5">
+                                            <div className="w-8 h-8 rounded-lg bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-600 font-bold text-sm">
+                                                <Truck className="w-4 h-4" />
+                                            </div>
+                                            <div>
+                                                <div className="flex items-center gap-1.5 font-bold text-slate-900 text-sm">
+                                                    {courierName}
+                                                    {partnerKey && (
+                                                        <span className="bg-amber-100 text-amber-800 text-[10px] font-extrabold px-1.5 py-0.5 rounded tracking-wide">
+                                                            {partnerKey}
+                                                        </span>
+                                                    )}
+                                                </div>
+                                                <p className="text-[11px] text-slate-500">Integrated Delivery Partner</p>
+                                            </div>
+                                        </div>
+                                        <div className="flex items-center gap-2">
+                                            {consignmentId ? (
+                                                <>
+                                                    <Badge variant="outline" className="bg-emerald-50 text-emerald-700 border-emerald-200 text-xs font-bold uppercase tracking-wider">
+                                                        {courierStatus || 'In Review'}
+                                                    </Badge>
+                                                    <Button
+                                                        variant="outline"
+                                                        size="sm"
+                                                        onClick={handleRefreshSteadfastStatus}
+                                                        disabled={isCheckingSteadfastStatus}
+                                                        className="h-8 px-2.5 text-xs text-slate-600 hover:text-indigo-600 border-slate-200"
+                                                        title="Refresh Live Status"
+                                                    >
+                                                        <RefreshCw className={`w-3.5 h-3.5 mr-1 ${isCheckingSteadfastStatus ? 'animate-spin' : ''}`} />
+                                                        Refresh
+                                                    </Button>
+                                                </>
+                                            ) : order.status !== "CANCELLED" ? (
+                                                activeCouriers.length <= 1 ? (
+                                                    <Button
+                                                        size="sm"
+                                                        onClick={() => openFastDispatch(activeCouriers[0]?.provider)}
+                                                        className="h-8 text-xs font-bold bg-amber-500 hover:bg-amber-600 text-white shadow-sm flex items-center gap-1.5"
+                                                    >
+                                                        <Zap className="w-3.5 h-3.5 fill-current" />
+                                                        ⚡ {activeCouriers.length === 1 ? `Dispatch via ${activeCouriers[0].name}` : "Fast Dispatch"}
+                                                    </Button>
+                                                ) : (
+                                                    <DropdownMenu>
+                                                        <DropdownMenuTrigger asChild>
+                                                          <Button
+                                                              size="sm"
+                                                              className="h-8 text-xs font-bold bg-amber-500 hover:bg-amber-600 text-white shadow-sm flex items-center gap-1.5"
+                                                          >
+                                                              <Zap className="w-3.5 h-3.5 fill-current" />
+                                                              ⚡ Dispatch Order
+                                                              <MoreHorizontal className="w-3.5 h-3.5 ml-1 opacity-70" />
+                                                          </Button>
+                                                        </DropdownMenuTrigger>
+                                                        <DropdownMenuContent align="end" className="w-48">
+                                                            <DropdownMenuLabel className="text-xs">Select Delivery Partner</DropdownMenuLabel>
+                                                            <DropdownMenuSeparator />
+                                                            {activeCouriers.map((c) => (
+                                                                <DropdownMenuItem
+                                                                    key={c.provider}
+                                                                    onClick={() => openFastDispatch(c.provider)}
+                                                                    className="text-xs font-semibold cursor-pointer"
+                                                                >
+                                                                    <Truck className="w-3.5 h-3.5 mr-2 text-amber-600" />
+                                                                    Dispatch via {c.name}
+                                                                </DropdownMenuItem>
+                                                            ))}
+                                                        </DropdownMenuContent>
+                                                    </DropdownMenu>
+                                                )
+                                            ) : (
+                                                <Badge variant="secondary" className="bg-slate-100 text-slate-500 text-xs">
+                                                    Order Cancelled
+                                                </Badge>
+                                            )}
+                                        </div>
+                                    </div>
+
+                                    {/* Consignment Details If Booked */}
+                                    {consignmentId ? (
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 bg-slate-50 p-3.5 rounded-lg border border-slate-100">
+                                            <div>
+                                                <span className="text-slate-400 text-[11px] font-medium block">Consignment ID</span>
+                                                <span className="font-mono font-bold text-slate-900 text-sm">
+                                                    #{consignmentId}
+                                                </span>
+                                            </div>
+                                            <div>
+                                                <span className="text-slate-400 text-[11px] font-medium block">Tracking Code</span>
+                                                <div className="flex items-center gap-2 mt-0.5">
+                                                    <span className="font-mono font-bold text-indigo-600 text-sm">
+                                                        {trackingCode || 'N/A'}
+                                                    </span>
+                                                    {trackingCode && (
+                                                        <div className="flex items-center gap-1">
+                                                            <Button
+                                                                variant="ghost"
+                                                                size="icon"
+                                                                className="h-6 w-6 text-slate-500 hover:text-slate-900"
+                                                                onClick={() => copyTrackingCode(trackingCode)}
+                                                                title="Copy Tracking Code"
+                                                            >
+                                                                {copiedTracking ? <Check className="w-3 h-3 text-emerald-600" /> : <Copy className="w-3 h-3" />}
+                                                            </Button>
+                                                            {trackingUrl && (
+                                                                <a
+                                                                    href={trackingUrl}
+                                                                    target="_blank"
+                                                                    rel="noreferrer"
+                                                                    onClick={() => {
+                                                                        if (trackingCode) {
+                                                                            copyTrackingCode(trackingCode);
+                                                                        }
+                                                                    }}
+                                                                    className="h-6 px-1.5 inline-flex items-center text-[10px] font-medium bg-white border border-slate-200 rounded text-slate-700 hover:text-indigo-600 hover:border-indigo-200"
+                                                                    title="Open Live Courier Tracker (Copies tracking code)"
+                                                                >
+                                                                    Track <ExternalLink className="w-2.5 h-2.5 ml-1" />
+                                                                </a>
+                                                            )}
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    ) : (
+                                        <div className="bg-amber-50/70 border border-amber-200/60 rounded-lg p-3 text-xs flex items-center justify-between gap-3">
+                                            <div className="text-amber-900">
+                                                <span className="font-bold">Not yet booked with a delivery agent.</span>
+                                                <p className="text-amber-700/90 text-[11px] mt-0.5">
+                                                    Click <strong>Fast Dispatch</strong> to book this parcel with Steadfast, Pathao, RedX, or Carrybee.
+                                                </p>
+                                            </div>
+                                            {order.status !== "CANCELLED" && (
+                                                <Button
+                                                    size="sm"
+                                                    onClick={openFastSteadfastDialog}
+                                                    className="h-7 text-xs font-bold bg-amber-600 hover:bg-amber-700 text-white shrink-0"
+                                                >
+                                                    Dispatch Now
+                                                </Button>
+                                            )}
+                                        </div>
+                                    )}
+
+                                     {/* Respective Delivery Method Fraud & Delivery Record */}
+                                     <div className="pt-2 border-t border-slate-100 space-y-2">
+                                         <div className="flex flex-wrap items-center justify-between gap-2">
+                                             <div className="flex items-center gap-1.5 text-xs font-semibold text-slate-700">
+                                                 <ShieldCheck className="w-3.5 h-3.5 text-slate-400" />
+                                                 Delivery Method Verification
+                                                 {fraudData && (
+                                                     <Badge variant="outline" className="text-[10px] font-bold bg-slate-50 text-slate-700 ml-1">
+                                                         {fraudData.provider_name}
+                                                     </Badge>
+                                                 )}
+                                             </div>
+                                             {!fraudData ? (
+                                                 <Button
+                                                     variant="ghost"
+                                                     size="sm"
+                                                     onClick={() => handleCheckCourierFraud(order.courier_partner || undefined)}
+                                                     disabled={isCheckingFraud}
+                                                     className="h-7 text-xs text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50 font-medium px-2"
+                                                 >
+                                                     {isCheckingFraud ? (
+                                                         <RefreshCw className="w-3 h-3 mr-1 animate-spin" />
+                                                     ) : (
+                                                         <Zap className="w-3 h-3 mr-1" />
+                                                     )}
+                                                     {isCheckingFraud ? "Checking..." : `Check ${order.courier_partner || "Courier"} History`}
+                                                 </Button>
+                                             ) : (
+                                                 <Badge
+                                                     className={`text-[10px] font-bold px-2 py-0.5 border-none ${
+                                                         fraudData.risk_level === 'HIGH_RISK' ? 'bg-red-100 text-red-800' :
+                                                         fraudData.risk_level === 'SAFE' ? 'bg-emerald-100 text-emerald-800' :
+                                                         'bg-slate-100 text-slate-800'
+                                                     }`}
+                                                 >
+                                                     {fraudData.risk_level === 'HIGH_RISK' ? '⚠️ High Risk of Return' :
+                                                      fraudData.risk_level === 'SAFE' ? '✓ Verified Safe Customer' : 'Normal Record'}
+                                                 </Badge>
+                                             )}
+                                         </div>
+
+                                         {/* Courier Selector Tabs when record loaded */}
+                                         {fraudData && (
+                                             <div className="flex flex-wrap items-center gap-1 pt-1">
+                                                 <span className="text-[10px] text-slate-400 font-medium mr-1">Method:</span>
+                                                 <Button
+                                                     type="button"
+                                                     variant={selectedFraudProvider === "ALL" ? "default" : "outline"}
+                                                     size="sm"
+                                                     className={`h-5 text-[10px] px-1.5 ${selectedFraudProvider === "ALL" ? "bg-indigo-600 text-white" : "text-slate-600"}`}
+                                                     onClick={() => handleCheckCourierFraud("ALL")}
+                                                     disabled={isCheckingFraud}
+                                                 >
+                                                     All
+                                                 </Button>
+                                                 {activeCouriers.map((c) => (
+                                                     <Button
+                                                         key={c.provider}
+                                                         type="button"
+                                                         variant={selectedFraudProvider === c.provider ? "default" : "outline"}
+                                                         size="sm"
+                                                         className={`h-5 text-[10px] px-1.5 ${selectedFraudProvider === c.provider ? "bg-indigo-600 text-white" : "text-slate-600"}`}
+                                                         onClick={() => handleCheckCourierFraud(c.provider)}
+                                                         disabled={isCheckingFraud}
+                                                     >
+                                                         {c.name.replace(" Courier", "").replace(" Logistics", "")}
+                                                     </Button>
+                                                 ))}
+                                                 {!activeCouriers.some(c => c.provider === "STEADFAST") && (
+                                                     <Button
+                                                         type="button"
+                                                         variant={selectedFraudProvider === "STEADFAST" ? "default" : "outline"}
+                                                         size="sm"
+                                                         className={`h-5 text-[10px] px-1.5 ${selectedFraudProvider === "STEADFAST" ? "bg-indigo-600 text-white" : "text-slate-600"}`}
+                                                         onClick={() => handleCheckCourierFraud("STEADFAST")}
+                                                         disabled={isCheckingFraud}
+                                                     >
+                                                         Steadfast
+                                                     </Button>
+                                                 )}
+                                             </div>
+                                         )}
+
+                                         {fraudData && (
+                                             <div className="grid grid-cols-4 gap-2 bg-slate-50 p-2.5 rounded-lg text-center text-xs border border-slate-100">
+                                                 <div>
+                                                     <span className="text-slate-400 text-[10px] block">Parcels</span>
+                                                     <span className="font-bold text-slate-900 text-xs">{fraudData.total_parcels}</span>
+                                                 </div>
+                                                 <div>
+                                                     <span className="text-slate-400 text-[10px] block">Delivered</span>
+                                                     <span className="font-bold text-emerald-700 text-xs">{fraudData.total_delivered}</span>
+                                                 </div>
+                                                 <div>
+                                                     <span className="text-slate-400 text-[10px] block">Cancelled</span>
+                                                     <span className="font-bold text-rose-700 text-xs">{fraudData.total_cancelled}</span>
+                                                 </div>
+                                                 <div>
+                                                     <span className="text-slate-400 text-[10px] block">Success Rate</span>
+                                                     <span className="font-extrabold text-indigo-700 text-xs">{fraudData.success_rate}%</span>
+                                                 </div>
+                                             </div>
+                                         )}
+                                     </div>
+                                </div>
+                            );
+                        })()}
 
                         {/* Fraud Risk & Customer History Card */}
                         {order.fraud_summary && (
@@ -528,7 +1005,160 @@ export function OrderDetailsSheet({ order, isOpen, onClose, onRefresh, onEdit, o
                         </DialogFooter>
                     </DialogContent>
                 </Dialog>
+
+                {/* Fast Courier Dispatch Dialog */}
+                <Dialog open={steadfastDialogOpen} onOpenChange={setSteadfastDialogOpen}>
+                    <DialogContent className="max-w-md">
+                        <DialogHeader>
+                            <DialogTitle className="flex items-center gap-2 text-lg text-slate-900 font-bold">
+                                <div className="w-7 h-7 rounded bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-amber-600">
+                                    <Zap className="w-4 h-4 fill-current" />
+                                </div>
+                                Fast Dispatch to Courier Partner
+                            </DialogTitle>
+                            <DialogDescription className="text-xs">
+                                Confirm delivery information for automated booking with your integrated courier.
+                            </DialogDescription>
+                        </DialogHeader>
+
+                        <div className="space-y-3.5 py-2">
+                            <div className="grid grid-cols-2 gap-3 bg-slate-50 p-3 rounded-lg border text-xs">
+                                <div>
+                                    <span className="text-slate-400 block font-medium">Customer</span>
+                                    <span className="font-bold text-slate-900">{order.customer_name}</span>
+                                </div>
+                                <div>
+                                    <span className="text-slate-400 block font-medium">Order Invoice</span>
+                                    <span className="font-bold text-indigo-600">#{order.id}</span>
+                                </div>
+                            </div>
+
+                            {/* Delivery Agent Options */}
+                            <div className="space-y-1.5">
+                                <div className="flex items-center justify-between">
+                                    <Label className="text-xs font-semibold text-slate-700">Delivery Agent / Courier Partner</Label>
+                                    <Link href="/settings" className="text-[11px] text-indigo-600 hover:underline">
+                                        Manage Keys in Settings
+                                    </Link>
+                                </div>
+                                {activeCouriers.length === 0 ? (
+                                    <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg text-xs text-amber-900 space-y-1">
+                                        <p className="font-semibold flex items-center gap-1 text-amber-800">
+                                            <Truck className="h-3.5 w-3.5" />
+                                            No Delivery Agent API Keys Configured
+                                        </p>
+                                        <p className="text-[11px] text-amber-700">
+                                            Please enter your API keys for Pathao, Steadfast, RedX, or Carrybee in Settings to enable 1-click dispatch.
+                                        </p>
+                                        <Button asChild size="sm" variant="outline" className="h-7 text-xs mt-1 border-amber-300 bg-white">
+                                            <Link href="/settings">Configure in Settings</Link>
+                                        </Button>
+                                    </div>
+                                ) : (
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                        {activeCouriers.map((c) => {
+                                            const isSelected = selectedCourierProvider === c.provider;
+                                            return (
+                                                <div
+                                                    key={c.provider}
+                                                    onClick={() => setSelectedCourierProvider(c.provider)}
+                                                    className={`p-2.5 rounded-lg border text-xs cursor-pointer flex items-center justify-between transition-all ${
+                                                        isSelected
+                                                            ? "border-amber-500 bg-amber-50/80 ring-2 ring-amber-400/40 shadow-xs font-bold text-amber-950"
+                                                            : "border-slate-200 bg-white hover:bg-slate-50 text-slate-700"
+                                                    }`}
+                                                >
+                                                    <div className="flex items-center gap-2">
+                                                        <Truck className={`h-4 w-4 ${isSelected ? "text-amber-600" : "text-slate-400"}`} />
+                                                        <span>{c.name}</span>
+                                                    </div>
+                                                    {isSelected ? (
+                                                        <Check className="h-4 w-4 text-amber-600" />
+                                                    ) : (
+                                                        <span className="text-[10px] text-slate-400">Select</span>
+                                                    )}
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                )}
+                            </div>
+
+                            <div className="space-y-1.5">
+                                <Label htmlFor="dispatchPhone" className="text-xs font-semibold text-slate-700">Recipient Phone (11 digits)</Label>
+                                <Input
+                                    id="dispatchPhone"
+                                    value={dispatchPhone}
+                                    onChange={(e) => setDispatchPhone(e.target.value)}
+                                    placeholder="01XXXXXXXXX"
+                                    className="h-9 text-sm"
+                                />
+                            </div>
+
+                            <div className="space-y-1.5">
+                                <Label htmlFor="codAmount" className="text-xs font-semibold text-slate-700">Cash on Delivery (COD) Amount (৳)</Label>
+                                <Input
+                                    id="codAmount"
+                                    type="number"
+                                    value={codAmount}
+                                    onChange={(e) => setCodAmount(e.target.value)}
+                                    placeholder="0.00"
+                                    className="h-9 text-sm font-semibold"
+                                />
+                                <p className="text-[11px] text-slate-400">Default is full order amount (৳{order.total_amount}). Set to 0 if paid in advance.</p>
+                            </div>
+
+                            <div className="space-y-1.5">
+                                <Label htmlFor="dispatchAddress" className="text-xs font-semibold text-slate-700">Delivery Address</Label>
+                                <Textarea
+                                    id="dispatchAddress"
+                                    value={dispatchAddress}
+                                    onChange={(e) => setDispatchAddress(e.target.value)}
+                                    placeholder="Customer street address, thana, district..."
+                                    rows={2}
+                                    className="text-xs resize-none"
+                                />
+                            </div>
+
+                            <div className="space-y-1.5">
+                                <Label htmlFor="dispatchNote" className="text-xs font-semibold text-slate-700">Courier Note</Label>
+                                <Input
+                                    id="dispatchNote"
+                                    value={dispatchNote}
+                                    onChange={(e) => setDispatchNote(e.target.value)}
+                                    placeholder="Special delivery instructions..."
+                                    className="h-9 text-xs"
+                                />
+                            </div>
+                        </div>
+
+                        <DialogFooter className="gap-2 sm:gap-0">
+                            <Button variant="outline" size="sm" onClick={() => setSteadfastDialogOpen(false)} disabled={isDispatchingSteadfast}>
+                                Cancel
+                            </Button>
+                            <Button
+                                size="sm"
+                                onClick={handleFastDispatch}
+                                disabled={isDispatchingSteadfast || !dispatchPhone || !dispatchAddress || activeCouriers.length === 0}
+                                className="bg-amber-600 hover:bg-amber-700 text-white font-bold flex items-center gap-1.5"
+                            >
+                                {isDispatchingSteadfast ? (
+                                    <>
+                                        <RefreshCw className="w-3.5 h-3.5 animate-spin mr-1" />
+                                        Booking Consignment...
+                                    </>
+                                ) : (
+                                    <>
+                                        <Zap className="w-3.5 h-3.5 fill-current" />
+                                        Confirm &amp; Dispatch via {activeCouriers.find(c => c.provider === selectedCourierProvider)?.name || 'Courier'}
+                                    </>
+                                )}
+                            </Button>
+                        </DialogFooter>
+                    </DialogContent>
+                </Dialog>
             </SheetContent>
         </Sheet>
+
     );
 }

@@ -62,12 +62,21 @@ class OnlinePreorder(models.Model):
     risk_score = models.IntegerField(default=0)
     risk_level = models.CharField(max_length=20, default='LOW')
 
-    # Cancellation & Steadfast courier fields
+    # Cancellation & Steadfast courier fields (maintained for backward compatibility)
     cancel_reason = models.CharField(max_length=255, null=True, blank=True)
     is_fake = models.BooleanField(default=False, help_text="Marked as fake order or fake customer")
     steadfast_consignment_id = models.CharField(max_length=100, null=True, blank=True)
     steadfast_status = models.CharField(max_length=100, null=True, blank=True)
     steadfast_tracking_code = models.CharField(max_length=100, null=True, blank=True)
+
+    # Multi-Delivery Agent Courier Partner fields
+    courier_partner = models.CharField(max_length=50, null=True, blank=True, help_text="STEADFAST, PATHAO, REDX, CARRYBEE")
+    courier_consignment_id = models.CharField(max_length=100, null=True, blank=True)
+    courier_tracking_code = models.CharField(max_length=100, null=True, blank=True)
+    courier_status = models.CharField(max_length=100, null=True, blank=True)
+    courier_dispatched_at = models.DateTimeField(null=True, blank=True)
+    courier_response = models.JSONField(null=True, blank=True)
+
 
     def __str__(self):
         return f"OnlinePreorder #{self.id} - {self.customer_name}"
@@ -240,5 +249,70 @@ class MetaEventLog(models.Model):
 
     def __str__(self):
         return f"MetaEventLog #{self.id} [{self.event_name}] Order #{self.online_preorder_id} - {self.status}"
+
+
+class CourierSetting(models.Model):
+    """
+    Settings and credentials for multi-delivery agents (Steadfast, Pathao, RedX, Carrybee).
+    Configurable via Settings page in the frontend.
+    """
+    PROVIDER_CHOICES = [
+        ('STEADFAST', 'Steadfast Courier'),
+        ('PATHAO', 'Pathao Courier'),
+        ('REDX', 'RedX Courier'),
+        ('CARRYBEE', 'Carrybee Courier'),
+    ]
+
+    provider = models.CharField(max_length=50, choices=PROVIDER_CHOICES, unique=True)
+    is_active = models.BooleanField(default=False, help_text="Enable or disable this delivery agent in online preorders")
+    is_default = models.BooleanField(default=False, help_text="Default selected courier agent")
+
+    # API Keys & Secrets
+    api_key = models.CharField(max_length=255, blank=True, null=True)
+    secret_key = models.CharField(max_length=255, blank=True, null=True)
+    base_url = models.CharField(max_length=255, blank=True, null=True)
+
+    # Provider specific fields (e.g. Pathao OAuth & Store ID)
+    client_id = models.CharField(max_length=255, blank=True, null=True)
+    client_secret = models.CharField(max_length=255, blank=True, null=True)
+    username = models.CharField(max_length=255, blank=True, null=True)
+    password = models.CharField(max_length=255, blank=True, null=True)
+    store_id = models.CharField(max_length=100, blank=True, null=True)
+
+    extra_config = models.JSONField(default=dict, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['provider']
+        verbose_name = 'Courier Setting'
+        verbose_name_plural = 'Courier Settings'
+
+    def __str__(self):
+        return f"{self.get_provider_display()} ({'Active' if self.is_active else 'Disabled'})"
+
+    def has_valid_credentials(self) -> bool:
+        """Returns True if the required credentials for this courier exist."""
+        if self.provider == 'STEADFAST':
+            from django.conf import settings
+            key = self.api_key or getattr(settings, 'STEADFAST_API_KEY', '')
+            sec = self.secret_key or getattr(settings, 'STEADFAST_SECRET_KEY', '')
+            return bool((key and sec and key != 'default_api_key') or self.api_key)
+        elif self.provider == 'PATHAO':
+            # Support both direct Bearer/API token and OAuth client credentials
+            return bool(self.api_key or (self.client_id and self.client_secret))
+        elif self.provider == 'REDX':
+            return bool(self.api_key)
+        elif self.provider == 'CARRYBEE':
+            return bool(self.api_key)
+        return False
+
+    def save(self, *args, **kwargs):
+        # If credentials exist and is_active is False, auto-activate by default
+        if self.has_valid_credentials() and not self.is_active:
+            if 'update_fields' not in kwargs or 'is_active' not in kwargs['update_fields']:
+                self.is_active = True
+        super().save(*args, **kwargs)
+
 
 

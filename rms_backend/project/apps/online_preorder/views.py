@@ -337,3 +337,388 @@ class OnlinePreorderViewSet(
         serializer = OnlinePreorderVerificationSerializer(verification, context={"request": request})
         return Response(serializer.data)
 
+    # --- Steadfast Courier Actions ---
+
+    @action(detail=True, methods=["post"], url_path="dispatch-steadfast", authentication_classes=[], permission_classes=[AllowAny])
+    def dispatch_steadfast(self, request, pk=None):
+        """
+        Fast dispatch this online preorder to Steadfast Courier portal.
+        Optional body fields: cod_amount, note, address, phone
+        """
+        from .steadfast_service import SteadfastService
+        order = self.get_object()
+
+        if order.status == "CANCELLED":
+            return Response(
+                {"detail": "Cannot dispatch a cancelled order to courier."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        cod_amount = request.data.get("cod_amount")
+        note = request.data.get("note")
+        address_override = request.data.get("address")
+        phone_override = request.data.get("phone")
+
+        res = SteadfastService.create_consignment(
+            order,
+            cod_amount=cod_amount,
+            note=note,
+            address_override=address_override,
+            phone_override=phone_override
+        )
+
+        if not res.get("success"):
+            return Response(
+                {
+                    "success": False,
+                    "message": res.get("message", "Failed to book with Steadfast Courier"),
+                    "data": res.get("data")
+                },
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Update order with Steadfast details
+        order.steadfast_consignment_id = res.get("consignment_id")
+        order.steadfast_tracking_code = res.get("tracking_code")
+        order.steadfast_status = res.get("status") or "in_review"
+
+        update_fields = ["steadfast_consignment_id", "steadfast_tracking_code", "steadfast_status", "updated_at"]
+        if order.status == "PENDING":
+            order.status = "CONFIRMED"
+            update_fields.append("status")
+
+        order.save(update_fields=update_fields)
+
+        return Response({
+            "success": True,
+            "message": res.get("message", "Dispatched to Steadfast Courier successfully!"),
+            "consignment_id": res.get("consignment_id"),
+            "tracking_code": res.get("tracking_code"),
+            "status": order.steadfast_status,
+            "order": OnlinePreorderSerializer(order, context={"request": request}).data
+        }, status=status.HTTP_200_OK)
+
+    @action(detail=True, methods=["get"], url_path="steadfast-status", authentication_classes=[], permission_classes=[AllowAny])
+    def steadfast_status(self, request, pk=None):
+        """
+        Fetch live tracking status from Steadfast Courier.
+        """
+        from .steadfast_service import SteadfastService
+        order = self.get_object()
+
+        consignment_id = order.steadfast_consignment_id
+        if not consignment_id:
+            return Response(
+                {"detail": "Order has not been dispatched to Steadfast yet (missing consignment ID)."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        res = SteadfastService.get_status(consignment_id)
+        if not res.get("success"):
+            return Response(
+                {"success": False, "message": res.get("message", "Failed to fetch Steadfast status")},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        order.steadfast_status = res.get("status")
+        update_fields = ["steadfast_status", "updated_at"]
+
+        # If delivered by courier, sync order status if desired
+        if str(res.get("status")).lower() == "delivered" and order.status != "DELIVERED":
+            order.status = "DELIVERED"
+            update_fields.append("status")
+
+        order.save(update_fields=update_fields)
+
+        return Response({
+            "success": True,
+            "status": order.steadfast_status,
+            "data": res.get("data"),
+            "order": OnlinePreorderSerializer(order, context={"request": request}).data
+        })
+
+    # --- Multi-Courier Fraud Check Endpoints ---
+
+    @action(detail=True, methods=["get"], url_path="courier-fraud-check", authentication_classes=[], permission_classes=[AllowAny])
+    def courier_fraud_check_detail(self, request, pk=None):
+        """
+        Check customer delivery performance and return rates for the respective delivery method.
+        Query params: provider (optional, e.g. PATHAO, STEADFAST, REDX, CARRYBEE, ALL).
+        """
+        from .courier_services import CourierManager
+        order = self.get_object()
+        provider = request.query_params.get("provider") or order.courier_partner or "ALL"
+        res = CourierManager.check_fraud(phone=order.customer_phone, provider=provider, order=order)
+        return Response(res, status=status.HTTP_200_OK if res.get("success") else status.HTTP_400_BAD_REQUEST)
+
+    @action(detail=False, methods=["get"], url_path="courier-fraud-check", authentication_classes=[], permission_classes=[AllowAny])
+    def courier_fraud_check_phone(self, request):
+        """
+        Check customer delivery performance by phone for a selected courier partner.
+        Query params: phone (required), provider (optional).
+        """
+        from .courier_services import CourierManager
+        phone = request.query_params.get("phone", "")
+        if not phone:
+            return Response({"detail": "Phone parameter is required."}, status=status.HTTP_400_BAD_REQUEST)
+        provider = request.query_params.get("provider") or "ALL"
+        res = CourierManager.check_fraud(phone=phone, provider=provider)
+        return Response(res, status=status.HTTP_200_OK if res.get("success") else status.HTTP_400_BAD_REQUEST)
+
+    # Backward compatibility with existing Steadfast actions
+    @action(detail=True, methods=["get"], url_path="steadfast-fraud-check", authentication_classes=[], permission_classes=[AllowAny])
+    def steadfast_fraud_check_detail(self, request, pk=None):
+        from .courier_services import CourierManager
+        order = self.get_object()
+        res = CourierManager.check_fraud(phone=order.customer_phone, provider="STEADFAST", order=order)
+        return Response(res, status=status.HTTP_200_OK if res.get("success") else status.HTTP_400_BAD_REQUEST)
+
+    @action(detail=False, methods=["get"], url_path="steadfast-fraud-check", authentication_classes=[], permission_classes=[AllowAny])
+    def steadfast_fraud_check_phone(self, request):
+        from .courier_services import CourierManager
+        phone = request.query_params.get("phone", "")
+        if not phone:
+            return Response({"detail": "Phone parameter is required."}, status=status.HTTP_400_BAD_REQUEST)
+        res = CourierManager.check_fraud(phone=phone, provider="STEADFAST")
+        return Response(res, status=status.HTTP_200_OK if res.get("success") else status.HTTP_400_BAD_REQUEST)
+
+    @action(detail=False, methods=["post"], url_path="bulk-dispatch-steadfast", authentication_classes=[], permission_classes=[AllowAny])
+    def bulk_dispatch_steadfast(self, request):
+        """
+        Fast bulk dispatch multiple online preorders to selected courier (Pathao, Steadfast, etc.).
+        Body: { "order_ids": [1, 2, 3], "provider": "PATHAO" | "STEADFAST" | ... }
+        """
+        from .courier_services import CourierManager
+        order_ids = request.data.get("order_ids", [])
+        provider = (request.data.get("provider") or request.data.get("courier_partner") or "STEADFAST").upper()
+
+        if not isinstance(order_ids, list) or not order_ids:
+            return Response({"detail": "order_ids list is required."}, status=status.HTTP_400_BAD_REQUEST)
+
+        orders = OnlinePreorder.objects.filter(id__in=order_ids).exclude(status="CANCELLED")
+        dispatched = []
+        failed = []
+
+        for o in orders:
+            if o.courier_consignment_id or o.steadfast_consignment_id:
+                dispatched.append({
+                    "id": o.id,
+                    "consignment_id": o.courier_consignment_id or o.steadfast_consignment_id,
+                    "tracking_code": o.courier_tracking_code or o.steadfast_tracking_code,
+                    "already_dispatched": True
+                })
+                continue
+
+            res = CourierManager.dispatch_order(o, provider=provider)
+            if res.get("success"):
+                dispatched.append({
+                    "id": o.id,
+                    "consignment_id": res.get("consignment_id"),
+                    "tracking_code": res.get("tracking_code"),
+                    "status": res.get("status")
+                })
+            else:
+                failed.append({
+                    "id": o.id,
+                    "error": res.get("message", "Dispatch failed")
+                })
+
+        return Response({
+            "success": len(dispatched) > 0,
+            "provider": provider,
+            "dispatched_count": len(dispatched),
+            "failed_count": len(failed),
+            "dispatched": dispatched,
+            "failed": failed
+        }, status=status.HTTP_200_OK)
+
+    # --- Multi-Courier Partner Endpoints ---
+
+    @action(detail=True, methods=["post"], url_path="dispatch-courier", authentication_classes=[], permission_classes=[AllowAny])
+    def dispatch_courier(self, request, pk=None):
+        """
+        Dispatch order to any selected delivery agent (STEADFAST, PATHAO, REDX, CARRYBEE).
+        """
+        from .courier_services import CourierManager
+        order = self.get_object()
+
+        if order.status == "CANCELLED":
+            return Response(
+                {"detail": "Cannot dispatch a cancelled order to courier."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        provider = request.data.get("provider") or request.data.get("courier_partner") or "STEADFAST"
+        cod_amount = request.data.get("cod_amount")
+        note = request.data.get("note")
+        address_override = request.data.get("address")
+        phone_override = request.data.get("phone")
+
+        res = CourierManager.dispatch_order(
+            order=order,
+            provider=provider,
+            cod_amount=cod_amount,
+            note=note,
+            address_override=address_override,
+            phone_override=phone_override
+        )
+
+        if not res.get("success"):
+            return Response(
+                {
+                    "success": False,
+                    "message": res.get("message", f"Failed to book with {provider} Courier"),
+                    "data": res.get("data")
+                },
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        return Response({
+            "success": True,
+            "message": res.get("message", f"Dispatched to {provider} Courier successfully!"),
+            "consignment_id": order.courier_consignment_id or order.steadfast_consignment_id,
+            "tracking_code": order.courier_tracking_code or order.steadfast_tracking_code,
+            "status": order.courier_status or order.steadfast_status,
+            "courier_partner": order.courier_partner or provider,
+            "order": OnlinePreorderSerializer(order, context={"request": request}).data
+        }, status=status.HTTP_200_OK)
+
+    @action(detail=True, methods=["get"], url_path="courier-status", authentication_classes=[], permission_classes=[AllowAny])
+    def courier_status(self, request, pk=None):
+        """
+        Fetch live tracking status from the order's courier partner.
+        """
+        from .courier_services import CourierManager
+        order = self.get_object()
+        res = CourierManager.get_order_status(order)
+        if not res.get("success"):
+            return Response(
+                {"success": False, "message": res.get("message", "Failed to fetch courier status")},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        return Response({
+            "success": True,
+            "status": order.courier_status or order.steadfast_status,
+            "courier_partner": order.courier_partner,
+            "data": res.get("data"),
+            "order": OnlinePreorderSerializer(order, context={"request": request}).data
+        })
+
+    @action(detail=False, methods=["get"], url_path="courier-parcels", authentication_classes=[], permission_classes=[AllowAny])
+    def courier_parcels(self, request):
+        """
+        List all orders dispatched to courier partners with statistics.
+        Filtered by courier_partner, status, search, date range.
+        """
+        qs = OnlinePreorder.objects.filter(
+            models.Q(courier_consignment_id__isnull=False) & ~models.Q(courier_consignment_id="") |
+            models.Q(steadfast_consignment_id__isnull=False) & ~models.Q(steadfast_consignment_id="")
+        )
+
+        partner = request.query_params.get("courier_partner")
+        if partner and partner.upper() != "ALL":
+            if partner.upper() == 'STEADFAST':
+                qs = qs.filter(models.Q(courier_partner='STEADFAST') | models.Q(steadfast_consignment_id__isnull=False))
+            else:
+                qs = qs.filter(courier_partner=partner.upper())
+
+        status_param = request.query_params.get("status")
+        if status_param and status_param != "all":
+            qs = qs.filter(models.Q(courier_status__iexact=status_param) | models.Q(steadfast_status__iexact=status_param))
+
+        search = request.query_params.get("search")
+        if search:
+            qs = qs.filter(
+                models.Q(customer_name__icontains=search) |
+                models.Q(customer_phone__icontains=search) |
+                models.Q(courier_consignment_id__icontains=search) |
+                models.Q(courier_tracking_code__icontains=search) |
+                models.Q(steadfast_consignment_id__icontains=search) |
+                models.Q(steadfast_tracking_code__icontains=search) |
+                models.Q(id__icontains=search)
+            )
+
+        all_courier_orders = list(qs.order_by('-created_at'))
+        total_booked = len(all_courier_orders)
+        in_transit = sum(1 for o in all_courier_orders if str(o.courier_status or o.steadfast_status).lower() in ['in_review', 'pending', 'created', 'in_transit', 'picked', 'in_process'])
+        delivered = sum(1 for o in all_courier_orders if str(o.courier_status or o.steadfast_status or o.status).lower() in ['delivered', 'completed'])
+        cancelled = sum(1 for o in all_courier_orders if str(o.courier_status or o.steadfast_status or o.status).lower() in ['cancelled', 'returned', 'failed'])
+        total_cod = sum(float(o.total_amount or 0) for o in all_courier_orders)
+
+        serialized = OnlinePreorderSerializer(all_courier_orders, many=True, context={'request': request}).data
+
+        return Response({
+            "summary": {
+                "total_booked": total_booked,
+                "in_transit": in_transit,
+                "delivered": delivered,
+                "cancelled": cancelled,
+                "total_cod_amount": total_cod,
+            },
+            "results": serialized
+        })
+
+
+class CourierSettingViewSet(viewsets.ModelViewSet):
+    """
+    Settings API for multi-delivery agents (Steadfast, Pathao, RedX, Carrybee).
+    """
+    from .models import CourierSetting
+    from .serializers import CourierSettingSerializer
+
+    queryset = CourierSetting.objects.all()
+    serializer_class = CourierSettingSerializer
+    permission_classes = [AllowAny]
+
+    def get_queryset(self):
+        from .models import CourierSetting
+        # Ensure all 4 providers exist in DB
+        for code in ['STEADFAST', 'PATHAO', 'REDX', 'CARRYBEE']:
+            CourierSetting.objects.get_or_create(provider=code)
+        return CourierSetting.objects.all().order_by('provider')
+
+    @action(detail=False, methods=['get'], url_path='active', authentication_classes=[], permission_classes=[AllowAny])
+    def active_couriers(self, request):
+        """
+        Returns only the active couriers that have valid credentials configured.
+        """
+        from .courier_services import CourierManager
+        active_list = CourierManager.get_active_couriers()
+        return Response(active_list)
+
+    @action(detail=True, methods=['post'], url_path='test-connection', authentication_classes=[], permission_classes=[AllowAny])
+    def test_connection(self, request, pk=None):
+        setting = self.get_object()
+        provider = setting.provider
+
+        if provider == 'STEADFAST':
+            from .courier_services import SteadfastService
+            cfg = SteadfastService.get_config()
+            if not cfg['api_key'] or not cfg['secret_key']:
+                return Response({'success': False, 'message': 'Steadfast API Key or Secret Key missing.'}, status=status.HTTP_400_BAD_REQUEST)
+            res = SteadfastService.check_fraud("01700000000")
+            if res.get('success') or res.get('phone'):
+                return Response({'success': True, 'message': 'Steadfast Courier API credentials verified successfully!'})
+            return Response({'success': False, 'message': res.get('message', 'Failed to connect to Steadfast')}, status=status.HTTP_400_BAD_REQUEST)
+
+        elif provider == 'PATHAO':
+            from .courier_services import PathaoService
+            token, err = PathaoService.get_auth_token()
+            if token:
+                return Response({'success': True, 'message': 'Pathao OAuth Authentication verified successfully!'})
+            return Response({'success': False, 'message': f"Pathao Connection Failed: {err}"}, status=status.HTTP_400_BAD_REQUEST)
+
+        elif provider == 'REDX':
+            if setting.api_key:
+                return Response({'success': True, 'message': 'RedX API Key configured.'})
+            return Response({'success': False, 'message': 'RedX API Key is missing.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        elif provider == 'CARRYBEE':
+            if setting.api_key:
+                return Response({'success': True, 'message': 'Carrybee API Key configured.'})
+            return Response({'success': False, 'message': 'Carrybee API Key is missing.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        return Response({'success': False, 'message': 'Unknown provider'}, status=status.HTTP_400_BAD_REQUEST)
+
+
+

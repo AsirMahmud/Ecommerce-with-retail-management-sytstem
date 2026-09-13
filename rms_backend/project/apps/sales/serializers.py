@@ -246,7 +246,7 @@ class SaleSerializer(serializers.ModelSerializer):
 
     def create(self, validated_data):
         items_data = validated_data.pop('items')
-        payment_data = validated_data.pop('payment_data', [])
+        payment_data = validated_data.pop('payment_data', None)
         customer_phone = validated_data.pop('customer_phone', None)
         customer_name = validated_data.pop('customer_name', None)
 

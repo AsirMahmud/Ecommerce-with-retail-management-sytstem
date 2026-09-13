@@ -46,6 +46,11 @@ def convert_online_preorder_to_sale(sender, instance: OnlinePreorder, created: b
             'sale_type': 'online_preorder',
             'notes': f"Converted from online preorder #{instance.id}",
             'items': items_payload,
+            'payment_data': [{
+                'method': 'cash',
+                'amount': float(subtotal),
+                'notes': f"COD payment for online preorder #{instance.id}",
+            }],
         }
 
         serializer = SaleSerializer(data=sale_data)

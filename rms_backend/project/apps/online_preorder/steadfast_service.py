@@ -6,54 +6,97 @@ logger = logging.getLogger(__name__)
 
 class SteadfastService:
     @staticmethod
-    def get_headers():
-        api_key = getattr(settings, 'STEADFAST_API_KEY', 'default_api_key')
-        secret_key = getattr(settings, 'STEADFAST_SECRET_KEY', 'default_secret_key')
+    def get_config():
+        from .models import CourierSetting
+        setting = CourierSetting.objects.filter(provider='STEADFAST').first()
+        api_key = (setting.api_key if setting and setting.api_key else None) or getattr(settings, 'STEADFAST_API_KEY', '')
+        secret_key = (setting.secret_key if setting and setting.secret_key else None) or getattr(settings, 'STEADFAST_SECRET_KEY', '')
+        base_url = (setting.base_url if setting and setting.base_url else None) or getattr(settings, 'STEADFAST_BASE_URL', 'https://portal.packzy.com/api/v1')
+        if 'portal.steadfast.com.bd' in base_url:
+            base_url = base_url.replace('portal.steadfast.com.bd', 'portal.packzy.com')
         return {
-            'Api-Key': api_key,
-            'Secret-Key': secret_key,
+            'api_key': api_key,
+            'secret_key': secret_key,
+            'base_url': base_url.rstrip('/')
+        }
+
+    @staticmethod
+    def get_headers():
+        cfg = SteadfastService.get_config()
+        return {
+            'Api-Key': cfg['api_key'],
+            'Secret-Key': cfg['secret_key'],
             'Content-Type': 'application/json'
         }
 
     @staticmethod
     def get_base_url():
-        return getattr(settings, 'STEADFAST_BASE_URL', 'https://portal.steadfast.com.bd/api/v1')
+        return SteadfastService.get_config()['base_url']
 
     @classmethod
-    def create_consignment(cls, order):
+    def format_address(cls, shipping_address):
+        if not shipping_address:
+            return "Customer Address"
+        if isinstance(shipping_address, str):
+            cleaned = shipping_address.strip()
+            return cleaned if cleaned else "Customer Address"
+        if isinstance(shipping_address, dict):
+            parts = []
+            for k in ['address', 'place', 'thana', 'city_corporation', 'union', 'upazila', 'district', 'division', 'city', 'area']:
+                val = shipping_address.get(k)
+                if val and str(val).strip():
+                    s = str(val).strip()
+                    if s not in parts:
+                        parts.append(s)
+            return ", ".join(parts) if parts else "Customer Address"
+        return "Customer Address"
+
+    @classmethod
+    def clean_phone(cls, phone):
+        if not phone:
+            return ""
+        digits = ''.join(filter(str.isdigit, str(phone)))
+        if digits.startswith('8801') and len(digits) == 13:
+            digits = digits[2:]
+        return digits
+
+    @classmethod
+    def create_consignment(cls, order, cod_amount=None, note=None, address_override=None, phone_override=None):
         """
         Creates a delivery consignment on Steadfast Courier portal.
         """
         url = f"{cls.get_base_url()}/create_order"
         
         # Build shipping address string
-        address_str = ""
-        if order.shipping_address and isinstance(order.shipping_address, dict):
-            parts = [
-                order.shipping_address.get('address'),
-                order.shipping_address.get('area'),
-                order.shipping_address.get('city')
-            ]
-            address_str = ", ".join([p for p in parts if p])
-        
-        if not address_str:
-            address_str = "Customer Address"
+        if address_override and str(address_override).strip():
+            address_str = str(address_override).strip()
+        else:
+            address_str = cls.format_address(order.shipping_address)
+
+        raw_phone = phone_override or order.customer_phone or ""
+        recipient_phone = cls.clean_phone(raw_phone)
+
+        cod = float(cod_amount) if cod_amount is not None else float(order.total_amount or 0)
+        order_note = note if note is not None else (order.notes or f"Online Preorder #{order.id}")
 
         payload = {
             "invoice": str(order.id),
-            "recipient_name": order.customer_name,
-            "recipient_phone": order.customer_phone,
+            "recipient_name": order.customer_name or "Valued Customer",
+            "recipient_phone": recipient_phone,
             "recipient_address": address_str,
-            "cod_amount": float(order.total_amount or 0),
-            "note": order.notes or f"Online Order #{order.id}"
+            "cod_amount": cod,
+            "note": order_note
         }
 
         try:
             logger.info(f"Posting to Steadfast API: {payload}")
             response = requests.post(url, json=payload, headers=cls.get_headers(), timeout=10)
-            data = response.json()
+            try:
+                data = response.json()
+            except Exception:
+                data = {"message": response.text or f"HTTP {response.status_code}"}
             
-            if response.status_code == 200 and data.get('status') == 200:
+            if response.status_code == 200 and (data.get('status') == 200 or data.get('consignment')):
                 consignment = data.get('consignment', {})
                 return {
                     'success': True,
@@ -63,8 +106,14 @@ class SteadfastService:
                     'message': data.get('message', 'Booking successful')
                 }
             else:
-                # If API credentials are not set or fail in sandbox mode, fallback gracefully for demo/testing
                 error_msg = data.get('message') or f"Steadfast Error Code {response.status_code}"
+                if data.get('errors') and isinstance(data['errors'], dict):
+                    details = []
+                    for field, errs in data['errors'].items():
+                        err_text = ", ".join(errs) if isinstance(errs, list) else str(errs)
+                        details.append(f"{field}: {err_text}")
+                    if details:
+                        error_msg = f"{error_msg} ({'; '.join(details)})"
                 return {
                     'success': False,
                     'message': error_msg,
@@ -85,14 +134,18 @@ class SteadfastService:
         url = f"{cls.get_base_url()}/status_by_cid/{consignment_id}"
         try:
             response = requests.get(url, headers=cls.get_headers(), timeout=10)
-            data = response.json()
+            try:
+                data = response.json()
+            except Exception:
+                data = {'message': response.text or f"HTTP {response.status_code}"}
             if response.status_code == 200:
+                delivery_status = data.get('delivery_status') or data.get('status') or 'unknown'
                 return {
                     'success': True,
-                    'status': data.get('delivery_status') or data.get('status') or 'unknown',
+                    'status': delivery_status,
                     'data': data
                 }
-            return {'success': False, 'message': 'Status fetch failed'}
+            return {'success': False, 'message': data.get('message', 'Status fetch failed'), 'data': data}
         except Exception as e:
             return {'success': False, 'message': str(e)}
 
@@ -102,11 +155,19 @@ class SteadfastService:
         Queries Steadfast's official Fraud Check endpoint for a phone number.
         Endpoint: GET /fraud_check/{phone}
         """
-        clean_phone = ''.join(filter(str.isdigit, str(phone)))
+        clean_phone = cls.clean_phone(phone)
+        if not clean_phone:
+            return {
+                'success': False,
+                'message': 'No valid phone number provided for fraud check.'
+            }
         url = f"{cls.get_base_url()}/fraud_check/{clean_phone}"
         try:
             response = requests.get(url, headers=cls.get_headers(), timeout=10)
-            data = response.json()
+            try:
+                data = response.json()
+            except Exception:
+                data = {'message': response.text or f"HTTP {response.status_code}"}
             if response.status_code == 200:
                 total_parcels = data.get('total_parcels', 0)
                 total_delivered = data.get('total_delivered', 0)
@@ -135,10 +196,12 @@ class SteadfastService:
                 }
             return {
                 'success': False,
-                'message': data.get('message', 'Fraud check request failed')
+                'message': data.get('message', 'Fraud check request failed'),
+                'data': data
             }
         except Exception as e:
             return {
                 'success': False,
                 'message': f"Error calling Steadfast Fraud Check: {str(e)}"
             }
+

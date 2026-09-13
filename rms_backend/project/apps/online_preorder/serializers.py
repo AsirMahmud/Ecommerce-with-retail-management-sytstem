@@ -5,7 +5,9 @@ from .models import (
     OnlinePreorderVerification,
     OnlinePreorderVerificationItem,
     OnlinePreorderVerificationScanLog,
+    CourierSetting,
 )
+
 
 
 import json
@@ -454,6 +456,37 @@ class OnlinePreorderScanResultSerializer(serializers.Serializer):
     result = serializers.ChoiceField(choices=['MATCHED', 'NOT_IN_ORDER', 'OVER_SCAN'])
     message = serializers.CharField()
     verification = OnlinePreorderVerificationSerializer()
+
+
+class CourierSettingSerializer(serializers.ModelSerializer):
+    has_keys = serializers.SerializerMethodField()
+    provider_name = serializers.CharField(source='get_provider_display', read_only=True)
+
+    class Meta:
+        model = CourierSetting
+        fields = [
+            'id',
+            'provider',
+            'provider_name',
+            'is_active',
+            'is_default',
+            'api_key',
+            'secret_key',
+            'base_url',
+            'client_id',
+            'client_secret',
+            'username',
+            'password',
+            'store_id',
+            'extra_config',
+            'has_keys',
+            'created_at',
+            'updated_at',
+        ]
+
+    def get_has_keys(self, obj):
+        return obj.has_valid_credentials()
+
 
 
 

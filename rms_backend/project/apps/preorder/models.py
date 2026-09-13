@@ -178,7 +178,12 @@ class Preorder(models.Model):
                         'discount': float(item.get('discount', 0)),
                     }
                     for item in self.items
-                ]
+                ],
+                'payment_data': [{
+                    'method': 'cash',
+                    'amount': sum(float(item['quantity']) * float(item['unit_price']) for item in self.items),
+                    'notes': f"Payment for preorder #{self.id}",
+                }],
             }
             # Use SaleSerializer to create the sale and items
             serializer = SaleSerializer(data=sale_data)

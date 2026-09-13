@@ -18,6 +18,7 @@ import {
   Globe,
   ChevronDown,
   ExternalLink,
+  Truck,
 } from "lucide-react";
 
 import { cn } from "@/lib/utils";
@@ -83,6 +84,11 @@ const mainNavItems = [
       { title: "Add Product", href: "/preorder?tab=add-product" },
       { title: "Online Preorders", href: "/online-preorders" },
     ],
+  },
+  {
+    title: "Courier Partners",
+    icon: Truck,
+    href: "/courier-partners",
   },
   {
     title: "Expenses",
