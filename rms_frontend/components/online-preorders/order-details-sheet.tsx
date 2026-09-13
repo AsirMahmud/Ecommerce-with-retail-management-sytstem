@@ -10,6 +10,7 @@ import { format } from "date-fns";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { toast } from "@/hooks/use-toast";
+import { formatCurrency } from "@/lib/utils";
 
 interface OrderDetailsSheetProps {
     order: OnlinePreorder | null;
@@ -327,20 +328,20 @@ export function OrderDetailsSheet({ order, isOpen, onClose, onRefresh, onEdit, o
                                 Billing details
                             </div>
                             <div className="space-y-2">
-                                {Number(order.automatic_discount_amount || 0) > 0 && <div className="flex justify-between text-sm text-red-600"><span>Automatic discount</span><span>-৳{Number(order.automatic_discount_amount).toLocaleString()}</span></div>}
-                                {Number(order.coupon_discount_amount || 0) > 0 && <div className="flex justify-between text-sm text-green-700"><span>Coupon ({order.coupon_code})</span><span>-৳{Number(order.coupon_discount_amount).toLocaleString()}</span></div>}
+                                {Number(order.automatic_discount_amount || 0) > 0 && <div className="flex justify-between text-sm text-rose-600"><span>Automatic discount</span><span>-{formatCurrency(order.automatic_discount_amount)}</span></div>}
+                                {Number(order.coupon_discount_amount || 0) > 0 && <div className="flex justify-between text-sm text-emerald-700"><span>Coupon ({order.coupon_code})</span><span>-{formatCurrency(order.coupon_discount_amount)}</span></div>}
                                 <div className="flex justify-between text-sm">
                                     <span className="text-slate-500">Subtotal</span>
-                                    <span className="font-medium">৳{(Number(order.total_amount) - Number(order.delivery_charge || 0)).toLocaleString()}</span>
+                                    <span className="font-semibold text-slate-800">{formatCurrency(Number(order.total_amount) - Number(order.delivery_charge || 0))}</span>
                                 </div>
                                 <div className="flex justify-between text-sm text-slate-500">
                                     <span>Shipping</span>
-                                    <span>৳{Number(order.delivery_charge || 0).toLocaleString()}</span>
+                                    <span>{formatCurrency(order.delivery_charge || 0)}</span>
                                 </div>
                                 <Separator className="my-2" />
-                                <div className="flex justify-between font-bold text-lg text-slate-900">
+                                <div className="flex justify-between font-bold text-base text-slate-900">
                                     <span>Grand Total</span>
-                                    <span>৳{Number(order.total_amount).toLocaleString()}</span>
+                                    <span className="text-indigo-600 font-extrabold">{formatCurrency(order.total_amount)}</span>
                                 </div>
                             </div>
                         </div>
@@ -371,16 +372,16 @@ export function OrderDetailsSheet({ order, isOpen, onClose, onRefresh, onEdit, o
                                             <div className="flex items-center justify-between mt-2">
                                                 <div className="flex flex-col">
                                                     <div className="text-sm font-bold text-slate-900">
-                                                        ৳{(Number(item.unit_price) * item.quantity - (item.discount || 0)).toLocaleString()}
+                                                        {formatCurrency(Number(item.unit_price) * item.quantity - (item.discount || 0))}
                                                     </div>
                                                     {item.discount! > 0 && (
-                                                        <div className="text-[10px] text-red-500 font-bold">
-                                                            Discount: -৳{Number(item.discount).toLocaleString()}
+                                                        <div className="text-[10px] text-rose-500 font-bold">
+                                                            Discount: -{formatCurrency(item.discount)}
                                                         </div>
                                                     )}
                                                 </div>
                                                 <div className="text-[10px] text-slate-400 line-through">
-                                                    ৳{(Number(item.unit_price) * item.quantity).toLocaleString()}
+                                                    {formatCurrency(Number(item.unit_price) * item.quantity)}
                                                 </div>
                                             </div>
                                         </div>

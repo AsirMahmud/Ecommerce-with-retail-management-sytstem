@@ -9,6 +9,7 @@ import { useInfiniteProducts } from "@/hooks/queries/useInventory";
 import { Product } from "@/types/inventory";
 import { Discount } from "@/lib/api/ecommerce";
 import { useDebounce } from "@/hooks/use-debounce";
+import { formatCurrency } from "@/lib/utils";
 
 interface POSStyleProductGridProps {
     searchQuery?: string;
@@ -207,9 +208,9 @@ export default function POSStyleProductGrid({
                                 </h3>
 
                                 <div className="flex items-baseline gap-2 mb-2">
-                                    <span className="text-lg font-bold text-slate-900">৳{finalPrice.toLocaleString()}</span>
+                                    <span className="text-lg font-bold text-slate-900">{formatCurrency(finalPrice)}</span>
                                     {discountPercent > 0 && (
-                                        <span className="text-xs text-slate-400 line-through">৳{originalPrice.toLocaleString()}</span>
+                                        <span className="text-xs text-slate-400 line-through">{formatCurrency(originalPrice)}</span>
                                     )}
                                 </div>
 

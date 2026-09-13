@@ -6,6 +6,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { formatCurrency } from "@/lib/utils";
 import React, { useState, useMemo } from "react";
 import {
   DollarSign,
@@ -205,7 +206,7 @@ export function OnlinePreorderAnalytics({ dateRange }: OnlinePreorderAnalyticsPr
           </CardHeader>
           <CardContent className="px-4 sm:px-5 pb-4">
             <div className="text-2xl font-black text-slate-900 tracking-tight">
-              ৳{Number(analyticsData.total_revenue).toLocaleString()}
+              {formatCurrency(analyticsData.total_revenue)}
             </div>
             <p className="text-[11px] text-blue-600 font-medium mt-1">From completed orders</p>
           </CardContent>
@@ -221,7 +222,7 @@ export function OnlinePreorderAnalytics({ dateRange }: OnlinePreorderAnalyticsPr
           </CardHeader>
           <CardContent className="px-4 sm:px-5 pb-4">
             <div className="text-2xl font-black text-slate-900 tracking-tight">
-              ৳{Number(analyticsData.average_order_value).toLocaleString()}
+              {formatCurrency(analyticsData.average_order_value)}
             </div>
             <p className="text-[11px] text-purple-600 font-medium mt-1">Per completed order</p>
           </CardContent>
@@ -296,7 +297,7 @@ export function OnlinePreorderAnalytics({ dateRange }: OnlinePreorderAnalyticsPr
           </CardTitle>
           <div className="flex items-center gap-3 text-xs font-semibold">
             <span className="flex items-center gap-1.5 text-indigo-600">
-              <span className="w-2.5 h-2.5 rounded-full bg-indigo-500"></span> Revenue (৳)
+              <span className="w-2.5 h-2.5 rounded-full bg-indigo-500"></span> Revenue ($)
             </span>
             <span className="flex items-center gap-1.5 text-emerald-600">
               <span className="w-2.5 h-2.5 rounded-full bg-emerald-500"></span> Orders
@@ -326,7 +327,7 @@ export function OnlinePreorderAnalytics({ dateRange }: OnlinePreorderAnalyticsPr
                     axisLine={false}
                     fontSize={11}
                     stroke="#94a3b8"
-                    tickFormatter={(value) => `৳${value.toLocaleString()}`}
+                    tickFormatter={(value) => `$${value >= 1000 ? `${(value / 1000).toFixed(0)}k` : value}`}
                   />
                   <YAxis 
                     yAxisId="right"
@@ -350,7 +351,7 @@ export function OnlinePreorderAnalytics({ dateRange }: OnlinePreorderAnalyticsPr
                                 />
                                 <span className="text-slate-400 capitalize">{p.name}:</span>
                                 <span className="font-bold text-white">
-                                  {p.dataKey === 'revenue' ? `৳${Number(p.value).toLocaleString()}` : `${p.value} orders`}
+                                  {p.dataKey === 'revenue' ? formatCurrency(p.value) : `${p.value} orders`}
                                 </span>
                               </p>
                             ))}
@@ -631,8 +632,8 @@ export function OnlinePreorderAnalytics({ dateRange }: OnlinePreorderAnalyticsPr
                           )}
                         </TableCell>
 
-                        <TableCell className="text-right font-black text-slate-900 text-xs sm:text-sm">
-                          ৳{Number(c.total_spent || 0).toLocaleString()}
+                        <TableCell className="text-right font-bold text-slate-900 text-xs sm:text-sm">
+                          {formatCurrency(c.total_spent || 0)}
                         </TableCell>
 
                         <TableCell className="text-right text-xs text-slate-500 whitespace-nowrap">
@@ -680,8 +681,8 @@ export function OnlinePreorderAnalytics({ dateRange }: OnlinePreorderAnalyticsPr
                         <Badge variant="secondary" className="text-[10px]">{product.category_name || 'Uncategorized'}</Badge>
                       </TableCell>
                       <TableCell className="text-right text-xs font-bold text-slate-700">{product.quantity_sold || 0}</TableCell>
-                      <TableCell className="text-right font-black text-xs text-slate-900">
-                        ৳{Number(product.total_sales || 0).toLocaleString()}
+                      <TableCell className="text-right font-bold text-xs text-slate-900">
+                        {formatCurrency(product.total_sales || 0)}
                       </TableCell>
                     </TableRow>
                   ))}
@@ -721,8 +722,8 @@ export function OnlinePreorderAnalytics({ dateRange }: OnlinePreorderAnalyticsPr
                       <TableCell className="font-semibold text-slate-900 text-xs">{category.category_name || 'Uncategorized'}</TableCell>
                       <TableCell className="text-right text-xs text-slate-600">{category.order_count || 0}</TableCell>
                       <TableCell className="text-right text-xs font-bold text-slate-700">{category.quantity_sold || 0}</TableCell>
-                      <TableCell className="text-right font-black text-xs text-slate-900">
-                        ৳{Number(category.total_sales || 0).toLocaleString()}
+                      <TableCell className="text-right font-bold text-xs text-slate-900">
+                        {formatCurrency(category.total_sales || 0)}
                       </TableCell>
                     </TableRow>
                   ))}

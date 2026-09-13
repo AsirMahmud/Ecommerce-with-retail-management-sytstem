@@ -37,7 +37,7 @@ export function CategoryReport({
 }: {
   dateRange: { from: Date | undefined; to: Date | undefined };
 }) {
-  const { data: categoryData, isLoading } = useCategoryReport(dateRange);
+  const { data: categoryData, isLoading } = useCategoryReport();
 
   if (isLoading) {
     return (

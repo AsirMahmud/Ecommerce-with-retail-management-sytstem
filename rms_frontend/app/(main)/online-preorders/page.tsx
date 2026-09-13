@@ -64,6 +64,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { toast } from "@/hooks/use-toast";
+import { formatCurrency } from "@/lib/utils";
 
 export default function OnlinePreordersPage() {
   const [activeTab, setActiveTab] = useState("orders");
@@ -244,73 +245,73 @@ export default function OnlinePreordersPage() {
 
       {/* Stats Cards */}
       <div className="grid gap-3 sm:gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
-        <Card className="bg-gradient-to-br from-indigo-50 to-indigo-100 border-indigo-200 shadow-lg hover:shadow-xl transition-all">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-semibold text-indigo-900">Total Orders</CardTitle>
-            <ShoppingBag className="h-5 w-5 text-indigo-600" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-bold text-indigo-900">
-              {isLoadingAnalytics ? (
-                <Skeleton className="h-8 w-20" />
-              ) : (
-                analyticsData?.total_orders ?? stats.totalOrders
-              )}
+        <div className="bg-white border border-slate-200/90 rounded-2xl p-4 shadow-2xs">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-xs font-semibold text-slate-500">Total Orders</span>
+            <div className="w-8 h-8 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center">
+              <ShoppingBag className="h-4 w-4" />
             </div>
-            <p className="text-xs text-indigo-700 mt-1">All online preorders</p>
-          </CardContent>
-        </Card>
+          </div>
+          <div className="text-2xl font-bold text-slate-900">
+            {isLoadingAnalytics ? (
+              <Skeleton className="h-7 w-20" />
+            ) : (
+              analyticsData?.total_orders ?? stats.totalOrders
+            )}
+          </div>
+          <p className="text-[11px] text-indigo-600 font-medium mt-1">All online preorders</p>
+        </div>
 
-        <Card className="bg-gradient-to-br from-emerald-50 to-emerald-100 border-emerald-200 shadow-lg hover:shadow-xl transition-all">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-semibold text-emerald-900">Total Revenue</CardTitle>
-            <DollarSign className="h-5 w-5 text-emerald-600" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-bold text-emerald-900">
-              {isLoadingAnalytics ? (
-                <Skeleton className="h-8 w-24" />
-              ) : (
-                `৳${Number(analyticsData?.total_revenue ?? stats.totalRevenue).toLocaleString()}`
-              )}
+        <div className="bg-white border border-slate-200/90 rounded-2xl p-4 shadow-2xs">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-xs font-semibold text-slate-500">Total Revenue</span>
+            <div className="w-8 h-8 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
+              <DollarSign className="h-4 w-4" />
             </div>
-            <p className="text-xs text-emerald-700 mt-1">From completed orders</p>
-          </CardContent>
-        </Card>
+          </div>
+          <div className="text-2xl font-bold text-slate-900">
+            {isLoadingAnalytics ? (
+              <Skeleton className="h-7 w-24" />
+            ) : (
+              formatCurrency(analyticsData?.total_revenue ?? stats.totalRevenue)
+            )}
+          </div>
+          <p className="text-[11px] text-emerald-600 font-medium mt-1">Completed orders</p>
+        </div>
 
-        <Card className="bg-gradient-to-br from-blue-50 to-blue-100 border-blue-200 shadow-lg hover:shadow-xl transition-all">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-semibold text-blue-900">Total Sales</CardTitle>
-            <BarChart3 className="h-5 w-5 text-blue-600" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-bold text-blue-900">
-              {isLoadingAnalytics ? (
-                <Skeleton className="h-8 w-20" />
-              ) : (
-                analyticsData?.total_sales_count ?? stats.completedCount
-              )}
+        <div className="bg-white border border-slate-200/90 rounded-2xl p-4 shadow-2xs">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-xs font-semibold text-slate-500">Total Sales</span>
+            <div className="w-8 h-8 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center">
+              <BarChart3 className="h-4 w-4" />
             </div>
-            <p className="text-xs text-blue-700 mt-1">Completed orders</p>
-          </CardContent>
-        </Card>
+          </div>
+          <div className="text-2xl font-bold text-slate-900">
+            {isLoadingAnalytics ? (
+              <Skeleton className="h-7 w-20" />
+            ) : (
+              analyticsData?.total_sales_count ?? stats.completedCount
+            )}
+          </div>
+          <p className="text-[11px] text-blue-600 font-medium mt-1">Completed orders</p>
+        </div>
 
-        <Card className="bg-gradient-to-br from-purple-50 to-purple-100 border-purple-200 shadow-lg hover:shadow-xl transition-all">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-semibold text-purple-900">Avg Order Value</CardTitle>
-            <TrendingUp className="h-5 w-5 text-purple-600" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-bold text-purple-900">
-              {isLoadingAnalytics ? (
-                <Skeleton className="h-8 w-24" />
-              ) : (
-                `৳${Number(analyticsData?.average_order_value ?? stats.averageOrderValue).toLocaleString()}`
-              )}
+        <div className="bg-white border border-slate-200/90 rounded-2xl p-4 shadow-2xs">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-xs font-semibold text-slate-500">Avg Order Value</span>
+            <div className="w-8 h-8 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center">
+              <TrendingUp className="h-4 w-4" />
             </div>
-            <p className="text-xs text-purple-700 mt-1">Per completed order</p>
-          </CardContent>
-        </Card>
+          </div>
+          <div className="text-2xl font-bold text-slate-900">
+            {isLoadingAnalytics ? (
+              <Skeleton className="h-7 w-24" />
+            ) : (
+              formatCurrency(analyticsData?.average_order_value ?? stats.averageOrderValue)
+            )}
+          </div>
+          <p className="text-[11px] text-purple-600 font-medium mt-1">Per completed order</p>
+        </div>
       </div>
 
       <Tabs value={activeTab} onValueChange={(v) => { setActiveTab(v); if (v !== "manual") setEditingOrder(null); }} className="w-full">
@@ -441,10 +442,10 @@ export default function OnlinePreordersPage() {
                                 {o.items?.length || 0}
                               </Badge>
                             </TableCell>
-                            <TableCell className="font-extrabold text-slate-900">৳{Number(o.total_amount).toLocaleString()}</TableCell>
+                            <TableCell className="font-semibold text-slate-900">{formatCurrency(o.total_amount)}</TableCell>
                             <TableCell>
                               {totalDiscount > 0 ? (
-                                <span className="text-red-500 font-bold text-sm">৳{totalDiscount.toLocaleString()}</span>
+                                <span className="text-rose-600 font-semibold text-sm">{formatCurrency(totalDiscount)}</span>
                               ) : (
                                 <span className="text-slate-400 text-xs">-</span>
                               )}
@@ -592,7 +593,7 @@ export default function OnlinePreordersPage() {
               {orderToDelete && (
                 <div className="mt-2 text-sm text-slate-600">
                   <p>Customer: {orderToDelete.customer_name}</p>
-                  <p>Total: ৳{Number(orderToDelete.total_amount).toLocaleString()}</p>
+                  <p>Total: {formatCurrency(orderToDelete.total_amount)}</p>
                 </div>
               )}
             </AlertDialogDescription>
@@ -627,7 +628,7 @@ export default function OnlinePreordersPage() {
               <div className="p-3 bg-slate-50 rounded-xl border border-slate-100 text-xs space-y-1">
                 <p className="font-bold text-slate-800">Customer: {cancelOrderTarget.customer_name}</p>
                 <p className="text-slate-500">Phone: {cancelOrderTarget.customer_phone}</p>
-                <p className="font-semibold text-slate-700">Amount: ৳{Number(cancelOrderTarget.total_amount).toLocaleString()}</p>
+                <p className="font-semibold text-slate-700">Amount: {formatCurrency(cancelOrderTarget.total_amount)}</p>
               </div>
             )}
             <div className="space-y-2">

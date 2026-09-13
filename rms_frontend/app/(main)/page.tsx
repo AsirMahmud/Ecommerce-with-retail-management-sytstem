@@ -674,9 +674,9 @@ function DashboardContent() {
                         fontSize={11}
                         tickLine={false}
                         axisLine={false}
-                        tickFormatter={(val) => `৳${val >= 1000 ? `${(val / 1000).toFixed(0)}k` : val}`}
+                        tickFormatter={(val) => `$${val >= 1000 ? `${(val / 1000).toFixed(0)}k` : val}`}
                       />
-                      <Tooltip content={<CustomChartTooltip prefix="৳" isCurrency={false} />} />
+                      <Tooltip content={<CustomChartTooltip isCurrency={true} />} />
                       <Bar
                         dataKey="total"
                         name="Daily Sales"
@@ -744,9 +744,9 @@ function DashboardContent() {
                         fontSize={11}
                         tickLine={false}
                         axisLine={false}
-                        tickFormatter={(val) => `৳${val >= 1000 ? `${(val / 1000).toFixed(0)}k` : val}`}
+                        tickFormatter={(val) => `$${val >= 1000 ? `${(val / 1000).toFixed(0)}k` : val}`}
                       />
-                      <Tooltip content={<CustomChartTooltip prefix="৳" isCurrency={false} />} />
+                      <Tooltip content={<CustomChartTooltip isCurrency={true} />} />
                       <Area
                         type="monotone"
                         dataKey="amount"
@@ -878,7 +878,7 @@ function DashboardContent() {
                             />
                           ))}
                         </Pie>
-                        <Tooltip content={<CustomChartTooltip prefix="৳" isCurrency={false} />} />
+                        <Tooltip content={<CustomChartTooltip isCurrency={true} />} />
                       </PieChart>
                     </ResponsiveContainer>
                     {/* Centered Donut Summary */}

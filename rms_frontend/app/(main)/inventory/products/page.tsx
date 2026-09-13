@@ -74,7 +74,28 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { toast } from "sonner";
-import { getImageUrl, slugify } from "@/lib/utils";
+import { getImageUrl, slugify, formatCurrency } from "@/lib/utils";
+
+function ProductThumb({ src, alt }: { src?: string; alt: string }) {
+  const [error, setError] = useState(false);
+  if (!src || error) {
+    return (
+      <div className="w-12 h-12 rounded-xl bg-slate-100 border border-slate-200 flex items-center justify-center text-slate-400 shrink-0">
+        <Package className="h-5 w-5 text-slate-400" />
+      </div>
+    );
+  }
+  return (
+    <div className="w-12 h-12 rounded-xl overflow-hidden border border-slate-200 bg-white shrink-0">
+      <img
+        src={src}
+        alt={alt}
+        className="w-full h-full object-cover"
+        onError={() => setError(true)}
+      />
+    </div>
+  );
+}
 
 export default function ProductsPage() {
   const router = useRouter();
@@ -551,14 +572,14 @@ export default function ProductsPage() {
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-1">
               <p className="text-xs text-muted-foreground">Cost Price</p>
-              <p className="text-lg font-bold text-red-600">
-                ${product.cost_price}
+              <p className="text-base font-bold text-slate-700">
+                {formatCurrency(product.cost_price)}
               </p>
             </div>
             <div className="space-y-1">
               <p className="text-xs text-muted-foreground">Selling Price</p>
-              <p className="text-lg font-bold text-green-600">
-                ${product.selling_price}
+              <p className="text-base font-bold text-emerald-600">
+                {formatCurrency(product.selling_price)}
               </p>
             </div>
           </div>
@@ -566,18 +587,14 @@ export default function ProductsPage() {
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-1">
               <p className="text-xs text-muted-foreground">Total Value</p>
-              <p className="text-lg font-bold text-blue-600">
-                ${(product.cost_price * product.stock_quantity).toLocaleString()}
+              <p className="text-base font-bold text-blue-600">
+                {formatCurrency(product.cost_price * product.stock_quantity)}
               </p>
             </div>
             <div className="space-y-1">
               <p className="text-xs text-muted-foreground">Potential Profit</p>
-              <p className="text-lg font-bold text-green-600">
-                $
-                {(
-                  (product.selling_price - product.cost_price) *
-                  product.stock_quantity
-                ).toLocaleString()}
+              <p className="text-base font-bold text-indigo-600">
+                {formatCurrency((product.selling_price - product.cost_price) * product.stock_quantity)}
               </p>
             </div>
           </div>
@@ -637,161 +654,137 @@ export default function ProductsPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
-      <div className="max-w-7xl mx-auto p-0 sm:p-2 md:p-6">
+    <div className="space-y-6">
+      <div className="max-w-7xl mx-auto space-y-6">
         {/* Header */}
-        <div className="mb-6 sm:mb-8">
-          <div className="flex items-center space-x-3 mb-4">
-            <div className="w-10 h-10 sm:w-12 sm:h-12 bg-gradient-to-r from-blue-600 to-indigo-600 rounded-xl flex items-center justify-center shadow-lg shrink-0">
-              <ShoppingCart className="h-5 w-5 sm:h-6 sm:w-6 text-white" />
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="flex items-center space-x-3">
+            <div className="w-10 h-10 sm:w-11 sm:h-11 bg-gradient-to-tr from-blue-600 to-indigo-600 rounded-xl flex items-center justify-center shadow-md shadow-blue-500/20 shrink-0 text-white">
+              <ShoppingCart className="h-5 w-5 sm:h-5.5 sm:w-5.5" />
             </div>
             <div>
-              <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold bg-gradient-to-r from-gray-900 to-gray-600 bg-clip-text text-transparent">
+              <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-slate-900">
                 Products
               </h1>
-              <p className="text-gray-600 mt-1 text-xs sm:text-sm">
-                Manage your product inventory and stock levels
+              <p className="text-slate-500 mt-0.5 text-xs sm:text-sm font-medium">
+                Manage your product catalog, pricing, and stock levels
               </p>
             </div>
           </div>
-          <div className="flex flex-wrap sm:justify-end gap-2 sm:gap-3">
+          <div className="flex flex-wrap items-center gap-2 sm:gap-3">
             <Button
               variant="outline"
               onClick={handleDownloadCatalog}
-              className="flex-1 sm:flex-none border-blue-200 hover:bg-blue-50 text-blue-700 shadow-sm text-xs sm:text-sm h-9"
+              className="bg-white border-slate-200 hover:bg-slate-50 text-slate-700 shadow-2xs text-xs sm:text-sm h-9 rounded-xl"
             >
-              <Download className="mr-1.5 sm:mr-2 h-4 w-4" />
+              <Download className="mr-1.5 h-4 w-4" />
               Download Catalog
             </Button>
             <Button
               onClick={() => router.push("/inventory/add-product")}
-              className="flex-1 sm:flex-none bg-gradient-to-r from-blue-500 to-indigo-500 hover:from-blue-600 hover:to-indigo-600 text-white shadow-lg text-xs sm:text-sm h-9"
+              className="bg-blue-600 hover:bg-blue-700 text-white shadow-md shadow-blue-500/20 text-xs sm:text-sm h-9 rounded-xl font-medium"
             >
-              <PlusCircle className="mr-1.5 sm:mr-2 h-4 w-4" />
+              <PlusCircle className="mr-1.5 h-4 w-4" />
               Add Product
             </Button>
           </div>
         </div>
 
         {/* Key Metrics */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-          <Card className="border-0 shadow-xl bg-white/70 backdrop-blur-sm">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium text-gray-700">
-                Total Products
-              </CardTitle>
-              <div className="w-10 h-10 bg-gradient-to-r from-blue-500 to-indigo-500 rounded-full flex items-center justify-center">
-                <Package className="h-5 w-5 text-white" />
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 sm:gap-4">
+          <div className="bg-white border border-slate-200/90 rounded-2xl p-4 shadow-2xs hover:border-slate-300 transition-all">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-xs font-semibold text-slate-500">Total Products</span>
+              <div className="w-8 h-8 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center">
+                <Package className="h-4 w-4" />
               </div>
-            </CardHeader>
-            <CardContent>
-              <div className="text-3xl font-bold text-gray-900">
-                {isStatsLoading ? "..." : stats.total_products}
-              </div>
-              <p className="text-xs text-blue-600 font-medium mt-1">
-                {isStatsLoading ? "Loading..." : `${stats.active_products} Active Products`}
-              </p>
-            </CardContent>
-          </Card>
+            </div>
+            <div className="text-2xl font-bold text-slate-900">
+              {isStatsLoading ? "..." : stats.total_products}
+            </div>
+            <p className="text-[11px] text-blue-600 font-medium mt-1">
+              {isStatsLoading ? "Loading..." : `${stats.active_products} Active`}
+            </p>
+          </div>
 
-          <Card className="border-0 shadow-xl bg-white/70 backdrop-blur-sm">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium text-gray-700">
-                Total Cost
-              </CardTitle>
-              <div className="w-10 h-10 bg-gradient-to-r from-blue-500 to-indigo-500 rounded-full flex items-center justify-center">
-                <DollarSign className="h-5 w-5 text-white" />
+          <div className="bg-white border border-slate-200/90 rounded-2xl p-4 shadow-2xs hover:border-slate-300 transition-all">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-xs font-semibold text-slate-500">Total Cost</span>
+              <div className="w-8 h-8 rounded-xl bg-slate-100 text-slate-700 flex items-center justify-center">
+                <DollarSign className="h-4 w-4" />
               </div>
-            </CardHeader>
-            <CardContent>
-              <div className="text-3xl font-bold text-gray-900">
-                {isStatsLoading ? "..." : `$${stats.total_cost.toLocaleString()}`}
-              </div>
-              <p className="text-xs text-blue-600 font-medium mt-1">
-                Cost Value of Current Stock
-              </p>
-            </CardContent>
-          </Card>
+            </div>
+            <div className="text-2xl font-bold text-slate-900">
+              {isStatsLoading ? "..." : formatCurrency(stats.total_cost)}
+            </div>
+            <p className="text-[11px] text-slate-500 font-medium mt-1">
+              Stock Cost
+            </p>
+          </div>
 
-          <Card className="border-0 shadow-xl bg-white/70 backdrop-blur-sm">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium text-gray-700">
-                Total Value
-              </CardTitle>
-              <div className="w-10 h-10 bg-gradient-to-r from-green-500 to-emerald-500 rounded-full flex items-center justify-center">
-                <TrendingUp className="h-5 w-5 text-white" />
+          <div className="bg-white border border-slate-200/90 rounded-2xl p-4 shadow-2xs hover:border-slate-300 transition-all">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-xs font-semibold text-slate-500">Total Value</span>
+              <div className="w-8 h-8 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
+                <TrendingUp className="h-4 w-4" />
               </div>
-            </CardHeader>
-            <CardContent>
-              <div className="text-3xl font-bold text-gray-900">
-                {isStatsLoading ? "..." : `$${stats.total_value.toLocaleString()}`}
-              </div>
-              <p className="text-xs text-green-600 font-medium mt-1">
-                Total Selling Value
-              </p>
-            </CardContent>
-          </Card>
+            </div>
+            <div className="text-2xl font-bold text-slate-900">
+              {isStatsLoading ? "..." : formatCurrency(stats.total_value)}
+            </div>
+            <p className="text-[11px] text-emerald-600 font-medium mt-1">
+              Selling Value
+            </p>
+          </div>
 
-          <Card className="border-0 shadow-xl bg-white/70 backdrop-blur-sm">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium text-gray-700">
-                Potential Profit
-              </CardTitle>
-              <div className="w-10 h-10 bg-gradient-to-r from-green-500 to-emerald-500 rounded-full flex items-center justify-center">
-                <DollarSign className="h-5 w-5 text-white" />
+          <div className="bg-white border border-slate-200/90 rounded-2xl p-4 shadow-2xs hover:border-slate-300 transition-all">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-xs font-semibold text-slate-500">Potential Profit</span>
+              <div className="w-8 h-8 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center">
+                <DollarSign className="h-4 w-4" />
               </div>
-            </CardHeader>
-            <CardContent>
-              <div className="text-3xl font-bold text-green-600">
-                {isStatsLoading ? "..." : `$${stats.potential_profit.toLocaleString()}`}
-              </div>
-              <p className="text-xs text-green-600 font-medium mt-1">
-                Expected Gross Profit
-              </p>
-            </CardContent>
-          </Card>
+            </div>
+            <div className="text-2xl font-bold text-emerald-600">
+              {isStatsLoading ? "..." : formatCurrency(stats.potential_profit)}
+            </div>
+            <p className="text-[11px] text-indigo-600 font-medium mt-1">
+              Expected Profit
+            </p>
+          </div>
 
-          <Card className="border-0 shadow-xl bg-white/70 backdrop-blur-sm">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium text-gray-700">
-                Low Stock Items
-              </CardTitle>
-              <div className="w-10 h-10 bg-gradient-to-r from-blue-500 to-indigo-500 rounded-full flex items-center justify-center">
-                <AlertTriangle className="h-5 w-5 text-white" />
+          <div className="bg-white border border-slate-200/90 rounded-2xl p-4 shadow-2xs hover:border-slate-300 transition-all">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-xs font-semibold text-slate-500">Low Stock</span>
+              <div className="w-8 h-8 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center">
+                <AlertTriangle className="h-4 w-4" />
               </div>
-            </CardHeader>
-            <CardContent>
-              <div className="text-3xl font-bold text-gray-900">
-                {isStatsLoading ? "..." : stats.low_stock_products}
-              </div>
-              <p className="text-xs text-blue-600 font-medium mt-1">
-                Needs attention
-              </p>
-            </CardContent>
-          </Card>
+            </div>
+            <div className="text-2xl font-bold text-slate-900">
+              {isStatsLoading ? "..." : stats.low_stock_products}
+            </div>
+            <p className="text-[11px] text-amber-600 font-medium mt-1">
+              Reorder needed
+            </p>
+          </div>
 
-          <Card className="border-0 shadow-xl bg-white/70 backdrop-blur-sm">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium text-gray-700">
-                Out of Stock
-              </CardTitle>
-              <div className="w-10 h-10 bg-gradient-to-r from-blue-500 to-indigo-500 rounded-full flex items-center justify-center">
-                <Package className="h-5 w-5 text-white" />
+          <div className="bg-white border border-slate-200/90 rounded-2xl p-4 shadow-2xs hover:border-slate-300 transition-all">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-xs font-semibold text-slate-500">Out of Stock</span>
+              <div className="w-8 h-8 rounded-xl bg-rose-50 text-rose-600 flex items-center justify-center">
+                <Package className="h-4 w-4" />
               </div>
-            </CardHeader>
-            <CardContent>
-              <div className="text-3xl font-bold text-gray-900">
-                {isStatsLoading ? "..." : stats.out_of_stock_products}
-              </div>
-              <p className="text-xs text-blue-600 font-medium mt-1">
-                Immediate action required
-              </p>
-            </CardContent>
-          </Card>
+            </div>
+            <div className="text-2xl font-bold text-slate-900">
+              {isStatsLoading ? "..." : stats.out_of_stock_products}
+            </div>
+            <p className="text-[11px] text-rose-600 font-medium mt-1">
+              Needs restock
+            </p>
+          </div>
         </div>
 
         {/* Filters */}
-        <Card className="border-0 shadow-xl bg-white/70 backdrop-blur-sm mb-6">
+        <Card className="border border-slate-200/90 shadow-2xs bg-white rounded-2xl">
           <CardContent className="p-4">
             <div className="flex flex-col md:flex-row gap-4">
               <div className="relative flex-1">
@@ -877,28 +870,32 @@ export default function ProductsPage() {
             ))}
           </div>
         ) : (
-          <Card className="border-0 shadow-xl bg-white/70 backdrop-blur-sm overflow-hidden">
-            <CardHeader className="bg-gradient-to-r from-slate-50 to-slate-100 border-b">
-              <CardTitle className="text-lg font-semibold text-slate-900">
-                Products List
-              </CardTitle>
-              <CardDescription>
-                {filteredProducts.length} products found
-              </CardDescription>
+          <Card className="border border-slate-200/90 shadow-2xs bg-white rounded-2xl overflow-hidden">
+            <CardHeader className="bg-slate-50/70 border-b border-slate-100 px-6 py-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle className="text-base font-bold text-slate-900">
+                    Products List
+                  </CardTitle>
+                  <CardDescription className="text-xs text-slate-500">
+                    {filteredProducts.length} items found
+                  </CardDescription>
+                </div>
+              </div>
             </CardHeader>
             <div className="overflow-x-auto">
               <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Product</TableHead>
-                    <TableHead>Category</TableHead>
-                    <TableHead>Online Cat.</TableHead>
-                    <TableHead>Stock</TableHead>
-                    <TableHead>Price</TableHead>
-                    <TableHead>Sale Price</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Online</TableHead>
-                    <TableHead className="text-right">Actions</TableHead>
+                <TableHeader className="bg-slate-50/50">
+                  <TableRow className="border-b border-slate-100">
+                    <TableHead className="font-semibold text-xs text-slate-600">Product</TableHead>
+                    <TableHead className="font-semibold text-xs text-slate-600">Category</TableHead>
+                    <TableHead className="font-semibold text-xs text-slate-600">Online Cat.</TableHead>
+                    <TableHead className="font-semibold text-xs text-slate-600">Stock</TableHead>
+                    <TableHead className="font-semibold text-xs text-slate-600">Price</TableHead>
+                    <TableHead className="font-semibold text-xs text-slate-600">Sale Price</TableHead>
+                    <TableHead className="font-semibold text-xs text-slate-600">Status</TableHead>
+                    <TableHead className="font-semibold text-xs text-slate-600">Online</TableHead>
+                    <TableHead className="font-semibold text-xs text-slate-600 text-right">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -908,92 +905,74 @@ export default function ProductsPage() {
                     const imageUrl = getImageUrl(firstImage?.image);
 
                     return (
-                      <TableRow key={product.id}>
+                      <TableRow key={product.id} className="hover:bg-slate-50/60 transition-colors">
                         <TableCell>
                           <div className="flex items-center gap-3">
-                            {imageUrl ? (
-                              <div className="w-12 h-12 rounded-lg overflow-hidden border border-gray-200">
-                                <img
-                                  src={imageUrl}
-                                  alt={product.name}
-                                  className="w-full h-full object-cover"
-                                />
-                              </div>
-                            ) : (
-                              <div className="w-12 h-12 bg-gradient-to-r from-blue-500 to-indigo-500 rounded-lg flex items-center justify-center">
-                                <Package className="h-5 w-5 text-white" />
-                              </div>
-                            )}
+                            <ProductThumb src={imageUrl} alt={product.name} />
                             <div>
-                              <p className="font-medium">{product.name}</p>
-                              <p className="text-sm text-muted-foreground">
+                              <p className="font-semibold text-slate-900 text-sm">{product.name}</p>
+                              <p className="text-xs text-slate-500 font-mono">
                                 {product.sku}
                               </p>
                               {(product.size_type ||
                                 product.size_category ||
                                 product.gender) && (
-                                  <div className="flex gap-1 mt-1">
+                                  <div className="flex gap-1 mt-1 flex-wrap">
                                     {product.size_type && (
-                                      <Badge
-                                        variant="outline"
-                                        className="text-xs bg-blue-100"
-                                      >
+                                      <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-slate-100 text-slate-700 border border-slate-200">
                                         {product.size_type}
-                                      </Badge>
+                                      </span>
                                     )}
                                     {product.size_category && (
-                                      <Badge
-                                        variant="outline"
-                                        className="text-xs bg-emerald-200"
-                                      >
+                                      <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-slate-100 text-slate-700 border border-slate-200">
                                         {product.size_category}
-                                      </Badge>
+                                      </span>
                                     )}
                                     {product.gender && (
-                                      <Badge
-                                        variant="outline"
-                                        className="text-xs bg-red-600 text-white"
-                                      >
-                                        {product.gender}
-                                      </Badge>
+                                      <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-blue-50 text-blue-700 border border-blue-200 capitalize">
+                                        {product.gender.toLowerCase()}
+                                      </span>
                                     )}
                                   </div>
                                 )}
                             </div>
                           </div>
                         </TableCell>
-                        <TableCell className="font-medium">
+                        <TableCell className="font-medium text-slate-700 text-sm">
                           {product.category?.name || "Uncategorized"}
                         </TableCell>
-                        <TableCell className="font-medium text-blue-600">
+                        <TableCell className="font-medium text-blue-600 text-xs">
                           {product.online_categories && product.online_categories.length > 0
                             ? product.online_categories.map(c => c.name).join(", ")
                             : "-"}
                         </TableCell>
                         <TableCell>
                           <div className="flex items-center gap-2">
-                            <span>{product.stock_quantity}</span>
+                            <span className="font-semibold text-slate-800 text-sm">{product.stock_quantity}</span>
                             {product.stock_quantity <= product.minimum_stock && (
-                              <Badge variant="destructive" className="text-xs">
+                              <Badge variant="destructive" className="text-[10px] px-1.5 py-0">
                                 Low Stock
                               </Badge>
                             )}
                           </div>
                         </TableCell>
-                        <TableCell>${product.selling_price}</TableCell>
+                        <TableCell className="font-semibold text-slate-900 text-sm">
+                          {formatCurrency(product.selling_price)}
+                        </TableCell>
                         <TableCell>
                           {product.discount_percentage && product.discount_percentage > 0 ? (
                             <div className="flex flex-col">
-                              <span className="font-bold text-green-600">${product.sale_price}</span>
-                              <span className="text-[10px] text-muted-foreground line-through">${product.selling_price}</span>
+                              <span className="font-bold text-emerald-600 text-sm">{formatCurrency(product.sale_price)}</span>
+                              <span className="text-[10px] text-muted-foreground line-through">{formatCurrency(product.selling_price)}</span>
                             </div>
                           ) : (
-                            <span className="text-muted-foreground">-</span>
+                            <span className="text-slate-400 text-xs">-</span>
                           )}
                         </TableCell>
                         <TableCell>
                           <Badge
                             variant={product.is_active ? "default" : "secondary"}
+                            className="text-xs"
                           >
                             {product.is_active ? "Active" : "Inactive"}
                           </Badge>

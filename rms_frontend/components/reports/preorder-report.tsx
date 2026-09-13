@@ -1,28 +1,37 @@
+"use client";
+
+import React from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import React from "react";
+import { Badge } from "@/components/ui/badge";
 import {
   DollarSign,
   ShoppingCart,
   TrendingUp,
-  Tag,
+  Clock,
+  CheckCircle2,
+  PackageCheck,
+  Truck,
   ArrowRight,
-} from "lucide-react"; // Added ArrowRight for a subtle touch
+} from "lucide-react";
 
 interface PreorderReportProps {
   overviewData: any;
   isLoading: boolean;
 }
 
-const STATUS_LABELS: Record<string, string> = {
-  PENDING: "Pending",
-  CONFIRMED: "Confirmed",
-  DEPOSIT_PAID: "Deposit Paid",
-  FULLY_PAID: "Fully Paid",
-  ARRIVED: "Arrived",
-  DELIVERED: "Delivered",
-  COMPLETED: "Completed",
-  CANCELLED: "Cancelled",
+const STATUS_CONFIG: Record<
+  string,
+  { label: string; color: string; badgeBg: string; textCol: string }
+> = {
+  PENDING: { label: "Pending", color: "bg-amber-500", badgeBg: "bg-amber-50", textCol: "text-amber-700" },
+  CONFIRMED: { label: "Confirmed", color: "bg-blue-500", badgeBg: "bg-blue-50", textCol: "text-blue-700" },
+  DEPOSIT_PAID: { label: "Deposit Paid", color: "bg-indigo-500", badgeBg: "bg-indigo-50", textCol: "text-indigo-700" },
+  FULLY_PAID: { label: "Fully Paid", color: "bg-emerald-500", badgeBg: "bg-emerald-50", textCol: "text-emerald-700" },
+  ARRIVED: { label: "Arrived", color: "bg-cyan-500", badgeBg: "bg-cyan-50", textCol: "text-cyan-700" },
+  DELIVERED: { label: "Delivered", color: "bg-teal-500", badgeBg: "bg-teal-50", textCol: "text-teal-700" },
+  COMPLETED: { label: "Completed", color: "bg-green-600", badgeBg: "bg-green-50", textCol: "text-green-700" },
+  CANCELLED: { label: "Cancelled", color: "bg-rose-500", badgeBg: "bg-rose-50", textCol: "text-rose-700" },
 };
 
 export function PreorderReport({
@@ -31,136 +40,172 @@ export function PreorderReport({
 }: PreorderReportProps) {
   if (isLoading) {
     return (
-      <div className="grid gap-8 md:grid-cols-2 lg:grid-cols-4 p-8">
-        {" "}
-        {/* Increased gap and padding */}
-        <Skeleton className="h-40 rounded-2xl" />{" "}
-        {/* Taller, more rounded skeletons */}
-        <Skeleton className="h-40 rounded-2xl" />
-        <Skeleton className="h-40 rounded-2xl" />
-        <Skeleton className="h-40 rounded-2xl" />
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+        {[...Array(4)].map((_, i) => (
+          <Card key={i} className="rounded-2xl border border-slate-100 shadow-xs p-5">
+            <Skeleton className="h-4 w-28 mb-3" />
+            <Skeleton className="h-8 w-36 mb-2" />
+            <Skeleton className="h-3 w-24" />
+          </Card>
+        ))}
       </div>
     );
   }
 
   if (!overviewData) return null;
 
+  const totalOrders = overviewData.preorder_total_orders || 0;
+  const totalRevenue = parseFloat(overviewData.preorder_total_revenue || 0);
+  const totalProfit = parseFloat(overviewData.preorder_profit || 0);
+
+  const statusEntries = overviewData.preorder_status_breakdown
+    ? Object.entries(overviewData.preorder_status_breakdown)
+    : [];
+
   return (
-    <div className="space-y-10 p-6 md:p-8 lg:p-10 bg-gray-50 rounded-xl shadow-inner">
-      {" "}
-      {/* Overall more defined section */}
-      <h2 className="text-3xl md:text-4xl font-extrabold text-gray-900 mb-6 text-center lg:text-left">
-        Preorder Performance Overview
-      </h2>
-      <div className="grid gap-8 md:grid-cols-2 lg:grid-cols-4">
-        {" "}
-        {/* Increased gap */}
-        {/* Preorder Orders Card */}
-        <Card className="bg-gradient-to-br from-purple-100 to-indigo-200 border border-purple-300 rounded-2xl shadow-xl hover:shadow-2xl transition-all duration-300 transform hover:-translate-y-2 cursor-pointer relative overflow-hidden">
-          <div className="absolute inset-0 bg-purple-500 opacity-5 -top-4 -left-4 w-24 h-24 rounded-full filter blur-xl"></div>{" "}
-          {/* Decorative element */}
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
-            <CardTitle className="text-base font-bold text-gray-800 flex items-center gap-3">
-              {" "}
-              {/* Larger font, bolder */}
-              <ShoppingCart className="h-6 w-6 text-purple-700" />{" "}
-              {/* Larger icon, darker color */}
-              Total Orders
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="pt-2">
-            <div className="text-5xl font-extrabold text-purple-900 drop-shadow-md">
-              {" "}
-              {/* Significantly larger and bolder */}
-              {overviewData.preorder_total_orders || 0}
+    <div className="space-y-6">
+      {/* 3 Executive Metric Cards */}
+      <div className="grid gap-4 grid-cols-1 sm:grid-cols-3">
+        {/* Total Preorders */}
+        <Card className="relative overflow-hidden bg-white border border-slate-200/80 shadow-xs hover:shadow-md transition-all rounded-2xl">
+          <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-purple-500 to-indigo-500" />
+          <CardHeader className="flex flex-row items-center justify-between pb-2 pt-4 px-5">
+            <span className="text-xs font-bold uppercase tracking-wider text-slate-500">
+              Total Preorder Bookings
+            </span>
+            <div className="w-8 h-8 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center shadow-xs">
+              <ShoppingCart className="w-4 h-4" />
             </div>
-            <p className="text-sm text-purple-800 mt-3 font-medium">
-              {" "}
-              {/* Clearer description */}
-              All preorders placed
-            </p>
+          </CardHeader>
+          <CardContent className="px-5 pb-4">
+            <div className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">
+              {totalOrders}
+            </div>
+            <div className="flex items-center gap-1.5 text-xs text-purple-600 font-semibold mt-1.5">
+              <Clock className="w-3.5 h-3.5" />
+              <span>Customer advance orders recorded</span>
+            </div>
           </CardContent>
         </Card>
-        {/* Preorder Revenue Card */}
-        <Card className="bg-gradient-to-br from-blue-100 to-indigo-200 border border-blue-300 rounded-2xl shadow-xl hover:shadow-2xl transition-all duration-300 transform hover:-translate-y-2 cursor-pointer relative overflow-hidden">
-          <div className="absolute inset-0 bg-blue-500 opacity-5 -top-4 -left-4 w-24 h-24 rounded-full filter blur-xl"></div>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
-            <CardTitle className="text-base font-bold text-gray-800 flex items-center gap-3">
-              <DollarSign className="h-6 w-6 text-blue-700" />
-              Total Revenue
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="pt-2">
-            <div className="text-5xl font-extrabold text-blue-900 drop-shadow-md">
-              ${parseFloat(overviewData.preorder_total_revenue || 0).toFixed(2)}
+
+        {/* Preorder Gross Revenue */}
+        <Card className="relative overflow-hidden bg-white border border-slate-200/80 shadow-xs hover:shadow-md transition-all rounded-2xl">
+          <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-blue-500 to-indigo-500" />
+          <CardHeader className="flex flex-row items-center justify-between pb-2 pt-4 px-5">
+            <span className="text-xs font-bold uppercase tracking-wider text-slate-500">
+              Preorder Gross Value
+            </span>
+            <div className="w-8 h-8 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center shadow-xs">
+              <DollarSign className="w-4 h-4" />
             </div>
-            <p className="text-sm text-blue-800 mt-3 font-medium">
-              Gross revenue from preorders
-            </p>
+          </CardHeader>
+          <CardContent className="px-5 pb-4">
+            <div className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">
+              ${totalRevenue.toLocaleString(undefined, {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2,
+              })}
+            </div>
+            <div className="flex items-center gap-1.5 text-xs text-blue-600 font-semibold mt-1.5">
+              <PackageCheck className="w-3.5 h-3.5" />
+              <span>Committed advance order volume</span>
+            </div>
           </CardContent>
         </Card>
-        {/* Preorder Profit Card */}
-        <Card className="bg-gradient-to-br from-emerald-100 to-teal-200 border border-emerald-300 rounded-2xl shadow-xl hover:shadow-2xl transition-all duration-300 transform hover:-translate-y-2 cursor-pointer relative overflow-hidden">
-          <div className="absolute inset-0 bg-emerald-500 opacity-5 -top-4 -left-4 w-24 h-24 rounded-full filter blur-xl"></div>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
-            <CardTitle className="text-base font-bold text-gray-800 flex items-center gap-3">
-              <TrendingUp className="h-6 w-6 text-emerald-700" />
-              Estimated Profit
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="pt-2">
-            <div className="text-5xl font-extrabold text-emerald-900 drop-shadow-md">
-              ${parseFloat(overviewData.preorder_profit || 0).toFixed(2)}
+
+        {/* Estimated Profit */}
+        <Card className="relative overflow-hidden bg-white border border-slate-200/80 shadow-xs hover:shadow-md transition-all rounded-2xl">
+          <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-emerald-500 to-teal-500" />
+          <CardHeader className="flex flex-row items-center justify-between pb-2 pt-4 px-5">
+            <span className="text-xs font-bold uppercase tracking-wider text-slate-500">
+              Estimated Net Profit
+            </span>
+            <div className="w-8 h-8 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center shadow-xs">
+              <TrendingUp className="w-4 h-4" />
             </div>
-            <p className="text-sm text-emerald-800 mt-3 font-medium">
-              Projected profit from preorders
-            </p>
-          </CardContent>
-        </Card>
-        {/* Status Breakdown Card - Innovative Approach */}
-        <Card className="bg-gradient-to-br from-orange-100 to-amber-200 border border-orange-300 rounded-2xl shadow-xl hover:shadow-2xl transition-all duration-300 transform hover:-translate-y-2 cursor-pointer relative overflow-hidden col-span-full lg:col-span-1">
-          {" "}
-          {/* Make this card potentially span wider on larger screens for better display */}
-          <div className="absolute inset-0 bg-orange-500 opacity-5 -top-4 -left-4 w-24 h-24 rounded-full filter blur-xl"></div>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
-            <CardTitle className="text-base font-bold text-gray-800 flex items-center gap-3">
-              <Tag className="h-6 w-6 text-orange-700" />
-              Order Status Breakdown
-            </CardTitle>
           </CardHeader>
-          <CardContent className="pt-2">
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-1 gap-y-3 gap-x-6">
-              {" "}
-              {/* Responsive grid for status items */}
-              {overviewData.preorder_status_breakdown &&
-                Object.entries(overviewData.preorder_status_breakdown).map(
-                  ([status, count]) => (
-                    <div
-                      key={status}
-                      className="flex items-center justify-between text-base px-3 py-2 bg-white/50 rounded-lg shadow-sm border border-gray-100" // Elevated individual status items
-                    >
-                      <span className="font-semibold text-gray-700 flex items-center gap-2">
-                        <ArrowRight className="h-4 w-4 text-orange-600" />{" "}
-                        {/* Decorative arrow */}
-                        {STATUS_LABELS[status] || status}
-                      </span>
-                      <span className="font-extrabold text-gray-900 text-lg">
-                        {" "}
-                        {/* Larger count */}
-                        {String(count)}
-                      </span>
-                    </div>
-                  )
-                )}
-              {!overviewData.preorder_status_breakdown && (
-                <p className="text-center text-gray-600 italic py-4">
-                  No detailed status data available.
-                </p>
-              )}
+          <CardContent className="px-5 pb-4">
+            <div className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">
+              ${totalProfit.toLocaleString(undefined, {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2,
+              })}
+            </div>
+            <div className="flex items-center gap-1.5 text-xs text-emerald-600 font-semibold mt-1.5">
+              <CheckCircle2 className="w-3.5 h-3.5" />
+              <span>Projected gross yield upon fulfillment</span>
             </div>
           </CardContent>
         </Card>
       </div>
+
+      {/* Status Breakdown Grid */}
+      <Card className="border border-slate-200/90 shadow-xs bg-white rounded-2xl overflow-hidden">
+        <CardHeader className="p-5 border-b border-slate-100 bg-slate-50/50 flex flex-row items-center justify-between">
+          <div>
+            <CardTitle className="text-base font-bold text-slate-900 flex items-center gap-2">
+              <Clock className="w-4 h-4 text-purple-600" />
+              Preorder Fulfillment Pipeline
+            </CardTitle>
+            <p className="text-xs text-slate-400 mt-0.5">
+              Distribution of preorders by current lifecycle status
+            </p>
+          </div>
+          <Badge variant="outline" className="bg-white text-slate-600 border-slate-200 text-xs">
+            {totalOrders} Total Orders
+          </Badge>
+        </CardHeader>
+
+        <CardContent className="p-5">
+          {statusEntries.length === 0 ? (
+            <p className="text-center text-slate-400 text-xs py-6">
+              No status records available.
+            </p>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+              {statusEntries.map(([status, count]) => {
+                const countNum = Number(count) || 0;
+                const config = STATUS_CONFIG[status] || {
+                  label: status,
+                  color: "bg-slate-400",
+                  badgeBg: "bg-slate-50",
+                  textCol: "text-slate-700",
+                };
+                const pct = totalOrders > 0 ? ((countNum / totalOrders) * 100).toFixed(0) : 0;
+
+                return (
+                  <div
+                    key={status}
+                    className="p-3.5 rounded-xl border border-slate-100 bg-slate-50/50 hover:bg-slate-50 transition-colors flex flex-col justify-between space-y-2"
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-semibold text-slate-700 flex items-center gap-1.5">
+                        <span className={`w-2 h-2 rounded-full ${config.color}`} />
+                        {config.label}
+                      </span>
+                      <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-md ${config.badgeBg} ${config.textCol}`}>
+                        {pct}%
+                      </span>
+                    </div>
+
+                    <div className="flex items-baseline justify-between pt-1">
+                      <span className="text-xl font-black text-slate-900">{countNum}</span>
+                      <span className="text-[11px] text-slate-400 font-medium">orders</span>
+                    </div>
+
+                    <div className="w-full bg-slate-200/80 rounded-full h-1 overflow-hidden">
+                      <div
+                        className={`h-1 rounded-full ${config.color} transition-all duration-500`}
+                        style={{ width: `${pct}%` }}
+                      />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
 }

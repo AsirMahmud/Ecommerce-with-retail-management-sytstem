@@ -24,12 +24,12 @@ export default function MainLayout({
     <TaskProvider>
       <ThemeProvider attribute="class" defaultTheme="light">
         <BismillahProvider>
-          <div className="flex flex-col md:flex-row min-h-screen bg-[#F1F5F9] w-full max-w-full overflow-x-hidden">
+          <div className="flex flex-col md:flex-row min-h-screen bg-[#F8FAFC] w-full max-w-full overflow-x-hidden">
             <SideNav />
-            <div className="flex-1 min-w-0 w-full max-w-full md:ml-[280px] flex flex-col">
+            <div className="flex-1 min-w-0 w-full max-w-full md:ml-[270px] flex flex-col">
               <UpperNav />
               <BismillahLogo />
-              <main className="flex-1 p-3 sm:p-4 md:p-6 min-w-0 w-full max-w-full">
+              <main className="flex-1 p-3 sm:p-5 md:p-6 min-w-0 w-full max-w-full">
                 {children}
               </main>
               <Toaster />

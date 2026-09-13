@@ -239,7 +239,7 @@ export default function ExpenseManagement() {
                           fontSize={11}
                           tickLine={false}
                           axisLine={false}
-                          tickFormatter={(val) => `৳${val >= 1000 ? `${(val / 1000).toFixed(0)}k` : val}`}
+                          tickFormatter={(val) => `$${val >= 1000 ? `${(val / 1000).toFixed(0)}k` : val}`}
                         />
                         <Tooltip
                           formatter={(value) => [formatCurrency(value as number), "Expenses"]}

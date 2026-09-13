@@ -682,6 +682,9 @@ export default function SalesHistory() {
             <Skeleton className="h-6 w-20" />
           </TableCell>
           <TableCell>
+            <Skeleton className="h-6 w-16" />
+          </TableCell>
+          <TableCell>
             <Skeleton className="h-8 w-8" />
           </TableCell>
         </TableRow>
@@ -755,8 +758,8 @@ export default function SalesHistory() {
         </div>
 
         {/* Filters - Always visible */}
-        <Card className="bg-white border-0 shadow-lg">
-          <CardContent className="p-3 sm:p-4 md:p-6">
+        <Card className="bg-white border border-slate-200/90 shadow-xs rounded-2xl">
+          <CardContent className="p-4 sm:p-5 md:p-6">
             <div className="flex flex-col gap-3 sm:gap-4">
               <div className="flex-1">
                 <div className="relative">
@@ -900,8 +903,8 @@ export default function SalesHistory() {
         </Card>
 
         {/* Sales Table */}
-        <Card className="bg-white border-0 shadow-lg">
-          <CardHeader className="pb-2 sm:pb-4 px-3 sm:px-6">
+        <Card className="bg-white border border-slate-200/90 shadow-xs rounded-2xl overflow-hidden">
+          <CardHeader className="pb-3 sm:pb-4 px-4 sm:px-6 pt-5 bg-slate-50/40 border-b border-slate-100">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 sm:gap-0">
               <div>
                 <CardTitle className="text-base sm:text-lg md:text-xl font-semibold text-gray-900">
@@ -1012,7 +1015,7 @@ export default function SalesHistory() {
                     <TableSkeleton />
                   ) : typedSales.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={9} className="text-center py-12">
+                      <TableCell colSpan={10} className="text-center py-12">
                         <div className="space-y-3">
                           <div className="text-gray-500 text-lg">
                             No sales found
@@ -1046,10 +1049,7 @@ export default function SalesHistory() {
                             </div>
                           </div>
                         </TableCell>
-                        <TableCell>
-                          {getSaleTypeBadge(sale.sale_type)}
-                        </TableCell>
-                        <TableCell className="text-sm text-gray-600">
+                        <TableCell className="text-xs font-medium text-slate-600 whitespace-nowrap">
                           {formatDate(sale.date)}
                         </TableCell>
                         <TableCell>
@@ -1058,7 +1058,7 @@ export default function SalesHistory() {
                         <TableCell>
                           <Badge
                             variant="outline"
-                            className="bg-blue-50 text-blue-700 border-blue-200"
+                            className="bg-slate-50 text-slate-700 border-slate-200 text-xs font-semibold px-2 py-0.5"
                           >
                             {sale.items?.length || 0} item
                             {sale.items?.length !== 1 ? "s" : ""}

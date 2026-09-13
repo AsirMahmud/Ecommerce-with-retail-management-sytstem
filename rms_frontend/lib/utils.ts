@@ -5,11 +5,14 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
 }
 
-export function formatCurrency(amount: number) {
+export function formatCurrency(amount: number | string | undefined | null) {
+  const num = typeof amount === "string" ? parseFloat(amount) : Number(amount ?? 0);
   return new Intl.NumberFormat("en-US", {
     style: "currency",
     currency: "USD",
-  }).format(amount)
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(isNaN(num) ? 0 : num);
 }
 
 /**

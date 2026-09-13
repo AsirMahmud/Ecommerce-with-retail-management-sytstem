@@ -12,6 +12,7 @@ import { Trophy, Medal, Award, Star, Crown } from "lucide-react";
 import Link from "next/link";
 import { useTopCustomers } from "@/hooks/queries/use-customer";
 import { Skeleton } from "@/components/ui/skeleton";
+import { formatCurrency } from "@/lib/utils";
 
 const rankingIcons = [
   { icon: Crown, color: "text-yellow-500", bgColor: "bg-yellow-100" },
@@ -92,18 +93,22 @@ export function TopCustomersAnalysis() {
   const maxSales = Math.max(...topCustomers.map(c => c.total_sales));
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <Trophy className="h-5 w-5 text-yellow-500" />
-          Top 5 Customers
-        </CardTitle>
-        <CardDescription>
-          Your highest-value customers based on total sales
-        </CardDescription>
+    <Card className="bg-white rounded-2xl border border-slate-200/90 shadow-2xs overflow-hidden">
+      <CardHeader className="bg-slate-50/60 border-b border-slate-100 p-4 sm:p-5">
+        <div className="flex items-center justify-between">
+          <div>
+            <CardTitle className="flex items-center gap-2 text-base font-bold text-slate-900">
+              <Trophy className="h-5 w-5 text-amber-500" />
+              Top 5 Customers
+            </CardTitle>
+            <CardDescription className="text-xs text-slate-500">
+              Your highest-value patrons based on cumulative purchase volume
+            </CardDescription>
+          </div>
+        </div>
       </CardHeader>
-      <CardContent>
-        <div className="space-y-4">
+      <CardContent className="p-4 sm:p-5">
+        <div className="space-y-3.5">
           {topCustomers.map((customer, index) => {
             const rankingIcon = rankingIcons[index];
             const IconComponent = rankingIcon.icon;
@@ -113,18 +118,18 @@ export function TopCustomersAnalysis() {
             return (
               <div
                 key={customer.id}
-                className="flex items-center space-x-4 p-3 rounded-lg border hover:bg-muted/50 transition-colors"
+                className="flex items-center space-x-4 p-3.5 rounded-xl border border-slate-200/80 hover:bg-slate-50/70 hover:border-slate-300 transition-all bg-white"
               >
-                <div className={`p-2 rounded-full ${rankingIcon.bgColor}`}>
-                  <IconComponent className={`h-5 w-5 ${rankingIcon.color}`} />
+                <div className={`p-2 rounded-xl ${rankingIcon.bgColor}`}>
+                  <IconComponent className={`h-4.5 w-4.5 ${rankingIcon.color}`} />
                 </div>
                 
-                <Avatar className="h-10 w-10">
+                <Avatar className="h-10 w-10 border border-slate-200">
                   <AvatarImage
                     src={`https://avatar.vercel.sh/${customer.id}`}
                     alt={name}
                   />
-                  <AvatarFallback>
+                  <AvatarFallback className="font-bold text-xs bg-slate-100 text-slate-700">
                     {name
                       .split(" ")
                       .map((n: string) => n[0])
@@ -136,20 +141,20 @@ export function TopCustomersAnalysis() {
                   <div className="flex items-center gap-2">
                     <Link
                       href={`/customers/${customer.id}`}
-                      className="font-medium hover:underline truncate"
+                      className="font-semibold text-slate-900 hover:text-blue-600 truncate text-sm transition-colors"
                     >
                       {name}
                     </Link>
-                    <Badge variant="secondary" className="text-xs">
+                    <Badge variant="secondary" className="text-[10px] font-bold bg-slate-100 text-slate-600 px-1.5 py-0">
                       #{customer.ranking}
                     </Badge>
                   </div>
                   
-                  <div className="flex items-center gap-4 mt-1 text-sm text-muted-foreground">
+                  <div className="flex items-center gap-2 mt-0.5 text-xs text-slate-500">
                     <span>{customer.sales_count} orders</span>
                     <span>•</span>
                     <span>
-                      Avg: ${customer.average_order_value.toFixed(2)}
+                      Avg: {formatCurrency(customer.average_order_value)}
                     </span>
                     {customer.last_purchase_date && (
                       <>
@@ -162,22 +167,22 @@ export function TopCustomersAnalysis() {
                   </div>
                   
                   <div className="mt-2">
-                    <div className="flex items-center justify-between text-sm mb-1">
-                      <span className="text-muted-foreground">Sales Performance</span>
-                      <span className="font-medium">
-                        ${customer.total_sales.toFixed(2)}
+                    <div className="flex items-center justify-between text-xs mb-1">
+                      <span className="text-slate-500">Share of Top Customer Volume</span>
+                      <span className="font-semibold text-slate-700">
+                        {Math.round(salesPercentage)}%
                       </span>
                     </div>
-                    <Progress value={salesPercentage} className="h-2" />
+                    <Progress value={salesPercentage} className="h-1.5" />
                   </div>
                 </div>
 
-                <div className="text-right">
-                  <div className="text-lg font-bold text-green-600">
-                    ${customer.total_sales.toFixed(2)}
+                <div className="text-right shrink-0">
+                  <div className="text-base font-bold text-emerald-600">
+                    {formatCurrency(customer.total_sales)}
                   </div>
-                  <div className="text-xs text-muted-foreground">
-                    Total Sales
+                  <div className="text-[11px] text-slate-400 font-medium">
+                    Total Revenue
                   </div>
                 </div>
               </div>

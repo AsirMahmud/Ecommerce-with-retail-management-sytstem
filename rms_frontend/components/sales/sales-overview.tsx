@@ -98,47 +98,49 @@ export default function SalesOverview() {
       : undefined,
   });
 
+  const anyStats = stats as any;
+
   const metrics = {
-    totalRevenue: stats?.monthly.total_sales || 0,
-    totalOrders: stats?.monthly.total_transactions || 0,
-    totalProfit: stats?.monthly.total_profit || 0,
-    totalDiscount: stats?.monthly.total_discount || 0,
-    avgTransactionValue: stats?.monthly.average_transaction_value || 0,
-    totalCustomers: stats?.monthly.total_customers || 0,
-    todayRevenue: stats?.today.total_sales || 0,
-    todayOrders: stats?.today.total_transactions || 0,
-    todayProfit: stats?.today.total_profit || 0,
-    todayCustomers: stats?.today.total_customers || 0,
+    totalRevenue: anyStats?.monthly?.total_sales || 0,
+    totalOrders: anyStats?.monthly?.total_transactions || 0,
+    totalProfit: anyStats?.monthly?.total_profit || 0,
+    totalDiscount: anyStats?.monthly?.total_discount || 0,
+    avgTransactionValue: anyStats?.monthly?.average_transaction_value || 0,
+    totalCustomers: anyStats?.monthly?.total_customers || 0,
+    todayRevenue: anyStats?.today?.total_sales || 0,
+    todayOrders: anyStats?.today?.total_transactions || 0,
+    todayProfit: anyStats?.today?.total_profit || 0,
+    todayCustomers: anyStats?.today?.total_customers || 0,
   };
 
   // Format sales trend data for the chart
   const salesTrendData = useMemo<SalesTrendDataPoint[]>(() => {
-    if (!stats?.sales_trend) return [];
-    return stats.sales_trend.map((item) => ({
+    if (!anyStats?.sales_trend) return [];
+    return anyStats.sales_trend.map((item: any) => ({
       date: item.date__date,
       sales: item.sales,
       profit: item.profit,
       orders: item.orders,
     }));
-  }, [stats?.sales_trend]);
+  }, [anyStats?.sales_trend]);
 
   // Format payment method distribution data
   const paymentMethodData = useMemo<PaymentMethodDataPoint[]>(() => {
-    if (!stats?.payment_method_distribution) return [];
-    return stats.payment_method_distribution.map((item) => ({
+    if (!anyStats?.payment_method_distribution) return [];
+    return anyStats.payment_method_distribution.map((item: any) => ({
       method: item.payment_method,
       count: item.count,
       total: item.total,
     }));
-  }, [stats?.payment_method_distribution]);
+  }, [anyStats?.payment_method_distribution]);
 
   // Format sales by hour data (filter out zero values for better visualization)
   const salesByHourData = useMemo<SalesByHourDataPoint[]>(() => {
-    if (!stats?.sales_by_hour) return [];
-    return stats.sales_by_hour.filter(
-      (item) => item.count > 0 || item.total > 0
+    if (!anyStats?.sales_by_hour) return [];
+    return anyStats.sales_by_hour.filter(
+      (item: any) => item.count > 0 || item.total > 0
     );
-  }, [stats?.sales_by_hour]);
+  }, [anyStats?.sales_by_hour]);
 
   if (isLoading) {
     return (
@@ -260,206 +262,185 @@ export default function SalesOverview() {
           </DialogContent>
         </Dialog>
 
-        {/* Key Metrics */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3 sm:gap-6">
-          <Card className="bg-white border-0 shadow-lg hover:shadow-xl transition-all duration-300 group">
-            <CardContent className="p-4 sm:p-6">
-              <div className="flex items-center justify-between">
-                <div className="space-y-2">
-                  <p className="text-sm font-medium text-gray-600">
-                    Today's Sales
-                  </p>
-                  <p className="text-2xl sm:text-3xl font-bold text-gray-900">
-                    ${metrics.todayRevenue.toLocaleString()}
-                  </p>
-                  <div className="flex items-center text-sm">
-                    <span className="text-gray-500">Daily total</span>
-                  </div>
-                </div>
-                <div className="p-3 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl group-hover:scale-110 transition-transform duration-300">
-                  <DollarSign className="h-6 w-6 text-white" />
+        {/* Today's Key Metrics (4 Cards) */}
+        <div>
+          <div className="flex items-center justify-between mb-3 px-1">
+            <h2 className="text-xs font-bold uppercase tracking-wider text-slate-500">
+              Today's Live Performance
+            </h2>
+            <span className="text-[11px] font-semibold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
+              Live Real-Time
+            </span>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3.5 sm:gap-5">
+            {/* Today's Sales */}
+            <Card className="bg-white border border-slate-200/90 shadow-2xs hover:shadow-xs transition-all duration-200 rounded-2xl p-5">
+              <div className="flex items-center justify-between pb-3">
+                <span className="text-xs font-bold uppercase tracking-wider text-slate-500">
+                  Today's Sales
+                </span>
+                <div className="w-8 h-8 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center">
+                  <DollarSign className="h-4 w-4" />
                 </div>
               </div>
-            </CardContent>
-          </Card>
+              <div className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">
+                ${metrics.todayRevenue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              </div>
+              <div className="text-xs font-medium text-slate-500 mt-2">
+                Daily sales revenue
+              </div>
+            </Card>
 
-          <Card className="bg-white border-0 shadow-lg hover:shadow-xl transition-all duration-300 group">
-            <CardContent className="p-4 sm:p-6">
-              <div className="flex items-center justify-between">
-                <div className="space-y-2">
-                  <p className="text-sm font-medium text-gray-600">
-                    Today's Orders
-                  </p>
-                  <p className="text-2xl sm:text-3xl font-bold text-gray-900">
-                    {metrics.todayOrders}
-                  </p>
-                  <div className="flex items-center text-sm">
-                    <span className="text-gray-500">Daily total</span>
-                  </div>
-                </div>
-                <div className="p-3 bg-gradient-to-br from-purple-500 to-purple-600 rounded-xl group-hover:scale-110 transition-transform duration-300">
-                  <ShoppingCart className="h-6 w-6 text-white" />
+            {/* Today's Orders */}
+            <Card className="bg-white border border-slate-200/90 shadow-2xs hover:shadow-xs transition-all duration-200 rounded-2xl p-5">
+              <div className="flex items-center justify-between pb-3">
+                <span className="text-xs font-bold uppercase tracking-wider text-slate-500">
+                  Today's Orders
+                </span>
+                <div className="w-8 h-8 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center">
+                  <ShoppingCart className="h-4 w-4" />
                 </div>
               </div>
-            </CardContent>
-          </Card>
+              <div className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">
+                {metrics.todayOrders}
+              </div>
+              <div className="text-xs font-medium text-slate-500 mt-2">
+                Transactions processed today
+              </div>
+            </Card>
 
-          <Card className="bg-white border-0 shadow-lg hover:shadow-xl transition-all duration-300 group">
-            <CardContent className="p-4 sm:p-6">
-              <div className="flex items-center justify-between">
-                <div className="space-y-2">
-                  <p className="text-sm font-medium text-gray-600">
-                    Today's Profit
-                  </p>
-                  <p className="text-2xl sm:text-3xl font-bold text-gray-900">
-                    ${metrics.todayProfit.toLocaleString()}
-                  </p>
-                  <div className="flex items-center text-sm">
-                    <span className="text-gray-500">Daily total</span>
-                  </div>
-                </div>
-                <div className="p-3 bg-gradient-to-br from-green-500 to-green-600 rounded-xl group-hover:scale-110 transition-transform duration-300">
-                  <Target className="h-6 w-6 text-white" />
+            {/* Today's Profit */}
+            <Card className="bg-white border border-slate-200/90 shadow-2xs hover:shadow-xs transition-all duration-200 rounded-2xl p-5">
+              <div className="flex items-center justify-between pb-3">
+                <span className="text-xs font-bold uppercase tracking-wider text-slate-500">
+                  Today's Profit
+                </span>
+                <div className="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center">
+                  <Target className="h-4 w-4" />
                 </div>
               </div>
-            </CardContent>
-          </Card>
-          <Card className="bg-white border-0 shadow-lg hover:shadow-xl transition-all duration-300 group">
-            <CardContent className="p-4 sm:p-6">
-              <div className="flex items-center justify-between">
-                <div className="space-y-2">
-                  <p className="text-sm font-medium text-gray-600">
-                    Total Revenue
-                  </p>
-                  <p className="text-2xl sm:text-3xl font-bold text-gray-900">
-                    ${metrics.totalRevenue.toLocaleString()}
-                  </p>
-                  <div className="flex items-center text-sm">
-                    <span className="text-gray-500">Monthly total</span>
-                  </div>
-                </div>
-                <div className="p-3 bg-gradient-to-br from-emerald-500 to-emerald-600 rounded-xl group-hover:scale-110 transition-transform duration-300">
-                  <DollarSign className="h-6 w-6 text-white" />
-                </div>
+              <div className="text-2xl sm:text-3xl font-black text-emerald-700 tracking-tight">
+                ${metrics.todayProfit.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
               </div>
-            </CardContent>
-          </Card>
+              <div className="text-xs font-medium text-emerald-600 mt-2">
+                Net operational profit
+              </div>
+            </Card>
 
-          <Card className="bg-white border-0 shadow-lg hover:shadow-xl transition-all duration-300 group">
-            <CardContent className="p-4 sm:p-6">
-              <div className="flex items-center justify-between">
-                <div className="space-y-2">
-                  <p className="text-sm font-medium text-gray-600">
-                    Total Orders
-                  </p>
-                  <p className="text-2xl sm:text-3xl font-bold text-gray-900">
-                    {metrics.totalOrders}
-                  </p>
-                  <div className="flex items-center text-sm">
-                    <span className="text-gray-500">Monthly total</span>
-                  </div>
-                </div>
-                <div className="p-3 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl group-hover:scale-110 transition-transform duration-300">
-                  <ShoppingCart className="h-6 w-6 text-white" />
+            {/* Avg Transaction */}
+            <Card className="bg-white border border-slate-200/90 shadow-2xs hover:shadow-xs transition-all duration-200 rounded-2xl p-5">
+              <div className="flex items-center justify-between pb-3">
+                <span className="text-xs font-bold uppercase tracking-wider text-slate-500">
+                  Avg Ticket Size
+                </span>
+                <div className="w-8 h-8 rounded-lg bg-purple-50 text-purple-600 flex items-center justify-center">
+                  <DollarSign className="h-4 w-4" />
                 </div>
               </div>
-            </CardContent>
-          </Card>
+              <div className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">
+                ${metrics.avgTransactionValue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              </div>
+              <div className="text-xs font-medium text-slate-500 mt-2">
+                Average value per order
+              </div>
+            </Card>
+          </div>
+        </div>
 
-          <Card className="bg-white border-0 shadow-lg hover:shadow-xl transition-all duration-300 group">
-            <CardContent className="p-4 sm:p-6">
-              <div className="flex items-center justify-between">
-                <div className="space-y-2">
-                  <p className="text-sm font-medium text-gray-600">
-                    Total Profit
-                  </p>
-                  <p className="text-2xl sm:text-3xl font-bold text-gray-900">
-                    ${metrics.totalProfit.toLocaleString()}
-                  </p>
-                  <div className="flex items-center text-sm">
-                    <span className="text-gray-500">Monthly total</span>
-                  </div>
-                </div>
-                <div className="p-3 bg-gradient-to-br from-green-500 to-green-600 rounded-xl group-hover:scale-110 transition-transform duration-300">
-                  <Target className="h-6 w-6 text-white" />
+        {/* Monthly Performance (4 Cards) */}
+        <div>
+          <div className="flex items-center justify-between mb-3 px-1">
+            <h2 className="text-xs font-bold uppercase tracking-wider text-slate-500">
+              Monthly Cumulative Overview
+            </h2>
+            <span className="text-[11px] font-semibold text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full border border-blue-200">
+              Current Month
+            </span>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3.5 sm:gap-5">
+            {/* Monthly Revenue */}
+            <Card className="bg-white border border-slate-200/90 shadow-2xs hover:shadow-xs transition-all duration-200 rounded-2xl p-5">
+              <div className="flex items-center justify-between pb-3">
+                <span className="text-xs font-bold uppercase tracking-wider text-slate-500">
+                  Total Revenue
+                </span>
+                <div className="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center">
+                  <DollarSign className="h-4 w-4" />
                 </div>
               </div>
-            </CardContent>
-          </Card>
+              <div className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">
+                ${metrics.totalRevenue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              </div>
+              <div className="text-xs font-medium text-slate-500 mt-2">
+                Monthly gross revenue
+              </div>
+            </Card>
 
-          <Card className="bg-white border-0 shadow-lg hover:shadow-xl transition-all duration-300 group">
-            <CardContent className="p-4 sm:p-6">
-              <div className="flex items-center justify-between">
-                <div className="space-y-2">
-                  <p className="text-sm font-medium text-gray-600">
-                    Avg Transaction
-                  </p>
-                  <p className="text-2xl sm:text-3xl font-bold text-gray-900">
-                    ${metrics.avgTransactionValue.toFixed(0)}
-                  </p>
-                  <div className="flex items-center text-sm">
-                    <span className="text-gray-500">Per order</span>
-                  </div>
-                </div>
-                <div className="p-3 bg-gradient-to-br from-purple-500 to-purple-600 rounded-xl group-hover:scale-110 transition-transform duration-300">
-                  <DollarSign className="h-6 w-6 text-white" />
+            {/* Monthly Orders */}
+            <Card className="bg-white border border-slate-200/90 shadow-2xs hover:shadow-xs transition-all duration-200 rounded-2xl p-5">
+              <div className="flex items-center justify-between pb-3">
+                <span className="text-xs font-bold uppercase tracking-wider text-slate-500">
+                  Total Orders
+                </span>
+                <div className="w-8 h-8 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center">
+                  <ShoppingCart className="h-4 w-4" />
                 </div>
               </div>
-            </CardContent>
-          </Card>
+              <div className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">
+                {metrics.totalOrders}
+              </div>
+              <div className="text-xs font-medium text-slate-500 mt-2">
+                Monthly orders completed
+              </div>
+            </Card>
 
-          <Card className="bg-white border-0 shadow-lg hover:shadow-xl transition-all duration-300 group">
-            <CardContent className="p-4 sm:p-6">
-              <div className="flex items-center justify-between">
-                <div className="space-y-2">
-                  <p className="text-sm font-medium text-gray-600">
-                    Total Customers
-                  </p>
-                  <p className="text-2xl sm:text-3xl font-bold text-gray-900">
-                    {metrics.totalCustomers}
-                  </p>
-                  <div className="flex items-center text-sm">
-                    <span className="text-gray-500">Monthly total</span>
-                  </div>
-                </div>
-                <div className="p-3 bg-gradient-to-br from-orange-500 to-orange-600 rounded-xl group-hover:scale-110 transition-transform duration-300">
-                  <Users className="h-6 w-6 text-white" />
+            {/* Monthly Profit */}
+            <Card className="bg-white border border-slate-200/90 shadow-2xs hover:shadow-xs transition-all duration-200 rounded-2xl p-5">
+              <div className="flex items-center justify-between pb-3">
+                <span className="text-xs font-bold uppercase tracking-wider text-slate-500">
+                  Total Profit
+                </span>
+                <div className="w-8 h-8 rounded-lg bg-teal-50 text-teal-600 flex items-center justify-center">
+                  <Target className="h-4 w-4" />
                 </div>
               </div>
-            </CardContent>
-          </Card>
+              <div className="text-2xl sm:text-3xl font-black text-emerald-700 tracking-tight">
+                ${metrics.totalProfit.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              </div>
+              <div className="text-xs font-medium text-emerald-600 mt-2">
+                Monthly net margin
+              </div>
+            </Card>
 
-          <Card className="bg-white border-0 shadow-lg hover:shadow-xl transition-all duration-300 group">
-            <CardContent className="p-4 sm:p-6">
-              <div className="flex items-center justify-between">
-                <div className="space-y-2">
-                  <p className="text-sm font-medium text-gray-600">
-                    Total Discount
-                  </p>
-                  <p className="text-2xl sm:text-3xl font-bold text-gray-900">
-                    ${metrics.totalDiscount.toLocaleString()}
-                  </p>
-                  <div className="flex items-center text-sm">
-                    <span className="text-gray-500">Monthly total</span>
-                  </div>
-                </div>
-                <div className="p-3 bg-gradient-to-br from-red-500 to-red-600 rounded-xl group-hover:scale-110 transition-transform duration-300">
-                  <Package className="h-6 w-6 text-white" />
+            {/* Total Discount */}
+            <Card className="bg-white border border-slate-200/90 shadow-2xs hover:shadow-xs transition-all duration-200 rounded-2xl p-5">
+              <div className="flex items-center justify-between pb-3">
+                <span className="text-xs font-bold uppercase tracking-wider text-slate-500">
+                  Total Discounts
+                </span>
+                <div className="w-8 h-8 rounded-lg bg-amber-50 text-amber-600 flex items-center justify-center">
+                  <Package className="h-4 w-4" />
                 </div>
               </div>
-            </CardContent>
-          </Card>
+              <div className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">
+                ${metrics.totalDiscount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              </div>
+              <div className="text-xs font-medium text-slate-500 mt-2">
+                Promotions and concessions
+              </div>
+            </Card>
+          </div>
         </div>
 
         {/* Top Products and Top Customers */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
           {/* Top Products */}
-          <Card className="bg-white border-0 shadow-lg">
-            <CardHeader className="pb-4">
-              <CardTitle className="text-base sm:text-lg md:text-xl font-semibold text-gray-900">
+          <Card className="bg-white border border-slate-200/90 shadow-2xs rounded-2xl overflow-hidden">
+            <CardHeader className="p-4 sm:p-5 border-b border-slate-100 bg-slate-50/40">
+              <CardTitle className="text-base sm:text-lg font-bold text-slate-900">
                 Top Selling Products
               </CardTitle>
-              <CardDescription className="text-gray-600">
+              <CardDescription className="text-xs text-slate-500">
                 Best performing products this month
               </CardDescription>
             </CardHeader>
@@ -498,19 +479,19 @@ export default function SalesOverview() {
           </Card>
 
           {/* Top Customers */}
-          <Card className="bg-white border-0 shadow-lg">
-            <CardHeader className="pb-4">
-              <CardTitle className="text-base sm:text-lg md:text-xl font-semibold text-gray-900">
+          <Card className="bg-white border border-slate-200/90 shadow-2xs rounded-2xl overflow-hidden">
+            <CardHeader className="p-4 sm:p-5 border-b border-slate-100 bg-slate-50/40">
+              <CardTitle className="text-base sm:text-lg font-bold text-slate-900">
                 Top Customers
               </CardTitle>
-              <CardDescription className="text-gray-600">
+              <CardDescription className="text-xs text-slate-500">
                 Highest spending customers
               </CardDescription>
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
-                {stats?.customer_analytics?.top_customers?.map(
-                  (customer, index) => (
+                {anyStats?.customer_analytics?.top_customers?.map(
+                  (customer: any, index: number) => (
                     <div
                       key={index}
                       className="flex items-center justify-between p-3 sm:p-4 bg-gray-50 rounded-xl hover:bg-gray-100 transition-colors"
@@ -545,13 +526,13 @@ export default function SalesOverview() {
         </div>
 
         {/* Sales Trend Chart */}
-        <Card className="bg-white border-0 shadow-lg">
-          <CardHeader className="pb-4">
-            <CardTitle className="text-base sm:text-lg md:text-xl font-semibold text-gray-900">
+        <Card className="bg-white border border-slate-200/90 shadow-2xs rounded-2xl overflow-hidden">
+          <CardHeader className="p-4 sm:p-5 border-b border-slate-100 bg-slate-50/40">
+            <CardTitle className="text-base sm:text-lg font-bold text-slate-900">
               Sales & Profit Trend
             </CardTitle>
-            <CardDescription className="text-gray-600">
-              Daily sales and profit performance
+            <CardDescription className="text-xs text-slate-500">
+              Daily sales and profit trajectory
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -748,64 +729,89 @@ export default function SalesOverview() {
           </CardContent>
         </Card>
 
-        {/* Customer Analytics */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 sm:gap-6">
-          <Card className="bg-white border-0 shadow-lg">
-            <CardContent className="p-4 sm:p-6">
-              <div className="flex items-center justify-between">
-                <div className="space-y-2">
-                  <p className="text-sm font-medium text-gray-600">
-                    New Customers Today
-                  </p>
-                  <p className="text-2xl sm:text-3xl font-bold text-gray-900">
-                    {stats?.customer_analytics?.new_customers_today || 0}
-                  </p>
-                </div>
-                <div className="p-3 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl">
-                  <Users className="h-6 w-6 text-white" />
+        {/* Customer Analytics (4 Cards) */}
+        <div>
+          <div className="flex items-center justify-between mb-3 px-1">
+            <h2 className="text-xs font-bold uppercase tracking-wider text-slate-500">
+              Customer & Audience Growth
+            </h2>
+            <span className="text-[11px] font-semibold text-slate-500">
+              Client Base Metrics
+            </span>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3.5 sm:gap-5">
+            {/* Total Customers */}
+            <Card className="bg-white border border-slate-200/90 shadow-2xs hover:shadow-xs transition-all duration-200 rounded-2xl p-5">
+              <div className="flex items-center justify-between pb-3">
+                <span className="text-xs font-bold uppercase tracking-wider text-slate-500">
+                  Total Clients
+                </span>
+                <div className="w-8 h-8 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center">
+                  <Users className="h-4 w-4" />
                 </div>
               </div>
-            </CardContent>
-          </Card>
+              <div className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">
+                {metrics.totalCustomers.toLocaleString()}
+              </div>
+              <div className="text-xs font-medium text-slate-500 mt-2">
+                Total registered accounts
+              </div>
+            </Card>
 
-          <Card className="bg-white border-0 shadow-lg">
-            <CardContent className="p-4 sm:p-6">
-              <div className="flex items-center justify-between">
-                <div className="space-y-2">
-                  <p className="text-sm font-medium text-gray-600">
-                    Active Customers Today
-                  </p>
-                  <p className="text-2xl sm:text-3xl font-bold text-gray-900">
-                    {stats?.customer_analytics?.active_customers_today || 0}
-                  </p>
-                </div>
-                <div className="p-3 bg-gradient-to-br from-green-500 to-green-600 rounded-xl">
-                  <Users className="h-6 w-6 text-white" />
+            {/* New Customers Today */}
+            <Card className="bg-white border border-slate-200/90 shadow-2xs hover:shadow-xs transition-all duration-200 rounded-2xl p-5">
+              <div className="flex items-center justify-between pb-3">
+                <span className="text-xs font-bold uppercase tracking-wider text-slate-500">
+                  New Clients Today
+                </span>
+                <div className="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center">
+                  <Users className="h-4 w-4" />
                 </div>
               </div>
-            </CardContent>
-          </Card>
+              <div className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">
+                {anyStats?.customer_analytics?.new_customers_today || 0}
+              </div>
+              <div className="text-xs font-medium text-slate-500 mt-2">
+                Acquired in current session
+              </div>
+            </Card>
 
-          <Card className="bg-white border-0 shadow-lg">
-            <CardContent className="p-4 sm:p-6">
-              <div className="flex items-center justify-between">
-                <div className="space-y-2">
-                  <p className="text-sm font-medium text-gray-600">
-                    Customer Retention Rate
-                  </p>
-                  <p className="text-2xl sm:text-3xl font-bold text-gray-900">
-                    {stats?.customer_analytics?.customer_retention_rate?.toFixed(
-                      1
-                    ) || 0}
-                    %
-                  </p>
-                </div>
-                <div className="p-3 bg-gradient-to-br from-purple-500 to-purple-600 rounded-xl">
-                  <Target className="h-6 w-6 text-white" />
+            {/* Active Customers Today */}
+            <Card className="bg-white border border-slate-200/90 shadow-2xs hover:shadow-xs transition-all duration-200 rounded-2xl p-5">
+              <div className="flex items-center justify-between pb-3">
+                <span className="text-xs font-bold uppercase tracking-wider text-slate-500">
+                  Active Transacting
+                </span>
+                <div className="w-8 h-8 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center">
+                  <Users className="h-4 w-4" />
                 </div>
               </div>
-            </CardContent>
-          </Card>
+              <div className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">
+                {anyStats?.customer_analytics?.active_customers_today || 0}
+              </div>
+              <div className="text-xs font-medium text-slate-500 mt-2">
+                Made purchases today
+              </div>
+            </Card>
+
+            {/* Retention Rate */}
+            <Card className="bg-white border border-slate-200/90 shadow-2xs hover:shadow-xs transition-all duration-200 rounded-2xl p-5">
+              <div className="flex items-center justify-between pb-3">
+                <span className="text-xs font-bold uppercase tracking-wider text-slate-500">
+                  Retention Rate
+                </span>
+                <div className="w-8 h-8 rounded-lg bg-purple-50 text-purple-600 flex items-center justify-center">
+                  <Target className="h-4 w-4" />
+                </div>
+              </div>
+              <div className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">
+                {(anyStats?.customer_analytics?.customer_retention_rate || 0).toFixed(1)}%
+              </div>
+              <div className="text-xs font-medium text-slate-500 mt-2">
+                Returning customer percentage
+              </div>
+            </Card>
+          </div>
         </div>
       </div>
     </div>

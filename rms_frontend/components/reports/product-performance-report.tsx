@@ -67,7 +67,7 @@ interface ProductPerformanceReportProps {
   dateRange: DateRange | undefined;
 }
 
-const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884D8', '#82ca9d', '#ffc658', '#8dd1e1'];
+const COLORS = ['#6366F1', '#06B6D4', '#10B981', '#F59E0B', '#EC4899', '#8B5CF6', '#3B82F6', '#64748B'];
 
 export function ProductPerformanceReport({ dateRange }: ProductPerformanceReportProps) {
   const [chartType, setChartType] = useState<string>("bar");
@@ -909,28 +909,36 @@ function MetricCard({
   icon, 
   trend 
 }: {
-  title: string;
-  value: string;
-  change: string;
-  changeValue: string;
-  icon: React.ReactNode;
+  title: string; 
+  value: string; 
+  change: string; 
+  changeValue: string; 
+  icon: React.ReactNode; 
   trend: 'up' | 'down' | 'neutral';
 }) {
+  const accentGradient =
+    trend === 'up'
+      ? 'from-emerald-500 to-teal-500'
+      : trend === 'down'
+      ? 'from-rose-500 to-red-500'
+      : 'from-indigo-500 to-blue-500';
+
   return (
-    <Card>
-      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-        <CardTitle className="text-sm font-medium">{title}</CardTitle>
-        {icon}
+    <Card className="relative overflow-hidden bg-white border border-slate-200/80 shadow-xs hover:shadow-md transition-all rounded-2xl">
+      <div className={`absolute top-0 left-0 right-0 h-1 bg-gradient-to-r ${accentGradient}`} />
+      <CardHeader className="flex flex-row items-center justify-between pb-2 pt-4 px-5">
+        <span className="text-xs font-bold uppercase tracking-wider text-slate-500">{title}</span>
+        <div className="w-8 h-8 rounded-xl bg-slate-100 text-slate-700 flex items-center justify-center shadow-xs">
+          {icon}
+        </div>
       </CardHeader>
-      <CardContent>
-        <div className="text-2xl font-bold">{value}</div>
-        <p className="text-xs text-muted-foreground">
-          {change}
-          {changeValue}
-          {trend === 'up' && <ArrowUpRight className="inline h-3 w-3 text-green-600 ml-1" />}
-          {trend === 'down' && <ArrowDownRight className="inline h-3 w-3 text-red-600 ml-1" />}
-          {trend === 'neutral' && <Minus className="inline h-3 w-3 text-gray-600 ml-1" />}
-        </p>
+      <CardContent className="px-5 pb-4">
+        <div className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">{value}</div>
+        <div className="flex items-center gap-1 text-xs text-slate-500 font-semibold mt-1.5">
+          <span>{changeValue}</span>
+          {trend === 'up' && <ArrowUpRight className="inline h-3.5 w-3.5 text-emerald-600 ml-0.5" />}
+          {trend === 'down' && <ArrowDownRight className="inline h-3.5 w-3.5 text-rose-600 ml-0.5" />}
+        </div>
       </CardContent>
     </Card>
   );

@@ -4,6 +4,7 @@ import React, { useState, useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { formatCurrency } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
@@ -360,8 +361,8 @@ export function OnlineCustomersTab({ onFilterCustomerOrders }: OnlineCustomersTa
                         </TableCell>
 
                         {/* Total Spent */}
-                        <TableCell className="text-right font-black text-slate-900 text-sm">
-                          ৳{Number(c.total_spent || 0).toLocaleString()}
+                        <TableCell className="text-right font-bold text-slate-900 text-sm">
+                          {formatCurrency(c.total_spent || 0)}
                         </TableCell>
 
                         {/* Last Order */}

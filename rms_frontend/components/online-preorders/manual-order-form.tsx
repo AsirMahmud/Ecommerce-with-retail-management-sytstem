@@ -18,6 +18,7 @@ import { ecommerceApi } from "@/lib/api/ecommerce";
 import { useDiscounts } from "@/hooks/queries/useEcommerce";
 import POSStyleProductGrid from "./pos-style-product-grid";
 import { toast } from "@/hooks/use-toast";
+import { formatCurrency } from "@/lib/utils";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { useBdAddress, Division, District, Upazilla, Union } from "@/hooks/useBdAddress";
@@ -578,7 +579,7 @@ export function ManualOrderForm({ onSuccess, onCancel, initialData }: ManualOrde
                                             </>
                                         )}
                                         <div className="space-y-2 col-span-2">
-                                            <Label>Delivery Charge (৳)</Label>
+                                            <Label>Delivery Charge ($)</Label>
                                             <Input type="number" value={deliveryCharge} onChange={e => setDeliveryCharge(Number(e.target.value))} />
                                         </div>
                                         <div className="space-y-2 col-span-2">
@@ -697,9 +698,9 @@ export function ManualOrderForm({ onSuccess, onCancel, initialData }: ManualOrde
                                                             </button>
                                                         </div>
                                                         <div className="text-right">
-                                                            <p className="font-bold text-sm text-slate-900">৳{(item.unit_price * item.quantity - (item.discount || 0)).toLocaleString()}</p>
+                                                            <p className="font-bold text-sm text-slate-900">{formatCurrency(item.unit_price * item.quantity - (item.discount || 0))}</p>
                                                             {item.discount > 0 && (
-                                                                <p className="text-[9px] text-slate-400 line-through">৳{(item.unit_price * item.quantity).toLocaleString()}</p>
+                                                                <p className="text-[9px] text-slate-400 line-through">{formatCurrency(item.unit_price * item.quantity)}</p>
                                                             )}
                                                         </div>
                                                     </div>
@@ -711,11 +712,11 @@ export function ManualOrderForm({ onSuccess, onCancel, initialData }: ManualOrde
                                 <div className="p-4 bg-slate-50 border-t space-y-2">
                                     <div className="flex justify-between text-xs text-slate-500">
                                         <span>Subtotal</span>
-                                        <span>৳{calculateSubtotal().toLocaleString()}</span>
+                                        <span>{formatCurrency(calculateSubtotal())}</span>
                                     </div>
                                     <div className="flex justify-between font-bold text-slate-900 border-t pt-2 mt-2">
                                         <span>Estimated Total</span>
-                                        <span>৳{calculateTotal().toLocaleString()}</span>
+                                        <span>{formatCurrency(calculateTotal())}</span>
                                     </div>
                                 </div>
                             </div>
@@ -776,25 +777,25 @@ export function ManualOrderForm({ onSuccess, onCancel, initialData }: ManualOrde
                                                 </div>
                                             </div>
                                             <div className="text-right">
-                                                <span className="font-bold text-slate-900 block">৳{(item.unit_price * item.quantity - (item.discount || 0)).toLocaleString()}</span>
+                                                <span className="font-bold text-slate-900 block">{formatCurrency(item.unit_price * item.quantity - (item.discount || 0))}</span>
                                                 {item.discount > 0 && (
-                                                    <span className="text-[10px] text-green-600 font-medium line-through opacity-70">৳{(item.unit_price * item.quantity).toLocaleString()}</span>
+                                                    <span className="text-[10px] text-emerald-600 font-medium line-through opacity-70">{formatCurrency(item.unit_price * item.quantity)}</span>
                                                 )}
                                             </div>
                                         </div>
                                     ))}
                                     <Separator className="my-2" />
-                                    <div className="flex justify-between">
-                                        <span>Subtotal</span>
-                                        <span>৳{calculateSubtotal().toLocaleString()}</span>
+                                    <div className="flex justify-between text-sm">
+                                        <span className="text-slate-500">Subtotal</span>
+                                        <span className="font-semibold text-slate-800">{formatCurrency(calculateSubtotal())}</span>
                                     </div>
-                                    <div className="flex justify-between">
-                                        <span>Delivery</span>
-                                        <span>৳{deliveryCharge.toLocaleString()}</span>
+                                    <div className="flex justify-between text-sm">
+                                        <span className="text-slate-500">Delivery</span>
+                                        <span className="font-semibold text-slate-800">{formatCurrency(deliveryCharge)}</span>
                                     </div>
-                                    <div className="flex justify-between font-bold text-lg pt-2 border-t">
+                                    <div className="flex justify-between font-bold text-base pt-2 border-t text-slate-900">
                                         <span>Total</span>
-                                        <span>৳{calculateTotal().toLocaleString()}</span>
+                                        <span className="text-indigo-600 font-extrabold">{formatCurrency(calculateTotal())}</span>
                                     </div>
                                 </div>
                             </div>
