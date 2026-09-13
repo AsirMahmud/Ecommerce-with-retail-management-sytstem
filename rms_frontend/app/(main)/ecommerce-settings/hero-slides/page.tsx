@@ -1179,41 +1179,35 @@ export default function HeroSlidesPage() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-gray-900 mx-auto"></div>
-          <p className="mt-4 text-gray-600">Loading hero slides...</p>
-        </div>
+      <div className="space-y-6">
+        <div className="h-8 w-48 bg-slate-200 rounded-lg animate-pulse" />
+        <div className="h-96 rounded-2xl bg-white border border-slate-200/90 shadow-2xs animate-pulse" />
       </div>
     )
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
-      <div className="max-w-7xl mx-auto p-6">
-        <div className="mb-8">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-3">
-              <div className="w-12 h-12 bg-gradient-to-r from-blue-600 to-indigo-600 rounded-xl flex items-center justify-center shadow-lg">
-                <ImageIcon className="h-6 w-6 text-white" />
-              </div>
-              <div>
-                <h1 className="text-4xl font-bold bg-gradient-to-r from-gray-900 to-gray-600 bg-clip-text text-transparent">
-                  Hero Slides Management
-                </h1>
-                <p className="text-gray-600 mt-1">Manage your hero section slides</p>
-              </div>
+    <div className="space-y-6">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div className="space-y-1">
+          <div className="flex items-center gap-2">
+            <div className="w-9 h-9 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center border border-blue-100">
+              <ImageIcon className="h-5 w-5" />
             </div>
-            <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-              <DialogTrigger asChild>
-                <Button
-                  onClick={() => handleOpenDialog()}
-                  className="bg-gradient-to-r from-blue-500 to-indigo-500 hover:from-blue-600 hover:to-indigo-600 text-white shadow-lg"
-                >
-                  <Plus className="mr-2 h-4 w-4" />
-                  Add Slide
-                </Button>
-              </DialogTrigger>
+            <h1 className="text-2xl font-bold tracking-tight text-slate-900">Hero Slides</h1>
+          </div>
+          <p className="text-sm text-slate-500">Manage, style, and reorder storefront carousel banners and CTA buttons.</p>
+        </div>
+        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+          <DialogTrigger asChild>
+            <Button
+              onClick={() => handleOpenDialog()}
+              className="bg-blue-600 hover:bg-blue-700 text-white rounded-xl shadow-xs"
+            >
+              <Plus className="mr-2 h-4 w-4" />
+              Add Hero Slide
+            </Button>
+          </DialogTrigger>
               <DialogContent className="max-w-[95vw] w-full h-[90vh] p-0 overflow-hidden flex flex-col bg-white">
                 <DialogHeader className="p-4">
                   <DialogTitle>{editingSlide ? "Edit Hero Slide" : "Create New Hero Slide"}</DialogTitle>
@@ -1607,24 +1601,23 @@ export default function HeroSlidesPage() {
               </DialogContent>
             </Dialog>
           </div>
-        </div>
 
-        <Card className="shadow-lg border-0 bg-white/80 backdrop-blur-sm">
-          <CardHeader>
-            <CardTitle className="text-2xl font-bold text-gray-900">Hero Slides</CardTitle>
-            <CardDescription>Manage all hero section slides. Drag to reorder or click edit to modify.</CardDescription>
+        <Card className="rounded-2xl border border-slate-200/90 shadow-2xs bg-white overflow-hidden">
+          <CardHeader className="bg-slate-50/60 border-b border-slate-100 p-5">
+            <CardTitle className="text-base font-semibold text-slate-900">Hero Carousel Slides</CardTitle>
+            <CardDescription className="text-xs text-slate-500">Manage all storefront banner slides. Use arrows to reorder or click edit to modify content.</CardDescription>
           </CardHeader>
-          <CardContent>
+          <CardContent className="p-0">
             {slides && slides.length > 0 ? (
               <Table>
                 <TableHeader>
-                  <TableRow>
-                    <TableHead>Order</TableHead>
-                    <TableHead>Image</TableHead>
-                    <TableHead>Title</TableHead>
-                    <TableHead>Layout</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead className="text-right">Actions</TableHead>
+                  <TableRow className="bg-slate-50/70 border-b border-slate-100">
+                    <TableHead className="font-semibold text-slate-700">Order</TableHead>
+                    <TableHead className="font-semibold text-slate-700">Preview</TableHead>
+                    <TableHead className="font-semibold text-slate-700">Title</TableHead>
+                    <TableHead className="font-semibold text-slate-700">Layout</TableHead>
+                    <TableHead className="font-semibold text-slate-700">Status</TableHead>
+                    <TableHead className="text-right font-semibold text-slate-700">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -1706,7 +1699,6 @@ export default function HeroSlidesPage() {
             )}
           </CardContent>
         </Card>
-      </div>
 
       {/* Fullscreen Preview Modal */}
       <Dialog open={isFullscreenPreviewOpen} onOpenChange={setIsFullscreenPreviewOpen}>

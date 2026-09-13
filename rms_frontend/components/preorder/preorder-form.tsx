@@ -68,8 +68,11 @@ export function PreorderForm({
 }) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const createPreorder = useCreatePreorder();
-  const updatePreorder = useUpdatePreorder();
-  const { data: products, isLoading } = useProducts();
+  const { data: productsData, isLoading } = useProducts();
+  const productsList = useMemo(() => {
+    if (!productsData) return [];
+    return Array.isArray(productsData) ? productsData : productsData.results || [];
+  }, [productsData]);
   const [amountError, setAmountError] = useState("");
   const [selectedVariants, setSelectedVariants] = useState<string[]>(
     preorder && preorder.items
@@ -122,8 +125,8 @@ export function PreorderForm({
 
   // Memoize the current product to prevent unnecessary re-renders
   const currentProduct = useMemo(() => {
-    return products?.find((p: any) => p.id.toString() === selectedProductId);
-  }, [products, selectedProductId]);
+    return productsList.find((p: any) => p.id.toString() === selectedProductId);
+  }, [productsList, selectedProductId]);
 
   // Memoize product variants and filter out those with no stock
   const productVariants = useMemo(() => {
@@ -506,11 +509,11 @@ export function PreorderForm({
                         <FormControl>
                           <ComboBox
                             options={
-                              products?.map((product: any) => ({
+                              productsList.map((product: any) => ({
                                 value: product.id.toString(),
                                 label: product.name,
                                 product: product,
-                              })) || []
+                              }))
                             }
                             value={field.value}
                             onValueChange={handleProductChange}

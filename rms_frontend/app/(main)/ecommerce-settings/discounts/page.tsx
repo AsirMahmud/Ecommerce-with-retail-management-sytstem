@@ -425,59 +425,42 @@ export default function DiscountManagementPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
-      <div className="max-w-7xl mx-auto p-6">
-        {/* Header */}
-        <div className="mb-8">
-          <div className="flex items-center space-x-3 mb-4">
-            <div className="w-12 h-12 bg-gradient-to-r from-blue-600 to-indigo-600 rounded-xl flex items-center justify-center shadow-lg">
-              <Percent className="h-6 w-6 text-white" />
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div className="space-y-1">
+          <div className="flex items-center gap-2">
+            <div className="w-9 h-9 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center border border-blue-100">
+              <Percent className="h-5 w-5" />
             </div>
-            <div>
-              <h1 className="text-4xl font-bold bg-gradient-to-r from-gray-900 to-gray-600 bg-clip-text text-transparent">
-                Discount Management
-              </h1>
-              <p className="text-gray-600 mt-1">
-                Create and manage discount campaigns for your products.
-              </p>
-            </div>
+            <h1 className="text-2xl font-bold tracking-tight text-slate-900">Discount Campaigns</h1>
           </div>
+          <p className="text-sm text-slate-500">
+            Configure automated storefront discounts across categories, individual products, or globally.
+          </p>
         </div>
+        <Button
+          onClick={() => {
+            resetForm();
+            setIsCreating(true);
+            setIsModalOpen(true);
+          }}
+          className="bg-blue-600 hover:bg-blue-700 text-white rounded-xl shadow-xs"
+        >
+          <Plus className="mr-2 h-4 w-4" />
+          Create New Discount
+        </Button>
+      </div>
 
-        {/* Priority Info Alert */}
-        <Alert className="mb-6 bg-amber-50 border-amber-200">
-          <Info className="h-4 w-4 text-amber-600" />
-          <AlertDescription className="text-amber-800">
-            <strong>Discount Priority:</strong> Product discounts override Category discounts, which override Global (App-Wide) discounts.
-            Only one discount applies per product based on this priority.
-          </AlertDescription>
-        </Alert>
+      {/* Priority Info Alert */}
+      <Alert className="bg-amber-50/80 border-amber-200 text-amber-900 rounded-2xl p-4">
+        <Info className="h-4 w-4 text-amber-600" />
+        <AlertDescription className="text-xs sm:text-sm text-amber-800 ml-2">
+          <strong className="font-semibold text-amber-900">Discount Priority Rule:</strong> Product discounts override Category discounts, which override Global (App-Wide) discounts. Only one discount applies per product based on this hierarchy.
+        </AlertDescription>
+      </Alert>
 
-        <div className="grid gap-8">
-          {/* Discount Actions & Info */}
-          <Card className="shadow-lg border-0 bg-white/80 backdrop-blur-sm">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <div>
-                <CardTitle className="text-2xl font-bold text-gray-900">
-                  Discount Overview
-                </CardTitle>
-                <CardDescription>
-                  View and manage your active discount campaigns
-                </CardDescription>
-              </div>
-              <Button
-                onClick={() => {
-                  resetForm();
-                  setIsCreating(true);
-                  setIsModalOpen(true);
-                }}
-                className="bg-gradient-to-r from-blue-500 to-indigo-500 hover:from-blue-600 hover:to-indigo-600 text-white shadow-lg"
-              >
-                <Plus className="mr-2 h-4 w-4" />
-                Create New Discount
-              </Button>
-            </CardHeader>
-          </Card>
+      <div className="grid gap-6">
 
           {/* Discount Form Modal */}
           <Dialog open={isModalOpen} onOpenChange={(open) => {
@@ -769,7 +752,7 @@ export default function DiscountManagementPage() {
                                             <div className="grid grid-cols-2 gap-2 text-xs">
                                               <div className="flex flex-col">
                                                 <span className="text-muted-foreground">Price</span>
-                                                <span className="font-medium">৳{product.selling_price}</span>
+                                                <span className="font-medium">${product.selling_price}</span>
                                               </div>
                                               <div className="flex flex-col">
                                                 <span className="text-muted-foreground">Stock</span>
@@ -866,7 +849,7 @@ export default function DiscountManagementPage() {
                   </Button>
                   <Button
                     onClick={editingId ? handleUpdateDiscount : handleCreateDiscount}
-                    className="bg-gradient-to-r from-blue-500 to-indigo-500 hover:from-blue-600 hover:to-indigo-600 text-white shadow-lg"
+                    className="bg-blue-600 hover:bg-blue-700 text-white rounded-xl shadow-xs"
                   >
                     <Save className="mr-2 h-4 w-4" />
                     {editingId ? "Update Discount" : "Create Discount"}
@@ -877,59 +860,64 @@ export default function DiscountManagementPage() {
           </Dialog>
 
           {/* Discounts List */}
-          <Card className="shadow-lg border-0 bg-white/80 backdrop-blur-sm">
-            <CardHeader>
-              <CardTitle className="text-2xl font-bold text-gray-900">
-                Active Discounts
+          <Card className="rounded-2xl border border-slate-200/90 shadow-2xs bg-white overflow-hidden">
+            <CardHeader className="bg-slate-50/60 border-b border-slate-100 p-5">
+              <CardTitle className="text-base font-semibold text-slate-900">
+                Active Discount Rules
               </CardTitle>
-              <CardDescription>
-                Manage your existing discount campaigns
+              <CardDescription className="text-xs text-slate-500">
+                {discounts.length} discount campaign{discounts.length === 1 ? "" : "s"} currently configured
               </CardDescription>
             </CardHeader>
-            <CardContent>
+            <CardContent className="p-0">
               {isLoading ? (
                 <div className="flex items-center justify-center py-12">
-                  <RefreshCw className="h-8 w-8 animate-spin text-blue-500" />
-                  <span className="ml-2 text-gray-600">Loading discounts...</span>
+                  <RefreshCw className="h-6 w-6 animate-spin text-blue-500" />
+                  <span className="ml-2 text-sm text-slate-500">Loading discount campaigns...</span>
+                </div>
+              ) : discounts.length === 0 ? (
+                <div className="py-12 text-center text-slate-500 text-sm">
+                  No discount campaigns found. Click "Create New Discount" above to set one up.
                 </div>
               ) : (
                 <Table>
                   <TableHeader>
-                    <TableRow>
-                      <TableHead>Name</TableHead>
-                      <TableHead>Type</TableHead>
-                      <TableHead>Target</TableHead>
-                      <TableHead>Value</TableHead>
-                      <TableHead>Start Date</TableHead>
-                      <TableHead>End Date</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead>Actions</TableHead>
+                    <TableRow className="bg-slate-50/70 border-b border-slate-100">
+                      <TableHead className="font-semibold text-slate-700">Name</TableHead>
+                      <TableHead className="font-semibold text-slate-700">Type</TableHead>
+                      <TableHead className="font-semibold text-slate-700">Target</TableHead>
+                      <TableHead className="font-semibold text-slate-700">Value</TableHead>
+                      <TableHead className="font-semibold text-slate-700">Start Date</TableHead>
+                      <TableHead className="font-semibold text-slate-700">End Date</TableHead>
+                      <TableHead className="font-semibold text-slate-700">Status</TableHead>
+                      <TableHead className="text-right font-semibold text-slate-700">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {discounts.map((discount: Discount) => (
-                      <TableRow key={discount.id}>
-                        <TableCell className="font-medium">{discount.name}</TableCell>
+                      <TableRow key={discount.id} className="hover:bg-slate-50/70 transition-colors border-b border-slate-100">
+                        <TableCell className="font-medium text-slate-900">{discount.name}</TableCell>
                         <TableCell>{getTypeBadge(discount.discount_type)}</TableCell>
-                        <TableCell className="text-sm text-gray-600">{getTargetName(discount)}</TableCell>
-                        <TableCell>{discount.value}%</TableCell>
-                        <TableCell>{new Date(discount.start_date).toLocaleDateString()}</TableCell>
-                        <TableCell>{new Date(discount.end_date).toLocaleDateString()}</TableCell>
+                        <TableCell className="text-xs text-slate-600">{getTargetName(discount)}</TableCell>
+                        <TableCell className="font-semibold text-emerald-600">{discount.value}%</TableCell>
+                        <TableCell className="text-xs text-slate-500">{new Date(discount.start_date).toLocaleDateString()}</TableCell>
+                        <TableCell className="text-xs text-slate-500">{new Date(discount.end_date).toLocaleDateString()}</TableCell>
                         <TableCell>{getStatusBadge(discount.status)}</TableCell>
-                        <TableCell>
-                          <div className="flex space-x-2">
+                        <TableCell className="text-right">
+                          <div className="flex items-center justify-end space-x-1">
                             <Button
-                              variant="outline"
-                              size="sm"
+                              variant="ghost"
+                              size="icon"
                               onClick={() => handleEditDiscount(discount.id)}
+                              className="h-8 w-8 text-slate-600 hover:text-slate-900 rounded-lg"
                             >
                               <Edit className="h-4 w-4" />
                             </Button>
                             <Button
-                              variant="outline"
-                              size="sm"
+                              variant="ghost"
+                              size="icon"
                               onClick={() => handleDeleteDiscount(discount.id)}
-                              className="text-red-600 hover:text-red-700"
+                              className="h-8 w-8 text-rose-600 hover:bg-rose-50 hover:text-rose-700 rounded-lg"
                             >
                               <Trash2 className="h-4 w-4" />
                             </Button>
@@ -943,7 +931,6 @@ export default function DiscountManagementPage() {
             </CardContent>
           </Card>
         </div>
-      </div>
     </div>
   );
 }

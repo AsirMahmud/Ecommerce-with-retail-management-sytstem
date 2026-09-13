@@ -124,8 +124,8 @@ export default function CategoriesPage() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 p-6">
-        <div className="max-w-7xl mx-auto space-y-6">
+      <div className="space-y-6">
+        <div className="space-y-6">
           <div className="flex items-center justify-between">
             <div className="space-y-2">
               <Skeleton className="h-8 w-48" />
@@ -155,22 +155,20 @@ export default function CategoriesPage() {
   }
 
   const CategoryCard = ({ category }: { category: Category }) => (
-    <Card className="group hover:shadow-xl transition-all duration-300 hover:-translate-y-1 border-0 bg-gradient-to-br from-white to-slate-50">
-      <CardHeader className="pb-4">
+    <Card className="rounded-2xl border border-slate-200/90 shadow-2xs hover:border-slate-300 transition-all bg-white overflow-hidden">
+      <CardHeader className="bg-slate-50/40 border-b border-slate-100 p-5">
         <div className="flex items-start justify-between">
-          <div className="space-y-2">
-            <div className="flex items-center gap-2">
-              <div className="w-10 h-10 bg-gradient-to-r from-blue-500 to-indigo-500 rounded-full flex items-center justify-center">
-                <Tag className="h-5 w-5 text-white" />
-              </div>
-              <div>
-                <CardTitle className="text-lg font-semibold group-hover:text-primary transition-colors line-clamp-1">
-                  {category.name}
-                </CardTitle>
-                <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                  <Package className="h-3 w-3" />
-                  {category.product_count || 0} Products
-                </div>
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
+              <Tag className="h-4 w-4" />
+            </div>
+            <div>
+              <CardTitle className="text-base font-semibold text-slate-900 line-clamp-1">
+                {category.name}
+              </CardTitle>
+              <div className="flex items-center gap-1 text-xs text-slate-500 mt-0.5">
+                <Package className="h-3 w-3 text-slate-400" />
+                <span>{category.product_count || 0} Products</span>
               </div>
             </div>
           </div>
@@ -179,21 +177,21 @@ export default function CategoriesPage() {
               <Button
                 variant="ghost"
                 size="sm"
-                className="opacity-0 group-hover:opacity-100 transition-opacity h-8 w-8 p-0"
+                className="h-8 w-8 p-0 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100"
               >
                 <MoreHorizontal className="h-4 w-4" />
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-48">
+            <DropdownMenuContent align="end" className="w-48 rounded-xl shadow-md border-slate-200">
               <DropdownMenuItem asChild className="cursor-pointer">
                 <Link href={`/inventory/categories/${category.id}`}>
-                  <Eye className="mr-2 h-4 w-4" />
+                  <Eye className="mr-2 h-4 w-4 text-slate-500" />
                   View Details
                 </Link>
               </DropdownMenuItem>
               <DropdownMenuItem asChild className="cursor-pointer">
                 <Link href={`/inventory/edit-category/${category.id}`}>
-                  <Edit3 className="mr-2 h-4 w-4" />
+                  <Edit3 className="mr-2 h-4 w-4 text-slate-500" />
                   Edit Category
                 </Link>
               </DropdownMenuItem>
@@ -205,12 +203,12 @@ export default function CategoriesPage() {
                   setIsStatsDialogOpen(true);
                 }}
               >
-                <BarChart3 className="mr-2 h-4 w-4" />
+                <BarChart3 className="mr-2 h-4 w-4 text-slate-500" />
                 View Statistics
               </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem
-                className="text-destructive cursor-pointer"
+                className="text-rose-600 cursor-pointer focus:text-rose-600 focus:bg-rose-50"
                 onClick={() => setCategoryToDelete(category)}
               >
                 <Trash2 className="mr-2 h-4 w-4" />
@@ -220,44 +218,39 @@ export default function CategoriesPage() {
           </DropdownMenu>
         </div>
       </CardHeader>
-      <CardContent className="space-y-4">
-        <div className="grid grid-cols-2 gap-4">
-          <div className="space-y-1">
-            <p className="text-xs text-muted-foreground">Products</p>
-            <p className="text-lg font-bold text-blue-600">
+      <CardContent className="p-5 space-y-4">
+        <div className="grid grid-cols-3 gap-3 text-center">
+          <div className="p-2.5 rounded-xl bg-slate-50/70 border border-slate-100">
+            <p className="text-[11px] font-medium text-slate-500">Products</p>
+            <p className="text-base font-bold text-slate-900 mt-0.5">
               {category.product_count || 0}
             </p>
           </div>
-          <div className="space-y-1">
-            <p className="text-xs text-muted-foreground">Subcategories</p>
-            <p className="text-lg font-bold text-green-600">
+          <div className="p-2.5 rounded-xl bg-slate-50/70 border border-slate-100">
+            <p className="text-[11px] font-medium text-slate-500">Subcategories</p>
+            <p className="text-base font-bold text-slate-900 mt-0.5">
               {category.children?.length || 0}
             </p>
           </div>
-          <div className="space-y-1">
-            <p className="text-xs text-muted-foreground">Total Stock</p>
-            <p className="text-lg font-bold text-orange-600">
+          <div className="p-2.5 rounded-xl bg-slate-50/70 border border-slate-100">
+            <p className="text-[11px] font-medium text-slate-500">Stock</p>
+            <p className="text-base font-bold text-slate-900 mt-0.5">
               {category.total_stock || 0}
             </p>
           </div>
         </div>
 
         {category.description && (
-          <div className="space-y-1">
-            <p className="text-xs text-muted-foreground">Description</p>
-            <p className="text-sm text-gray-700 line-clamp-2">
-              {category.description}
-            </p>
-          </div>
+          <p className="text-xs text-slate-600 line-clamp-2 bg-slate-50/50 p-2.5 rounded-xl border border-slate-100">
+            {category.description}
+          </p>
         )}
 
-        <div className="flex items-center justify-between">
-          <div className="space-y-1">
-            <p className="text-xs text-muted-foreground">Created</p>
-            <div className="flex items-center gap-1 text-xs text-gray-600">
-              <Calendar className="h-3 w-3" />
-              {new Date(category.created_at).toLocaleDateString()}
-            </div>
+        <div className="flex items-center justify-between pt-1 text-xs text-slate-400 border-t border-slate-100">
+          <span>Created</span>
+          <div className="flex items-center gap-1 text-slate-500 font-medium">
+            <Calendar className="h-3 w-3" />
+            {new Date(category.created_at).toLocaleDateString()}
           </div>
         </div>
       </CardContent>
@@ -265,117 +258,107 @@ export default function CategoriesPage() {
   );
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
-      <div className="max-w-7xl mx-auto p-6">
-        {/* Header */}
-        <div className="mb-8">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-3">
-              <div className="w-12 h-12 bg-gradient-to-r from-blue-600 to-indigo-600 rounded-xl flex items-center justify-center shadow-lg">
-                <Tag className="h-6 w-6 text-white" />
-              </div>
-              <div>
-                <h1 className="text-4xl font-bold bg-gradient-to-r from-gray-900 to-gray-600 bg-clip-text text-transparent">
-                  Categories
-                </h1>
-                <p className="text-gray-600 mt-1">
-                  Manage your product categories and organization
-                </p>
-              </div>
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight text-slate-900">
+            Categories
+          </h1>
+          <p className="text-sm text-slate-500 mt-1">
+            Manage your retail product categories, subcategories, and stock distribution
+          </p>
+        </div>
+        <Button
+          onClick={() => router.push("/inventory/categories/add")}
+          className="gap-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl shadow-2xs font-medium"
+        >
+          <PlusCircle className="h-4 w-4" />
+          Add Category
+        </Button>
+      </div>
+
+      {/* Key Metrics */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <Card className="rounded-2xl border border-slate-200/90 shadow-2xs bg-white hover:border-slate-300 transition-all">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
+              Total Categories
+            </CardTitle>
+            <div className="w-8 h-8 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center">
+              <Tag className="h-4 w-4" />
             </div>
-            <Button
-              onClick={() => router.push("/inventory/categories/add")}
-              className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white shadow-lg hover:shadow-xl transition-all duration-300"
-            >
-              <PlusCircle className="mr-2 h-4 w-4" />
-              Add Category
-            </Button>
-          </div>
-        </div>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-slate-900 tracking-tight">
+              {totalCategories}
+            </div>
+            <p className="text-xs text-blue-600 font-medium mt-1">
+              Active taxonomy records
+            </p>
+          </CardContent>
+        </Card>
 
-        {/* Key Metrics */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-          <Card className="bg-gradient-to-br from-blue-50 to-indigo-100 border-0 shadow-xl hover:shadow-2xl transition-all duration-300 hover:-translate-y-1">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium text-gray-700">
-                Total Categories
-              </CardTitle>
-              <div className="w-10 h-10 bg-gradient-to-r from-blue-500 to-indigo-500 rounded-full flex items-center justify-center">
-                <Tag className="h-5 w-5 text-white" />
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="text-3xl font-bold text-gray-900">
-                {totalCategories}
-              </div>
-              <p className="text-xs text-blue-600 font-medium mt-1">
-                All categories
-              </p>
-            </CardContent>
-          </Card>
+        <Card className="rounded-2xl border border-slate-200/90 shadow-2xs bg-white hover:border-slate-300 transition-all">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
+              Total Products
+            </CardTitle>
+            <div className="w-8 h-8 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
+              <Package className="h-4 w-4" />
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-slate-900 tracking-tight">
+              {totalProducts}
+            </div>
+            <p className="text-xs text-emerald-600 font-medium mt-1">
+              Across all categories
+            </p>
+          </CardContent>
+        </Card>
 
-          <Card className="bg-gradient-to-br from-emerald-50 to-teal-100 border-0 shadow-xl hover:shadow-2xl transition-all duration-300 hover:-translate-y-1">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium text-gray-700">
-                Total Products
-              </CardTitle>
-              <div className="w-10 h-10 bg-gradient-to-r from-emerald-500 to-teal-500 rounded-full flex items-center justify-center">
-                <Package className="h-5 w-5 text-white" />
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="text-3xl font-bold text-gray-900">
-                {totalProducts}
-              </div>
-              <p className="text-xs text-emerald-600 font-medium mt-1">
-                Across all categories
-              </p>
-            </CardContent>
-          </Card>
+        <Card className="rounded-2xl border border-slate-200/90 shadow-2xs bg-white hover:border-slate-300 transition-all">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
+              Parent Categories
+            </CardTitle>
+            <div className="w-8 h-8 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center">
+              <Tag className="h-4 w-4" />
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-slate-900 tracking-tight">
+              {categoriesWithChildren}
+            </div>
+            <p className="text-xs text-indigo-600 font-medium mt-1">
+              Categories with subcategories
+            </p>
+          </CardContent>
+        </Card>
+      </div>
 
-          <Card className="bg-gradient-to-br from-purple-50 to-violet-100 border-0 shadow-xl hover:shadow-2xl transition-all duration-300 hover:-translate-y-1">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium text-gray-700">
-                With Subcategories
-              </CardTitle>
-              <div className="w-10 h-10 bg-gradient-to-r from-purple-500 to-violet-500 rounded-full flex items-center justify-center">
-                <Tag className="h-5 w-5 text-white" />
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="text-3xl font-bold text-gray-900">
-                {categoriesWithChildren}
-              </div>
-              <p className="text-xs text-purple-600 font-medium mt-1">
-                Parent categories
-              </p>
-            </CardContent>
-          </Card>
-        </div>
+      {/* Search */}
+      <div className="relative">
+        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-slate-400" />
+        <Input
+          placeholder="Search categories..."
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          className="pl-9 bg-white border-slate-200 rounded-xl shadow-2xs text-sm"
+        />
+      </div>
 
-        {/* Search */}
-        <div className="flex flex-col md:flex-row gap-4 mb-6">
-          <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input
-              placeholder="Search categories..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-9 bg-white/70 backdrop-blur-sm border-white/20 shadow-lg"
-            />
-          </div>
-        </div>
+      {/* Categories Grid */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        {filteredCategories.map((category) => (
+          <CategoryCard key={category.id} category={category} />
+        ))}
+      </div>
 
-        {/* Categories Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {filteredCategories.map((category) => (
-            <CategoryCard key={category.id} category={category} />
-          ))}
-        </div>
-
-        {/* Delete Confirmation Dialog */}
-        <AlertDialog
-          open={!!categoryToDelete}
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog
+        open={!!categoryToDelete}
           onOpenChange={() => setCategoryToDelete(null)}
         >
           <AlertDialogContent>
@@ -678,7 +661,6 @@ export default function CategoriesPage() {
             )}
           </DialogContent>
         </Dialog>
-      </div>
     </div>
   );
 }

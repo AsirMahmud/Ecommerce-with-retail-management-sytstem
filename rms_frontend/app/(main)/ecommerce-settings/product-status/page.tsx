@@ -284,37 +284,34 @@ export default function ProductStatusPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
-      <div className="max-w-7xl mx-auto p-6">
-        {/* Header */}
-        <div className="mb-8">
-          <div className="flex items-center space-x-3 mb-4">
-            <div className="w-12 h-12 bg-gradient-to-r from-blue-600 to-indigo-600 rounded-xl flex items-center justify-center shadow-lg">
-              <Star className="h-6 w-6 text-white" />
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div className="space-y-1">
+          <div className="flex items-center gap-2">
+            <div className="w-9 h-9 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center border border-blue-100">
+              <Star className="h-5 w-5" />
             </div>
-            <div>
-              <h1 className="text-4xl font-bold bg-gradient-to-r from-gray-900 to-gray-600 bg-clip-text text-transparent">
-                Product Status Management
-              </h1>
-              <p className="text-gray-600 mt-1">
-                Manage product visibility and promotional statuses.
-              </p>
-            </div>
+            <h1 className="text-2xl font-bold tracking-tight text-slate-900">Product Status & Sections</h1>
           </div>
+          <p className="text-sm text-slate-500">
+            Define dynamic promotional home page sections and assign curated inventory items.
+          </p>
         </div>
+      </div>
 
-        <div className="grid gap-8">
-          {/* Status Management (Sections) */}
-          <Card className="shadow-lg border-0 bg-white/80 backdrop-blur-sm">
-            <CardHeader className="flex flex-row items-center justify-between">
-              <div>
-                <CardTitle className="text-2xl font-bold text-gray-900">
-                  Home Page Sections
-                </CardTitle>
-                <CardDescription>
-                  Define dynamic sections for your home page
-                </CardDescription>
-              </div>
+      <div className="grid gap-6">
+        {/* Status Management (Sections) */}
+        <Card className="rounded-2xl border border-slate-200/90 shadow-2xs bg-white overflow-hidden">
+          <CardHeader className="bg-slate-50/60 border-b border-slate-100 p-5 flex flex-row items-center justify-between">
+            <div>
+              <CardTitle className="text-base font-semibold text-slate-900">
+                Home Page Showcase Sections
+              </CardTitle>
+              <CardDescription className="text-xs text-slate-500">
+                Define dynamic product rows and showcase tags for your storefront
+              </CardDescription>
+            </div>
               <Dialog open={isDialogOpen} onOpenChange={(open) => {
                 setIsDialogOpen(open);
                 if (!open) {
@@ -501,23 +498,24 @@ export default function ProductStatusPage() {
           </Card>
 
           {/* Products List */}
-          <Card className="shadow-lg border-0 bg-white/80 backdrop-blur-sm">
-            <CardHeader>
+          <Card className="rounded-2xl border border-slate-200/90 shadow-2xs bg-white overflow-hidden">
+            <CardHeader className="bg-slate-50/60 border-b border-slate-100 p-5">
               <div className="flex justify-between items-center">
                 <div>
-                  <CardTitle className="text-2xl font-bold text-gray-900">
-                    Products
+                  <CardTitle className="text-base font-semibold text-slate-900">
+                    Featured Inventory Curation
                   </CardTitle>
-                  <CardDescription>
-                    Assign products to the sections above
+                  <CardDescription className="text-xs text-slate-500">
+                    Assign specific products to the showcase sections defined above
                   </CardDescription>
                 </div>
                 <Button
                   onClick={() => { refetchProducts(); refetchStatuses(); }}
                   variant="outline"
-                  className="flex items-center space-x-2"
+                  size="sm"
+                  className="rounded-xl border-slate-200 flex items-center space-x-1.5"
                 >
-                  <RefreshCw className="h-4 w-4" />
+                  <RefreshCw className="h-3.5 w-3.5" />
                   <span>Refresh</span>
                 </Button>
               </div>
@@ -750,8 +748,5 @@ export default function ProductStatusPage() {
           </Card>
         </div>
       </div>
-    </div>
   );
 }
-
-

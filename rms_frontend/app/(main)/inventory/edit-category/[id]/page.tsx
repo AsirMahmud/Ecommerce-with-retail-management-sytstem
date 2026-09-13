@@ -94,159 +94,132 @@ export default function EditCategoryPage() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
-        <div className="max-w-4xl mx-auto p-6">
-          <div className="mb-8">
-            <div className="flex items-center space-x-3 mb-4">
-              <Skeleton className="w-12 h-12 rounded-xl" />
-              <div className="space-y-2">
-                <Skeleton className="h-8 w-48" />
-                <Skeleton className="h-4 w-96" />
-              </div>
-            </div>
-          </div>
-          <Card className="border-0 shadow-xl bg-white/70 backdrop-blur-sm">
-            <CardHeader>
-              <Skeleton className="h-6 w-32" />
-              <Skeleton className="h-4 w-64" />
-            </CardHeader>
-            <CardContent className="space-y-6">
-              <div className="space-y-4">
-                <div>
-                  <Skeleton className="h-4 w-16 mb-2" />
-                  <Skeleton className="h-12 w-full" />
-                </div>
-                <div>
-                  <Skeleton className="h-4 w-24 mb-2" />
-                  <Skeleton className="h-24 w-full" />
-                </div>
-              </div>
-              <div className="flex gap-4">
-                <Skeleton className="h-10 w-20" />
-                <Skeleton className="h-10 w-32" />
-              </div>
-            </CardContent>
-          </Card>
+      <div className="max-w-3xl space-y-6">
+        <div className="flex items-center gap-3">
+          <Skeleton className="h-9 w-9 rounded-xl" />
+          <Skeleton className="h-8 w-48" />
         </div>
+        <Card className="rounded-2xl border border-slate-200/90 shadow-2xs bg-white p-6 space-y-4">
+          <Skeleton className="h-10 w-full rounded-xl" />
+          <Skeleton className="h-28 w-full rounded-xl" />
+          <div className="flex justify-end gap-2">
+            <Skeleton className="h-9 w-20 rounded-xl" />
+            <Skeleton className="h-9 w-28 rounded-xl" />
+          </div>
+        </Card>
       </div>
     );
   }
 
   if (!category) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
-        <div className="max-w-4xl mx-auto p-6">
-          <div className="flex flex-col items-center justify-center h-[50vh] gap-4">
-            <Tag className="h-16 w-16 text-muted-foreground opacity-30" />
-            <p className="text-xl font-medium text-muted-foreground">
-              Category not found
-            </p>
-            <Button variant="outline" onClick={() => router.back()}>
-              <ArrowLeft className="h-4 w-4 mr-2" /> Go Back
-            </Button>
+      <div className="max-w-3xl space-y-6">
+        <div className="flex flex-col items-center justify-center h-[40vh] gap-3 text-center">
+          <div className="w-12 h-12 rounded-2xl bg-slate-100 flex items-center justify-center text-slate-400">
+            <Tag className="h-6 w-6" />
           </div>
+          <p className="text-base font-semibold text-slate-800">Category not found</p>
+          <Button variant="outline" className="rounded-xl border-slate-200 text-slate-700" onClick={() => router.back()}>
+            <ArrowLeft className="h-4 w-4 mr-2" /> Go Back
+          </Button>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
-      <div className="max-w-4xl mx-auto p-6">
-        <div className="mb-8">
-          <div className="flex items-center space-x-3 mb-4">
-            <div className="w-12 h-12 bg-gradient-to-r from-blue-600 to-indigo-600 rounded-xl flex items-center justify-center shadow-lg">
-              <Tag className="h-6 w-6 text-white" />
-            </div>
-            <div>
-              <h1 className="text-4xl font-bold bg-gradient-to-r from-gray-900 to-gray-600 bg-clip-text text-transparent">
-                Edit Category
-              </h1>
-              <p className="text-gray-600 mt-1">
-                Update category information and details
-              </p>
-            </div>
-          </div>
+    <div className="max-w-3xl space-y-6">
+      <div className="flex items-center gap-3">
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-9 w-9 rounded-xl text-slate-500 hover:text-slate-800 hover:bg-slate-100"
+          onClick={() => router.back()}
+        >
+          <ArrowLeft className="h-5 w-5" />
+        </Button>
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight text-slate-900">
+            Edit Category
+          </h1>
+          <p className="text-xs text-slate-500 mt-0.5">
+            Update category taxonomy and display details
+          </p>
         </div>
-
-        <Card className="border-0 shadow-xl bg-white/70 backdrop-blur-sm">
-          <CardHeader>
-            <CardTitle className="text-xl font-semibold text-gray-900">
-              Category Information
-            </CardTitle>
-            <CardDescription className="text-gray-600">
-              Update the basic details of your category
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Form {...form}>
-              <form
-                onSubmit={form.handleSubmit(onSubmit)}
-                className="space-y-6"
-              >
-                <FormField
-                  control={form.control}
-                  name="name"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel className="text-gray-700">
-                        Category Name
-                      </FormLabel>
-                      <FormControl>
-                        <Input
-                          placeholder="Enter category name"
-                          {...field}
-                          className="h-12 border-2 border-gray-200 focus:border-blue-500 rounded-xl transition-colors"
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="description"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel className="text-gray-700">
-                        Description
-                      </FormLabel>
-                      <FormControl>
-                        <Textarea
-                          placeholder="Enter category description"
-                          rows={4}
-                          {...field}
-                          className="border-2 border-gray-200 focus:border-blue-500 rounded-xl transition-colors"
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <div className="flex justify-end gap-2">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => router.back()}
-                    className="bg-white/70 backdrop-blur-sm border-white/20 shadow-lg hover:bg-white/90"
-                  >
-                    Cancel
-                  </Button>
-                  <Button
-                    type="submit"
-                    disabled={updateCategory.isPending}
-                    className="bg-gradient-to-r from-blue-500 to-indigo-500 hover:from-blue-600 hover:to-indigo-600 text-white shadow-lg"
-                  >
-                    {updateCategory.isPending
-                      ? "Updating..."
-                      : "Update Category"}
-                  </Button>
-                </div>
-              </form>
-            </Form>
-          </CardContent>
-        </Card>
       </div>
+
+      <Card className="rounded-2xl border border-slate-200/90 shadow-2xs bg-white overflow-hidden">
+        <CardHeader className="bg-slate-50/60 border-b border-slate-100 p-5">
+          <CardTitle className="text-base font-semibold text-slate-900">
+            Category Details
+          </CardTitle>
+          <CardDescription className="text-xs text-slate-500">
+            Modify the name and description of this retail category
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="p-5">
+          <Form {...form}>
+            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+              <FormField
+                control={form.control}
+                name="name"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="text-xs font-semibold text-slate-700">
+                      Category Name
+                    </FormLabel>
+                    <FormControl>
+                      <Input
+                        placeholder="Enter category name"
+                        {...field}
+                        className="bg-slate-50/50 border-slate-200 rounded-xl text-sm"
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="description"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="text-xs font-semibold text-slate-700">
+                      Description
+                    </FormLabel>
+                    <FormControl>
+                      <Textarea
+                        placeholder="Enter category description..."
+                        rows={3}
+                        {...field}
+                        className="bg-slate-50/50 border-slate-200 rounded-xl text-sm"
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <div className="flex justify-end gap-2 pt-2 border-t border-slate-100">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => router.back()}
+                  className="rounded-xl border-slate-200 text-slate-700 hover:bg-slate-50 text-xs font-medium"
+                >
+                  Cancel
+                </Button>
+                <Button
+                  type="submit"
+                  disabled={updateCategory.isPending}
+                  className="bg-blue-600 hover:bg-blue-700 text-white rounded-xl shadow-2xs text-xs font-medium"
+                >
+                  {updateCategory.isPending ? "Updating..." : "Update Category"}
+                </Button>
+              </div>
+            </form>
+          </Form>
+        </CardContent>
+      </Card>
     </div>
   );
 }

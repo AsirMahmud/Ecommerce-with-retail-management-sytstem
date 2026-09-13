@@ -92,47 +92,45 @@ export default function PreorderPage() {
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="flex flex-col items-center space-y-4">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
-          <p className="text-muted-foreground">Loading dashboard...</p>
+      <div className="space-y-6">
+        <div className="h-8 w-48 bg-slate-200 rounded-lg animate-pulse" />
+        <div className="h-10 w-64 bg-slate-200 rounded-xl animate-pulse" />
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          {[1, 2, 3, 4].map((i) => (
+            <div key={i} className="h-28 rounded-2xl bg-white border border-slate-200/90 shadow-2xs animate-pulse" />
+          ))}
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
-      <div className="max-w-7xl mx-auto p-6">
-        <div className="mb-8">
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center space-x-3">
-              <div className="w-12 h-12 bg-gradient-to-r from-purple-600 to-indigo-600 rounded-xl flex items-center justify-center shadow-lg">
-                <Package className="h-6 w-6 text-white" />
-              </div>
-              <div>
-                <h1 className="text-4xl font-bold bg-gradient-to-r from-gray-900 to-gray-600 bg-clip-text text-transparent">
-                  Preorder Management
-                </h1>
-                <p className="text-gray-600 mt-1">
-                  Comprehensive preorder tracking and management
-                </p>
-              </div>
+    <div className="space-y-6">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div className="space-y-1">
+          <div className="flex items-center gap-2">
+            <div className="w-9 h-9 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center border border-blue-100">
+              <Package className="h-5 w-5" />
             </div>
-            <Button
-              asChild
-              className="bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700"
-            >
-              <Link href="/preorder/create">
-                <Plus className="mr-2 h-4 w-4" />
-                Create Preorder
-              </Link>
-            </Button>
+            <h1 className="text-2xl font-bold tracking-tight text-slate-900">Preorder Management</h1>
           </div>
+          <p className="text-sm text-slate-500">
+            Track and process advance customer bookings, allocations, and fulfillment statuses.
+          </p>
         </div>
+        <Button
+          asChild
+          className="bg-blue-600 hover:bg-blue-700 text-white rounded-xl shadow-xs"
+        >
+          <Link href="/preorder/create">
+            <Plus className="mr-2 h-4 w-4" />
+            Create Preorder
+          </Link>
+        </Button>
+      </div>
 
-        <Tabs
-          value={activeTab}
+      <Tabs
+        value={activeTab}
           onValueChange={setActiveTab}
           className="space-y-8"
         >
@@ -371,7 +369,6 @@ export default function PreorderPage() {
             <PreorderList />
           </TabsContent>
         </Tabs>
-      </div>
     </div>
   );
 }

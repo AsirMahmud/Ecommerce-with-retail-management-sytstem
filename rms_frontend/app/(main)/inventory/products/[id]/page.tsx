@@ -1308,7 +1308,7 @@ async function handlePrintLabel(product: Product, variation: any, count: number)
         <div class="label-content">
           <div class="label-text">
             <div class="sku">SKU: ${product.sku}</div>
-            <div class="price">Price: ৳${product.selling_price}</div>
+            <div class="price">Price: $${product.selling_price}</div>
             <div class="size">Size: ${variation.size}</div>
             <div class="color">Color: <span class="color-swatch" style="background:${variation.color_hax || variation.color};"></span>${variation.color}</div>
           </div>
@@ -1500,7 +1500,7 @@ async function handlePrintAllVariantsByStock(product: Product) {
           <div class="label-content">
             <div class="label-text">
               <div class="sku">SKU: ${product.sku}</div>
-              <div class="price">Price: ৳${product.selling_price}</div>
+              <div class="price">Price: $${product.selling_price}</div>
               <div class="size">Size: ${variation.size}</div>
               <div class="color">Color: <span class="color-swatch" style="background:${variation.color_hax || variation.color};"></span>${variation.color}</div>
             </div>

@@ -60,39 +60,39 @@ export default function ExpenseManagement() {
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="flex flex-col items-center space-y-4">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
-          <p className="text-muted-foreground">Loading dashboard...</p>
+      <div className="space-y-6">
+        <div className="h-8 w-48 bg-slate-200 rounded-lg animate-pulse" />
+        <div className="h-10 w-96 bg-slate-200 rounded-xl animate-pulse" />
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          {[1, 2, 3, 4].map((i) => (
+            <div key={i} className="h-28 rounded-2xl bg-white border border-slate-200/90 shadow-2xs animate-pulse" />
+          ))}
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
-      <div className="max-w-7xl mx-auto p-0 sm:p-2 md:p-6">
-        <div className="mb-6 sm:mb-8">
-          <div className="flex items-center space-x-3 mb-4">
-            <div className="w-10 h-10 sm:w-12 sm:h-12 bg-gradient-to-r from-blue-600 to-indigo-600 rounded-xl flex items-center justify-center shadow-lg shrink-0">
-              <DollarSign className="h-5 w-5 sm:h-6 sm:w-6 text-white" />
+    <div className="space-y-6">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div className="space-y-1">
+          <div className="flex items-center gap-2">
+            <div className="w-9 h-9 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center border border-blue-100">
+              <DollarSign className="h-5 w-5" />
             </div>
-            <div>
-              <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold bg-gradient-to-r from-gray-900 to-gray-600 bg-clip-text text-transparent">
-                Expense Management
-              </h1>
-              <p className="text-gray-600 mt-1 text-xs sm:text-sm">
-                Comprehensive retail expense tracking and management
-              </p>
-            </div>
+            <h1 className="text-2xl font-bold tracking-tight text-slate-900">Expense Management</h1>
           </div>
+          <p className="text-sm text-slate-500">
+            Comprehensive retail operating expenses, category tracking, and financial analytics.
+          </p>
         </div>
+      </div>
 
-        <Tabs
-          value={activeTab}
-          onValueChange={setActiveTab}
-          className="space-y-6 sm:space-y-8"
-        >
+      <Tabs
+        value={activeTab}
+        onValueChange={setActiveTab}
+        className="space-y-6"
+      >
           <TabsList className="flex overflow-x-auto no-scrollbar sm:grid sm:grid-cols-5 w-full bg-white/70 backdrop-blur-sm border border-white/20 shadow-lg rounded-xl p-1 h-auto">
             <TabsTrigger
               value="dashboard"
@@ -406,7 +406,6 @@ export default function ExpenseManagement() {
             <ExpenseForm />
           </TabsContent>
         </Tabs>
-      </div>
     </div>
   );
 }

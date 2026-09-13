@@ -882,55 +882,49 @@ export default function AddProductPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
-      <div className="max-w-7xl mx-auto p-6">
-        <div className="mb-8">
-          <div className="flex items-center space-x-3 mb-4">
-            <div className="w-12 h-12 bg-gradient-to-r from-blue-600 to-indigo-600 rounded-xl flex items-center justify-center shadow-lg">
-              <ShoppingCart className="h-6 w-6 text-white" />
-            </div>
-            <div>
-              <h1 className="text-4xl font-bold bg-gradient-to-r from-gray-900 to-gray-600 bg-clip-text text-transparent">
-                Add New Product
-              </h1>
-              <p className="text-gray-600 mt-1">
-                Add a new product to your inventory with variants and stock
-                information
-              </p>
-            </div>
-          </div>
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight text-slate-900">
+            Add New Product
+          </h1>
+          <p className="text-sm text-slate-500 mt-1">
+            Create a new retail inventory product with variants, sizing, categories, and galleries
+          </p>
         </div>
+      </div>
 
-        <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-            <div className="flex justify-end gap-2">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => router.back()}
-                className="bg-white/70 backdrop-blur-sm border-white/20 shadow-lg hover:bg-white/90"
-              >
-                Cancel
-              </Button>
-              <Button
-                type="submit"
-                disabled={createProduct.isPending}
-                className="bg-gradient-to-r from-blue-500 to-indigo-500 hover:from-blue-600 hover:to-indigo-600 text-white shadow-lg"
-              >
-                {createProduct.isPending ? "Creating..." : "Save Product"}
-              </Button>
-            </div>
+      <Form {...form}>
+        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+          <div className="flex justify-end gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => router.back()}
+              className="rounded-xl border-slate-200 text-slate-700 hover:bg-slate-50"
+            >
+              Cancel
+            </Button>
+            <Button
+              type="submit"
+              disabled={createProduct.isPending}
+              className="bg-blue-600 hover:bg-blue-700 text-white rounded-xl shadow-2xs font-medium"
+            >
+              {createProduct.isPending ? "Creating..." : "Save Product"}
+            </Button>
+          </div>
 
-            <Card className="border-0 shadow-xl bg-white/70 backdrop-blur-sm">
-              <CardHeader>
-                <CardTitle className="text-xl font-semibold text-gray-900">
-                  Product Information
-                </CardTitle>
-                <CardDescription className="text-gray-600">
-                  Enter the basic details of your product
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-6">
+          <Card className="rounded-2xl border border-slate-200/90 shadow-2xs bg-white overflow-hidden">
+            <CardHeader className="bg-slate-50/60 border-b border-slate-100 p-5">
+              <CardTitle className="text-base font-semibold text-slate-900">
+                Product Information
+              </CardTitle>
+              <CardDescription className="text-xs text-slate-500">
+                Enter the basic details of your product
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="p-5 space-y-6">
                 {/* Basic Information */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <FormField
@@ -1855,7 +1849,6 @@ export default function AddProductPage() {
             </Card>
           </form>
         </Form>
-      </div>
     </div>
   );
 }

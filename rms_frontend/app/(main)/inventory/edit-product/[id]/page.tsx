@@ -1129,16 +1129,21 @@ export default function EditProductPage() {
   }
 
   return (
-    <div className="container mx-auto py-6 space-y-6">
+    <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Edit Product</h1>
-          <p className="text-muted-foreground">
-            Update product information and inventory
+        <div className="space-y-1">
+          <div className="flex items-center gap-2">
+            <div className="w-9 h-9 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center border border-blue-100">
+              <ShoppingCart className="h-5 w-5" />
+            </div>
+            <h1 className="text-2xl font-bold tracking-tight text-slate-900">Edit Product</h1>
+          </div>
+          <p className="text-sm text-slate-500">
+            Update product information, variations, and inventory
           </p>
         </div>
-        <Button variant="outline" onClick={() => router.back()}>
+        <Button variant="outline" onClick={() => router.back()} className="rounded-xl border-slate-200">
           <ArrowLeft className="h-4 w-4 mr-2" /> Back
         </Button>
       </div>
@@ -1147,14 +1152,14 @@ export default function EditProductPage() {
       <Form {...form}>
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
           {/* Basic Information Card */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Basic Information</CardTitle>
-              <CardDescription>
+          <Card className="rounded-2xl border border-slate-200/90 shadow-2xs bg-white overflow-hidden">
+            <CardHeader className="bg-slate-50/60 border-b border-slate-100 p-5">
+              <CardTitle className="text-base font-semibold text-slate-900">Basic Information</CardTitle>
+              <CardDescription className="text-xs text-slate-500">
                 Enter the basic details of the product
               </CardDescription>
             </CardHeader>
-            <CardContent className="grid gap-6">
+            <CardContent className="p-6">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <FormField
                   control={form.control}
@@ -1338,14 +1343,14 @@ export default function EditProductPage() {
           </Card>
 
           {/* Pricing and Stock Card */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Pricing and Stock</CardTitle>
-              <CardDescription>
+          <Card className="rounded-2xl border border-slate-200/90 shadow-2xs bg-white overflow-hidden">
+            <CardHeader className="bg-slate-50/60 border-b border-slate-100 p-5">
+              <CardTitle className="text-base font-semibold text-slate-900">Pricing and Stock</CardTitle>
+              <CardDescription className="text-xs text-slate-500">
                 Set the product pricing and stock levels
               </CardDescription>
             </CardHeader>
-            <CardContent className="grid gap-6">
+            <CardContent className="p-6">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <FormField
                   control={form.control}
@@ -1456,14 +1461,14 @@ export default function EditProductPage() {
           </Card>
 
           {/* Size and Variations Card */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Size and Variations</CardTitle>
-              <CardDescription>
-                Configure product sizes and variations
+          <Card className="rounded-2xl border border-slate-200/90 shadow-2xs bg-white overflow-hidden">
+            <CardHeader className="bg-slate-50/60 border-b border-slate-100 p-5">
+              <CardTitle className="text-base font-semibold text-slate-900">Size and Variations</CardTitle>
+              <CardDescription className="text-xs text-slate-500">
+                Configure product sizes, color variants, and variations
               </CardDescription>
             </CardHeader>
-            <CardContent className="space-y-6">
+            <CardContent className="p-6 space-y-6">
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 <FormField
                   control={form.control}
@@ -1813,14 +1818,14 @@ export default function EditProductPage() {
           </Card>
 
           {/* Material Composition Card */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Material Composition</CardTitle>
-              <CardDescription>
+          <Card className="rounded-2xl border border-slate-200/90 shadow-2xs bg-white overflow-hidden">
+            <CardHeader className="bg-slate-50/60 border-b border-slate-100 p-5">
+              <CardTitle className="text-base font-semibold text-slate-900">Material Composition</CardTitle>
+              <CardDescription className="text-xs text-slate-500">
                 Define the material composition of the product
               </CardDescription>
             </CardHeader>
-            <CardContent className="space-y-4">
+            <CardContent className="p-6 space-y-4">
               {materialCompositions.map((item, index) => (
                 <div key={item.id} className="flex items-center gap-4">
                   <Input
@@ -1830,20 +1835,20 @@ export default function EditProductPage() {
                     placeholder="Percentage"
                     value={item.percentage}
                     onChange={(e) => updateMaterialComposition(item.id, 'percentage', parseInt(e.target.value) || 0)}
-                    className="w-32"
+                    className="w-32 rounded-xl"
                   />
                   <Input
                     placeholder="Material name"
                     value={item.title || ""}
                     onChange={(e) => updateMaterialComposition(item.id, 'title', e.target.value)}
-                    className="flex-1"
+                    className="flex-1 rounded-xl"
                   />
                   <Button
                     type="button"
                     variant="ghost"
-                    size="sm"
+                    size="icon"
                     onClick={() => removeMaterialComposition(item.id)}
-                    className="text-destructive"
+                    className="text-rose-600 hover:bg-rose-50 hover:text-rose-700 rounded-xl"
                   >
                     <Trash2 className="h-4 w-4" />
                   </Button>
@@ -1854,6 +1859,7 @@ export default function EditProductPage() {
                 variant="outline"
                 size="sm"
                 onClick={addMaterialComposition}
+                className="rounded-xl border-slate-200"
               >
                 <PlusCircle className="h-4 w-4 mr-2" />
                 Add Material
@@ -1862,34 +1868,36 @@ export default function EditProductPage() {
           </Card>
 
           {/* Who Is This For Card */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Who Is This For</CardTitle>
-              <CardDescription>
+          <Card className="rounded-2xl border border-slate-200/90 shadow-2xs bg-white overflow-hidden">
+            <CardHeader className="bg-slate-50/60 border-b border-slate-100 p-5">
+              <CardTitle className="text-base font-semibold text-slate-900">Who Is This For</CardTitle>
+              <CardDescription className="text-xs text-slate-500">
                 Define the target audience for this product
               </CardDescription>
             </CardHeader>
-            <CardContent className="space-y-4">
+            <CardContent className="p-6 space-y-4">
               {whoIsThisFor.map((item, index) => (
-                <div key={item.id} className="space-y-2">
+                <div key={item.id} className="space-y-2 p-4 rounded-xl border border-slate-100 bg-slate-50/50">
                   <Input
                     placeholder="Title"
                     value={item.title || ""}
                     onChange={(e) => updateWhoIsThisFor(item.id, 'title', e.target.value)}
+                    className="rounded-xl bg-white"
                   />
                   <Textarea
                     placeholder="Description"
                     value={item.description || ""}
                     onChange={(e) => updateWhoIsThisFor(item.id, 'description', e.target.value)}
+                    className="rounded-xl bg-white"
                   />
                   <Button
                     type="button"
                     variant="ghost"
                     size="sm"
                     onClick={() => removeWhoIsThisFor(item.id)}
-                    className="text-destructive"
+                    className="text-rose-600 hover:bg-rose-50 hover:text-rose-700 rounded-xl text-xs"
                   >
-                    <Trash2 className="h-4 w-4 mr-2" />
+                    <Trash2 className="h-4 w-4 mr-1.5" />
                     Remove
                   </Button>
                 </div>
@@ -1899,6 +1907,7 @@ export default function EditProductPage() {
                 variant="outline"
                 size="sm"
                 onClick={addWhoIsThisFor}
+                className="rounded-xl border-slate-200"
               >
                 <PlusCircle className="h-4 w-4 mr-2" />
                 Add Target Audience
@@ -1907,34 +1916,36 @@ export default function EditProductPage() {
           </Card>
 
           {/* Product Features Card */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Product Features</CardTitle>
-              <CardDescription>
+          <Card className="rounded-2xl border border-slate-200/90 shadow-2xs bg-white overflow-hidden">
+            <CardHeader className="bg-slate-50/60 border-b border-slate-100 p-5">
+              <CardTitle className="text-base font-semibold text-slate-900">Product Features</CardTitle>
+              <CardDescription className="text-xs text-slate-500">
                 Define the key features of this product
               </CardDescription>
             </CardHeader>
-            <CardContent className="space-y-4">
+            <CardContent className="p-6 space-y-4">
               {features.map((item, index) => (
-                <div key={item.id} className="space-y-2">
+                <div key={item.id} className="space-y-2 p-4 rounded-xl border border-slate-100 bg-slate-50/50">
                   <Input
                     placeholder="Feature title"
                     value={item.title || ""}
                     onChange={(e) => updateFeature(item.id, 'title', e.target.value)}
+                    className="rounded-xl bg-white"
                   />
                   <Textarea
                     placeholder="Feature description"
                     value={item.description || ""}
                     onChange={(e) => updateFeature(item.id, 'description', e.target.value)}
+                    className="rounded-xl bg-white"
                   />
                   <Button
                     type="button"
                     variant="ghost"
                     size="sm"
                     onClick={() => removeFeature(item.id)}
-                    className="text-destructive"
+                    className="text-rose-600 hover:bg-rose-50 hover:text-rose-700 rounded-xl text-xs"
                   >
-                    <Trash2 className="h-4 w-4 mr-2" />
+                    <Trash2 className="h-4 w-4 mr-1.5" />
                     Remove
                   </Button>
                 </div>
@@ -1944,6 +1955,7 @@ export default function EditProductPage() {
                 variant="outline"
                 size="sm"
                 onClick={addFeature}
+                className="rounded-xl border-slate-200"
               >
                 <PlusCircle className="h-4 w-4 mr-2" />
                 Add Feature
@@ -1952,23 +1964,23 @@ export default function EditProductPage() {
           </Card>
 
           {/* Product Gallery Card */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Product Gallery</CardTitle>
-              <CardDescription>
+          <Card className="rounded-2xl border border-slate-200/90 shadow-2xs bg-white overflow-hidden">
+            <CardHeader className="bg-slate-50/60 border-b border-slate-100 p-5">
+              <CardTitle className="text-base font-semibold text-slate-900">Product Gallery</CardTitle>
+              <CardDescription className="text-xs text-slate-500">
                 Upload images for each color variant (up to 4 images per color)
               </CardDescription>
             </CardHeader>
-            <CardContent className="space-y-6">
+            <CardContent className="p-6 space-y-6">
               {galleries.map((gallery, galleryIndex) => (
                 <div key={gallery.color} className="space-y-4">
                   <div className="flex items-center gap-2">
                     <div
-                      className="w-6 h-6 rounded-full border-2 border-gray-300"
+                      className="w-6 h-6 rounded-full border-2 border-gray-300 shadow-xs"
                       style={{ backgroundColor: gallery.color_hax || gallery.colorHex }}
                     />
-                    <h4 className="font-medium">{gallery.color}</h4>
-                    <span className="text-sm text-muted-foreground">
+                    <h4 className="font-semibold text-sm text-slate-900">{gallery.color}</h4>
+                    <span className="text-xs text-slate-500">
                       ({gallery.images.filter(img => img.file || img.preview).length}/4 images)
                     </span>
                   </div>
@@ -1976,9 +1988,9 @@ export default function EditProductPage() {
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                     {gallery.images.map((image, imageIndex) => (
                       <div key={image.id} className="space-y-2">
-                        <div className={`aspect-square border-2 border-dashed rounded-lg flex items-center justify-center overflow-hidden ${image.preview ? 'border-gray-300' :
-                          imagesToDelete.includes(image.id) ? 'border-red-300 bg-red-50' :
-                            'border-gray-300'
+                        <div className={`aspect-square border-2 border-dashed rounded-xl flex items-center justify-center overflow-hidden transition-all ${image.preview ? 'border-slate-200 bg-white' :
+                          imagesToDelete.includes(image.id) ? 'border-rose-300 bg-rose-50' :
+                            'border-slate-200 bg-slate-50/50 hover:bg-slate-50'
                           }`}>
                           {image.preview ? (
                             <div className="relative w-full h-full">
@@ -1990,8 +2002,8 @@ export default function EditProductPage() {
                               <Button
                                 type="button"
                                 variant="destructive"
-                                size="sm"
-                                className="absolute top-2 right-2 h-6 w-6 p-0"
+                                size="icon"
+                                className="absolute top-2 right-2 h-6 w-6 rounded-lg shadow-xs"
                                 onClick={() => removeImage(galleryIndex, imageIndex)}
                               >
                                 <X className="h-3 w-3" />
@@ -1999,39 +2011,52 @@ export default function EditProductPage() {
                             </div>
                           ) : imagesToDelete.includes(image.id) ? (
                             <div className="text-center">
-                              <X className="h-8 w-8 text-red-400 mx-auto mb-2" />
-                              <p className="text-xs text-red-500">Will be deleted</p>
+                              <X className="h-8 w-8 text-rose-400 mx-auto mb-2" />
+                              <p className="text-xs text-rose-500 font-medium">Will be deleted</p>
                             </div>
                           ) : (
                             <div className="text-center">
-                              <Upload className="h-8 w-8 text-gray-400 mx-auto mb-2" />
-                              <p className="text-xs text-gray-500">{image.imageType}</p>
+                              <Upload className="h-8 w-8 text-slate-400 mx-auto mb-2" />
+                              <p className="text-xs text-slate-500 font-medium">{image.imageType}</p>
                             </div>
                           )}
                         </div>
 
+                        {/* Image Action Buttons */}
                         <div className="space-y-1">
+                          <input
+                            type="file"
+                            accept="image/*"
+                            onChange={(e) => {
+                              const file = e.target.files?.[0];
+                              if (file) {
+                                handleImageUpload(galleryIndex, imageIndex, file);
+                              }
+                            }}
+                            className="hidden"
+                            id={`image-upload-${galleryIndex}-${imageIndex}`}
+                          />
                           {!image.preview && !imagesToDelete.includes(image.id) && (
-                            <Input
-                              type="file"
-                              accept="image/*"
-                              onChange={(e) => {
-                                const file = e.target.files?.[0];
-                                if (file) {
-                                  handleImageUpload(galleryIndex, imageIndex, file);
-                                }
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              className="w-full text-xs rounded-xl border-slate-200"
+                              onClick={() => {
+                                document.getElementById(`image-upload-${galleryIndex}-${imageIndex}`)?.click();
                               }}
-                              className="text-xs"
-                            />
+                            >
+                              <Upload className="h-3 w-3 mr-1" />
+                              Upload
+                            </Button>
                           )}
                           {image.preview && (
-                            <div className="text-center">
-                              <p className="text-xs text-green-600 font-medium">✓ Image loaded</p>
+                            <div className="flex gap-1">
                               <Button
                                 type="button"
                                 variant="outline"
                                 size="sm"
-                                className="w-full text-xs"
+                                className="flex-1 text-xs rounded-xl border-slate-200"
                                 onClick={() => {
                                   const fileInput = document.createElement('input');
                                   fileInput.type = 'file';
@@ -2045,7 +2070,16 @@ export default function EditProductPage() {
                                   fileInput.click();
                                 }}
                               >
-                                Replace Image
+                                Replace
+                              </Button>
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                className="text-xs rounded-xl border-slate-200 text-rose-600 hover:bg-rose-50 hover:text-rose-700"
+                                onClick={() => removeImage(galleryIndex, imageIndex)}
+                              >
+                                Remove
                               </Button>
                             </div>
                           )}
@@ -2055,11 +2089,9 @@ export default function EditProductPage() {
                                 type="button"
                                 variant="outline"
                                 size="sm"
-                                className="w-full text-xs text-red-600 border-red-300"
+                                className="w-full text-xs text-rose-600 border-rose-300 rounded-xl"
                                 onClick={() => {
-                                  // Restore the image by removing it from deletion list
                                   setImagesToDelete(prev => prev.filter(id => id !== image.id));
-                                  // Restore the image data if it exists
                                   if (image.image) {
                                     image.preview = getImageUrl(image.image_url || image.image);
                                   }
@@ -2077,17 +2109,17 @@ export default function EditProductPage() {
               ))}
 
               {galleries.length === 0 && (
-                <div className="text-center py-8 text-muted-foreground">
-                  <Upload className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                  <p>Add color variants to see gallery options</p>
+                <div className="text-center py-8 text-slate-400">
+                  <Upload className="h-10 w-10 mx-auto mb-2 opacity-50" />
+                  <p className="text-xs">Add color variants above to enable gallery upload</p>
                 </div>
               )}
             </CardContent>
           </Card>
 
           {/* Submit Button */}
-          <div className="flex justify-end">
-            <Button type="submit" className="w-full md:w-auto">
+          <div className="flex justify-end pt-4 border-t border-slate-100">
+            <Button type="submit" className="w-full md:w-auto bg-blue-600 hover:bg-blue-700 text-white rounded-xl px-6 shadow-xs">
               Update Product
             </Button>
           </div>

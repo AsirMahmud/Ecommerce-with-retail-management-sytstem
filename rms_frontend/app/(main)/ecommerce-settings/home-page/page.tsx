@@ -181,44 +181,39 @@ export default function HomePageSettingsPage() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-gray-900 mx-auto"></div>
-          <p className="mt-4 text-gray-600">Loading settings...</p>
-        </div>
+      <div className="space-y-6">
+        <div className="h-8 w-48 bg-slate-200 rounded-lg animate-pulse" />
+        <div className="h-96 rounded-2xl bg-white border border-slate-200/90 shadow-2xs animate-pulse" />
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
-      <div className="max-w-7xl mx-auto p-6">
-        <div className="mb-8">
-          <div className="flex items-center space-x-3 mb-4">
-            <div className="w-12 h-12 bg-gradient-to-r from-blue-600 to-indigo-600 rounded-xl flex items-center justify-center shadow-lg">
-              <Home className="h-6 w-6 text-white" />
+    <div className="space-y-6">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div className="space-y-1">
+          <div className="flex items-center gap-2">
+            <div className="w-9 h-9 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center border border-blue-100">
+              <Home className="h-5 w-5" />
             </div>
-            <div>
-              <h1 className="text-4xl font-bold bg-gradient-to-r from-gray-900 to-gray-600 bg-clip-text text-transparent">
-                Home Page Settings
-              </h1>
-              <p className="text-gray-600 mt-1">
-                Customize your ecommerce home page content
-              </p>
-            </div>
+            <h1 className="text-2xl font-bold tracking-tight text-slate-900">Home Page Configuration</h1>
           </div>
+          <p className="text-sm text-slate-500">
+            Customize branding, storefront hero banners, statistics, and footer information.
+          </p>
         </div>
+      </div>
 
-        <Card className="shadow-lg border-0 bg-white/80 backdrop-blur-sm">
-          <CardHeader>
-            <CardTitle className="text-2xl font-bold text-gray-900">
-              Home Page Configuration
-            </CardTitle>
-            <CardDescription>
-              Update logo, hero section, and statistics for your home page
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
+      <Card className="rounded-2xl border border-slate-200/90 shadow-2xs bg-white overflow-hidden">
+        <CardHeader className="bg-slate-50/60 border-b border-slate-100 p-5">
+          <CardTitle className="text-base font-semibold text-slate-900">
+            Storefront Settings
+          </CardTitle>
+          <CardDescription className="text-xs text-slate-500">
+            Update logo, typography, hero section banners, and footer contacts
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="p-6">
             <Tabs defaultValue="logo" className="w-full">
               <TabsList className="grid w-full grid-cols-4">
                 <TabsTrigger value="logo">
@@ -509,19 +504,18 @@ export default function HomePageSettingsPage() {
               </TabsContent>
             </Tabs>
 
-            <div className="flex justify-end mt-8">
+            <div className="flex justify-end mt-8 pt-4 border-t border-slate-100">
               <Button
                 onClick={handleSave}
                 disabled={saving}
-                className="bg-gradient-to-r from-blue-500 to-indigo-500 hover:from-blue-600 hover:to-indigo-600 text-white shadow-lg"
+                className="bg-blue-600 hover:bg-blue-700 text-white rounded-xl px-5 shadow-xs"
               >
                 <Save className="mr-2 h-4 w-4" />
-                {saving ? 'Saving...' : 'Save Changes'}
+                {saving ? 'Saving Changes...' : 'Save Configuration'}
               </Button>
             </div>
           </CardContent>
         </Card>
-      </div>
     </div>
   );
 }

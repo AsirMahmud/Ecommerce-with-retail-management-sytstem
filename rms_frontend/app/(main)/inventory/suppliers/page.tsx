@@ -101,8 +101,8 @@ export default function SuppliersPage() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 p-6">
-        <div className="max-w-7xl mx-auto space-y-6">
+      <div className="space-y-6">
+        <div className="space-y-6">
           <div className="flex items-center justify-between">
             <div className="space-y-2">
               <Skeleton className="h-8 w-48" />
@@ -132,22 +132,20 @@ export default function SuppliersPage() {
   }
 
   const SupplierCard = ({ supplier }: { supplier: Supplier }) => (
-    <Card className="group hover:shadow-xl transition-all duration-300 hover:-translate-y-1 border-0 bg-gradient-to-br from-white to-slate-50">
-      <CardHeader className="pb-4">
+    <Card className="rounded-2xl border border-slate-200/90 shadow-2xs hover:border-slate-300 transition-all bg-white overflow-hidden">
+      <CardHeader className="bg-slate-50/40 border-b border-slate-100 p-5">
         <div className="flex items-start justify-between">
-          <div className="space-y-2">
-            <div className="flex items-center gap-2">
-              <div className="w-10 h-10 bg-gradient-to-r from-blue-500 to-indigo-500 rounded-full flex items-center justify-center">
-                <Building2 className="h-5 w-5 text-white" />
-              </div>
-              <div>
-                <CardTitle className="text-lg font-semibold group-hover:text-primary transition-colors line-clamp-1">
-                  {supplier.company_name}
-                </CardTitle>
-                <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                  <Package className="h-3 w-3" />
-                  {supplier.products_count || 0} Products
-                </div>
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
+              <Building2 className="h-4 w-4" />
+            </div>
+            <div>
+              <CardTitle className="text-base font-semibold text-slate-900 line-clamp-1">
+                {supplier.company_name}
+              </CardTitle>
+              <div className="flex items-center gap-1 text-xs text-slate-500 mt-0.5">
+                <Package className="h-3 w-3 text-slate-400" />
+                <span>{supplier.products_count || 0} Products</span>
               </div>
             </div>
           </div>
@@ -156,27 +154,27 @@ export default function SuppliersPage() {
               <Button
                 variant="ghost"
                 size="sm"
-                className="opacity-0 group-hover:opacity-100 transition-opacity h-8 w-8 p-0"
+                className="h-8 w-8 p-0 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100"
               >
                 <MoreHorizontal className="h-4 w-4" />
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-48">
+            <DropdownMenuContent align="end" className="w-48 rounded-xl shadow-md border-slate-200">
               <DropdownMenuItem asChild className="cursor-pointer">
                 <Link href={`/inventory/suppliers/${supplier.id}`}>
-                  <Eye className="mr-2 h-4 w-4" />
+                  <Eye className="mr-2 h-4 w-4 text-slate-500" />
                   View Details
                 </Link>
               </DropdownMenuItem>
               <DropdownMenuItem asChild className="cursor-pointer">
                 <Link href={`/inventory/suppliers/edit/${supplier.id}`}>
-                  <Edit3 className="mr-2 h-4 w-4" />
+                  <Edit3 className="mr-2 h-4 w-4 text-slate-500" />
                   Edit Supplier
                 </Link>
               </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem
-                className="text-destructive cursor-pointer"
+                className="text-rose-600 cursor-pointer focus:text-rose-600 focus:bg-rose-50"
                 onClick={() => setSupplierToDelete(supplier)}
               >
                 <Trash2 className="mr-2 h-4 w-4" />
@@ -186,188 +184,175 @@ export default function SuppliersPage() {
           </DropdownMenu>
         </div>
       </CardHeader>
-      <CardContent className="space-y-4">
-        <div className="grid grid-cols-2 gap-4 text-sm">
-          <div className="space-y-2">
-            <div className="flex items-center gap-2">
-              <Phone className="h-3 w-3 text-muted-foreground" />
-              <span className="text-muted-foreground">Phone</span>
+      <CardContent className="p-5 space-y-4">
+        <div className="grid grid-cols-2 gap-3 text-xs">
+          <div className="p-2.5 rounded-xl bg-slate-50/70 border border-slate-100 space-y-1">
+            <div className="flex items-center gap-1.5 text-slate-400">
+              <Phone className="h-3 w-3" />
+              <span className="font-medium">Phone</span>
             </div>
-            <p className="font-medium">{supplier.phone || "N/A"}</p>
+            <p className="font-semibold text-slate-800 truncate">{supplier.phone || "N/A"}</p>
           </div>
-          <div className="space-y-2">
-            <div className="flex items-center gap-2">
-              <Mail className="h-3 w-3 text-muted-foreground" />
-              <span className="text-muted-foreground">Email</span>
+          <div className="p-2.5 rounded-xl bg-slate-50/70 border border-slate-100 space-y-1">
+            <div className="flex items-center gap-1.5 text-slate-400">
+              <Mail className="h-3 w-3" />
+              <span className="font-medium">Email</span>
             </div>
-            <p className="font-medium">{supplier.email || "N/A"}</p>
+            <p className="font-semibold text-slate-800 truncate">{supplier.email || "N/A"}</p>
           </div>
         </div>
 
-        <div className="grid grid-cols-2 gap-4">
-          <div className="space-y-1">
-            <p className="text-xs text-muted-foreground">Products</p>
-            <p className="text-lg font-bold text-blue-600">
+        <div className="grid grid-cols-2 gap-3 text-center">
+          <div className="p-2.5 rounded-xl bg-slate-50/70 border border-slate-100">
+            <p className="text-[11px] font-medium text-slate-500">Products</p>
+            <p className="text-base font-bold text-slate-900 mt-0.5">
               {supplier.products_count || 0}
             </p>
           </div>
-          <div className="space-y-1">
-            <p className="text-xs text-muted-foreground">Total Value</p>
-            <p className="text-lg font-bold text-green-600">
+          <div className="p-2.5 rounded-xl bg-slate-50/70 border border-slate-100">
+            <p className="text-[11px] font-medium text-slate-500">Total Value</p>
+            <p className="text-base font-bold text-slate-900 mt-0.5">
               ${supplier.total_value?.toLocaleString() || 0}
             </p>
           </div>
         </div>
 
-        <div className="flex items-center justify-between">
-          <div className="space-y-1">
-            <p className="text-xs text-muted-foreground">Status</p>
-            <Badge
-              variant={supplier.is_active ? "default" : "secondary"}
-              className="ml-auto"
-            >
-              {supplier.is_active ? "Active" : "Inactive"}
-            </Badge>
-          </div>
+        <div className="flex items-center justify-between pt-1 text-xs border-t border-slate-100">
+          <span className="text-slate-400">Status</span>
+          <Badge
+            variant="outline"
+            className={supplier.is_active ? "bg-emerald-50 text-emerald-700 border-emerald-200/60 font-medium" : "bg-slate-100 text-slate-600 border-slate-200 font-medium"}
+          >
+            {supplier.is_active ? "Active" : "Inactive"}
+          </Badge>
         </div>
       </CardContent>
     </Card>
   );
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
-      <div className="max-w-7xl mx-auto p-6">
-        {/* Header */}
-        <div className="mb-8">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-3">
-              <div className="w-12 h-12 bg-gradient-to-r from-blue-600 to-indigo-600 rounded-xl flex items-center justify-center shadow-lg">
-                <Building2 className="h-6 w-6 text-white" />
-              </div>
-              <div>
-                <h1 className="text-4xl font-bold bg-gradient-to-r from-gray-900 to-gray-600 bg-clip-text text-transparent">
-                  Suppliers
-                </h1>
-                <p className="text-gray-600 mt-1">
-                  Manage your suppliers and their products
-                </p>
-              </div>
-            </div>
-            <Button
-              onClick={() => router.push("/inventory/suppliers/add")}
-              className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white shadow-lg hover:shadow-xl transition-all duration-300"
-            >
-              <PlusCircle className="mr-2 h-4 w-4" />
-              Add Supplier
-            </Button>
-          </div>
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight text-slate-900">
+            Suppliers
+          </h1>
+          <p className="text-sm text-slate-500 mt-1">
+            Manage your vendors, suppliers, and procurement relationships
+          </p>
         </div>
-
-        {/* Key Metrics */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-          <Card className="bg-gradient-to-br from-blue-50 to-indigo-100 border-0 shadow-xl hover:shadow-2xl transition-all duration-300 hover:-translate-y-1">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium text-gray-700">
-                Total Suppliers
-              </CardTitle>
-              <div className="w-10 h-10 bg-gradient-to-r from-blue-500 to-indigo-500 rounded-full flex items-center justify-center">
-                <Building2 className="h-5 w-5 text-white" />
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="text-3xl font-bold text-gray-900">
-                {totalSuppliers}
-              </div>
-              <p className="text-xs text-blue-600 font-medium mt-1">
-                {activeSuppliers} Active Suppliers
-              </p>
-            </CardContent>
-          </Card>
-
-          <Card className="bg-gradient-to-br from-emerald-50 to-teal-100 border-0 shadow-xl hover:shadow-2xl transition-all duration-300 hover:-translate-y-1">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium text-gray-700">
-                Total Products
-              </CardTitle>
-              <div className="w-10 h-10 bg-gradient-to-r from-emerald-500 to-teal-500 rounded-full flex items-center justify-center">
-                <Package className="h-5 w-5 text-white" />
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="text-3xl font-bold text-gray-900">
-                {totalProducts}
-              </div>
-              <p className="text-xs text-emerald-600 font-medium mt-1">
-                Across all suppliers
-              </p>
-            </CardContent>
-          </Card>
-
-          <Card className="bg-gradient-to-br from-orange-50 to-amber-100 border-0 shadow-xl hover:shadow-2xl transition-all duration-300 hover:-translate-y-1">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium text-gray-700">
-                Total Value
-              </CardTitle>
-              <div className="w-10 h-10 bg-gradient-to-r from-orange-500 to-amber-500 rounded-full flex items-center justify-center">
-                <DollarSign className="h-5 w-5 text-white" />
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="text-3xl font-bold text-gray-900">
-                ${totalValue.toLocaleString()}
-              </div>
-              <p className="text-xs text-orange-600 font-medium mt-1">
-                Inventory value
-              </p>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Search */}
-        <div className="flex flex-col md:flex-row gap-4 mb-6">
-          <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input
-              placeholder="Search suppliers..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-9 bg-white/70 backdrop-blur-sm border-white/20 shadow-lg"
-            />
-          </div>
-        </div>
-
-        {/* Suppliers Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {filteredSuppliers.map((supplier) => (
-            <SupplierCard key={supplier.id} supplier={supplier} />
-          ))}
-        </div>
-
-        {/* Delete Confirmation Dialog */}
-        <AlertDialog
-          open={!!supplierToDelete}
-          onOpenChange={() => setSupplierToDelete(null)}
+        <Button
+          onClick={() => router.push("/inventory/suppliers/add")}
+          className="gap-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl shadow-2xs font-medium"
         >
-          <AlertDialogContent>
-            <AlertDialogHeader>
-              <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-              <AlertDialogDescription>
-                This action cannot be undone. This will permanently delete the
-                supplier and remove it from our servers.
-              </AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-              <AlertDialogCancel>Cancel</AlertDialogCancel>
-              <AlertDialogAction
-                onClick={handleDeleteSupplier}
-                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-              >
-                Delete
-              </AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
+          <PlusCircle className="h-4 w-4" />
+          Add Supplier
+        </Button>
       </div>
+
+      {/* Key Metrics */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <Card className="rounded-2xl border border-slate-200/90 shadow-2xs bg-white hover:border-slate-300 transition-all">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
+              Total Suppliers
+            </CardTitle>
+            <div className="w-8 h-8 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center">
+              <Building2 className="h-4 w-4" />
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-slate-900 tracking-tight">
+              {totalSuppliers}
+            </div>
+            <p className="text-xs text-blue-600 font-medium mt-1">
+              {activeSuppliers} Active Suppliers
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card className="rounded-2xl border border-slate-200/90 shadow-2xs bg-white hover:border-slate-300 transition-all">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
+              Supplied Products
+            </CardTitle>
+            <div className="w-8 h-8 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
+              <Package className="h-4 w-4" />
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-slate-900 tracking-tight">
+              {totalProducts}
+            </div>
+            <p className="text-xs text-emerald-600 font-medium mt-1">
+              Across all vendors
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card className="rounded-2xl border border-slate-200/90 shadow-2xs bg-white hover:border-slate-300 transition-all">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
+              Procured Value
+            </CardTitle>
+            <div className="w-8 h-8 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center">
+              <DollarSign className="h-4 w-4" />
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-slate-900 tracking-tight">
+              ${totalValue.toLocaleString()}
+            </div>
+            <p className="text-xs text-amber-600 font-medium mt-1">
+              Total procurement valuation
+            </p>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Search */}
+      <div className="relative">
+        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-slate-400" />
+        <Input
+          placeholder="Search suppliers..."
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          className="pl-9 bg-white border-slate-200 rounded-xl shadow-2xs text-sm"
+        />
+      </div>
+
+      {/* Suppliers Grid */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        {filteredSuppliers.map((supplier) => (
+          <SupplierCard key={supplier.id} supplier={supplier} />
+        ))}
+      </div>
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog
+        open={!!supplierToDelete}
+        onOpenChange={() => setSupplierToDelete(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This action cannot be undone. This will permanently delete the
+              supplier and remove it from our servers.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteSupplier}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

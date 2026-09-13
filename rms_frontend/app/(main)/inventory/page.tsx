@@ -133,114 +133,119 @@ export default function InventoryPage() {
       : 0;
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
-      <div className="max-w-7xl mx-auto p-0 sm:p-2 md:p-6">
-        {/* Header */}
-        <div className="mb-6 sm:mb-8">
-          <div className="flex items-center space-x-3 mb-4">
-            <div className="w-10 h-10 sm:w-12 sm:h-12 bg-gradient-to-r from-blue-600 to-indigo-600 rounded-xl flex items-center justify-center shadow-lg shrink-0">
-              <Package className="h-5 w-5 sm:h-6 sm:w-6 text-white" />
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight text-slate-900">
+            Inventory Overview
+          </h1>
+          <p className="text-sm text-slate-500 mt-1">
+            Monitor stock levels, track valuations, and manage product inventory performance
+          </p>
+        </div>
+        <div className="flex items-center gap-2">
+          <Link href="/inventory/add-product">
+            <Button className="gap-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl shadow-2xs font-medium">
+              <PlusCircle className="h-4 w-4" />
+              Add Product
+            </Button>
+          </Link>
+          <Link href="/inventory/products">
+            <Button variant="outline" className="rounded-xl border-slate-200 text-slate-700 hover:bg-slate-50">
+              View All Products
+            </Button>
+          </Link>
+        </div>
+      </div>
+
+      {/* Key Metrics */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <Card className="rounded-2xl border border-slate-200/90 shadow-2xs bg-white hover:border-slate-300 transition-all">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
+              Total Products
+            </CardTitle>
+            <div className="w-8 h-8 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center">
+              <Package className="h-4 w-4" />
             </div>
-            <div>
-              <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold bg-gradient-to-r from-gray-900 to-gray-600 bg-clip-text text-transparent">
-                Inventory Management
-              </h1>
-              <p className="text-gray-600 mt-1 text-xs sm:text-sm">
-                Monitor your stock levels, manage products, and track inventory
-                performance
-              </p>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-slate-900 tracking-tight">
+              {overview?.metrics.total_products || 0}
             </div>
-          </div>
-        </div>
+            <p className="text-xs text-blue-600 font-medium mt-1">
+              {overview?.metrics.active_products || 0} Active Products
+            </p>
+          </CardContent>
+        </Card>
 
-        {/* Key Metrics */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-6">
-          <Card className="bg-gradient-to-br from-blue-50 to-indigo-100 border-0 shadow-xl hover:shadow-2xl transition-all duration-300 hover:-translate-y-1">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium text-gray-700">
-                Total Products
-              </CardTitle>
-              <div className="w-10 h-10 bg-gradient-to-r from-blue-500 to-indigo-500 rounded-full flex items-center justify-center">
-                <Package className="h-5 w-5 text-white" />
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl sm:text-3xl font-bold text-gray-900">
-                {overview?.metrics.total_products}
-              </div>
-              <p className="text-xs text-blue-600 font-medium mt-1">
-                {overview?.metrics.active_products} Active Products
-              </p>
-            </CardContent>
-          </Card>
+        <Card className="rounded-2xl border border-slate-200/90 shadow-2xs bg-white hover:border-slate-300 transition-all">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
+              Total Value
+            </CardTitle>
+            <div className="w-8 h-8 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
+              <DollarSign className="h-4 w-4" />
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-slate-900 tracking-tight">
+              ${(overview?.metrics.total_inventory_value || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            </div>
+            <p className="text-xs text-emerald-600 font-medium mt-1">
+              Current Inventory Value
+            </p>
+          </CardContent>
+        </Card>
 
-          <Card className="bg-gradient-to-br from-emerald-50 to-teal-100 border-0 shadow-xl hover:shadow-2xl transition-all duration-300 hover:-translate-y-1">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium text-gray-700">
-                Total Value
-              </CardTitle>
-              <div className="w-10 h-10 bg-gradient-to-r from-emerald-500 to-teal-500 rounded-full flex items-center justify-center">
-                <DollarSign className="h-5 w-5 text-white" />
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl sm:text-3xl font-bold text-gray-900">
-                ${overview?.metrics.total_inventory_value.toLocaleString()}
-              </div>
-              <p className="text-xs text-emerald-600 font-medium mt-1">
-                Current Inventory Value
-              </p>
-            </CardContent>
-          </Card>
+        <Card className="rounded-2xl border border-slate-200/90 shadow-2xs bg-white hover:border-slate-300 transition-all">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
+              Low Stock Items
+            </CardTitle>
+            <div className="w-8 h-8 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center">
+              <AlertTriangle className="h-4 w-4" />
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-slate-900 tracking-tight">
+              {overview?.metrics.low_stock_products || 0}
+            </div>
+            <p className="text-xs text-amber-600 font-medium mt-1">
+              Needs attention
+            </p>
+          </CardContent>
+        </Card>
 
-          <Card className="bg-gradient-to-br from-orange-50 to-amber-100 border-0 shadow-xl hover:shadow-2xl transition-all duration-300 hover:-translate-y-1">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium text-gray-700">
-                Low Stock Items
-              </CardTitle>
-              <div className="w-10 h-10 bg-gradient-to-r from-orange-500 to-amber-500 rounded-full flex items-center justify-center">
-                <AlertTriangle className="h-5 w-5 text-white" />
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl sm:text-3xl font-bold text-gray-900">
-                {overview?.metrics.low_stock_products}
-              </div>
-              <p className="text-xs text-orange-600 font-medium mt-1">
-                Needs attention
-              </p>
-            </CardContent>
-          </Card>
+        <Card className="rounded-2xl border border-slate-200/90 shadow-2xs bg-white hover:border-slate-300 transition-all">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
+              Out of Stock
+            </CardTitle>
+            <div className="w-8 h-8 rounded-xl bg-rose-50 text-rose-600 flex items-center justify-center">
+              <Package className="h-4 w-4" />
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-slate-900 tracking-tight">
+              {overview?.metrics.out_of_stock_products || 0}
+            </div>
+            <p className="text-xs text-rose-600 font-medium mt-1">
+              Zero inventory units
+            </p>
+          </CardContent>
+        </Card>
+      </div>
 
-          <Card className="bg-gradient-to-br from-red-50 to-rose-100 border-0 shadow-xl hover:shadow-2xl transition-all duration-300 hover:-translate-y-1">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium text-gray-700">
-                Out of Stock
-              </CardTitle>
-              <div className="w-10 h-10 bg-gradient-to-r from-red-500 to-rose-500 rounded-full flex items-center justify-center">
-                <Package className="h-5 w-5 text-white" />
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl sm:text-3xl font-bold text-gray-900">
-                {overview?.metrics.out_of_stock_products}
-              </div>
-              <p className="text-xs text-red-600 font-medium mt-1">
-                Immediate action required
-              </p>
-            </CardContent>
-          </Card>
-        </div>
+      {/* Charts Section */}
+      <div>
+        <DashboardCharts />
+      </div>
 
-        {/* Charts Section */}
-        <div className="mt-8">
-          <DashboardCharts />
-        </div>
-
-        {/* Stock Alerts */}
-        <div className="mt-8">
-          <StockAlerts />
-        </div>
+      {/* Stock Alerts */}
+      <div>
+        <StockAlerts />
       </div>
     </div>
   );

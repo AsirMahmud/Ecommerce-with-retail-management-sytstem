@@ -360,86 +360,94 @@ export default function DueSalesPage() {
 
       {/* Analytics Dashboard */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <Card>
+        <Card className="rounded-2xl border border-slate-200/90 shadow-2xs bg-white hover:border-slate-300 transition-all">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Due Amount</CardTitle>
-            <DollarSign className="h-4 w-4 text-muted-foreground" />
+            <CardTitle className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Total Due Amount</CardTitle>
+            <div className="w-8 h-8 rounded-xl bg-rose-50 text-rose-600 flex items-center justify-center">
+              <DollarSign className="h-4 w-4" />
+            </div>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-red-600">
+            <div className="text-2xl font-bold text-slate-900 tracking-tight">
               {formatCurrency(analytics.totalDue)}
             </div>
-            <p className="text-xs text-muted-foreground">
-              Across {analytics.totalSales} sales
+            <p className="text-xs text-rose-600 font-medium mt-1">
+              Across {analytics.totalSales} pending sales
             </p>
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="rounded-2xl border border-slate-200/90 shadow-2xs bg-white hover:border-slate-300 transition-all">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Due Sales Count</CardTitle>
-            <Clock className="h-4 w-4 text-muted-foreground" />
+            <CardTitle className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Due Sales Count</CardTitle>
+            <div className="w-8 h-8 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center">
+              <Clock className="h-4 w-4" />
+            </div>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{analytics.totalSales}</div>
-            <p className="text-xs text-muted-foreground">
+            <div className="text-2xl font-bold text-slate-900 tracking-tight">{analytics.totalSales}</div>
+            <p className="text-xs text-slate-500 font-medium mt-1">
               Outstanding transactions
             </p>
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="rounded-2xl border border-slate-200/90 shadow-2xs bg-white hover:border-slate-300 transition-all">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Customers with Due</CardTitle>
-            <Users className="h-4 w-4 text-muted-foreground" />
+            <CardTitle className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Customers with Due</CardTitle>
+            <div className="w-8 h-8 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center">
+              <Users className="h-4 w-4" />
+            </div>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{analytics.uniqueCustomers}</div>
-            <p className="text-xs text-muted-foreground">
-              Unique customers
+            <div className="text-2xl font-bold text-slate-900 tracking-tight">{analytics.uniqueCustomers}</div>
+            <p className="text-xs text-slate-500 font-medium mt-1">
+              Unique customer accounts
             </p>
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="rounded-2xl border border-slate-200/90 shadow-2xs bg-white hover:border-slate-300 transition-all">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Average Due</CardTitle>
-            <TrendingUp className="h-4 w-4 text-muted-foreground" />
+            <CardTitle className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Average Due</CardTitle>
+            <div className="w-8 h-8 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center">
+              <TrendingUp className="h-4 w-4" />
+            </div>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">
+            <div className="text-2xl font-bold text-slate-900 tracking-tight">
               {formatCurrency(analytics.totalSales > 0 ? analytics.totalDue / analytics.totalSales : 0)}
             </div>
-            <p className="text-xs text-muted-foreground">
-              Per transaction
+            <p className="text-xs text-slate-500 font-medium mt-1">
+              Per outstanding transaction
             </p>
           </CardContent>
         </Card>
       </div>
 
       {/* Filters and Search */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Search & Filters</CardTitle>
+      <Card className="rounded-2xl border border-slate-200/90 shadow-2xs bg-white overflow-hidden">
+        <CardHeader className="bg-slate-50/60 border-b border-slate-100 p-5">
+          <CardTitle className="text-base font-semibold text-slate-900">Search & Filters</CardTitle>
         </CardHeader>
-        <CardContent>
+        <CardContent className="p-5">
           <div className="grid gap-4 md:grid-cols-4">
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Search</label>
+            <div className="space-y-1.5">
+              <label className="text-xs font-medium text-slate-600">Search</label>
               <div className="relative">
-                <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+                <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-slate-400" />
                 <Input
-                  placeholder="Search by invoice, customer..."
+                  placeholder="Search invoice, customer..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-8"
+                  className="pl-8 bg-slate-50/50 border-slate-200 rounded-xl text-sm"
                 />
               </div>
             </div>
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Time Period</label>
+            <div className="space-y-1.5">
+              <label className="text-xs font-medium text-slate-600">Time Period</label>
               <Select value={timeFilter} onValueChange={setTimeFilter}>
-                <SelectTrigger>
+                <SelectTrigger className="bg-slate-50/50 border-slate-200 rounded-xl text-sm">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -450,14 +458,14 @@ export default function DueSalesPage() {
                 </SelectContent>
               </Select>
             </div>
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Customer</label>
-                             <Select value={selectedCustomer} onValueChange={setSelectedCustomer}>
-                 <SelectTrigger>
-                   <SelectValue placeholder="All Customers" />
-                 </SelectTrigger>
-                 <SelectContent>
-                   <SelectItem value="all">All Customers</SelectItem>
+            <div className="space-y-1.5">
+              <label className="text-xs font-medium text-slate-600">Customer</label>
+              <Select value={selectedCustomer} onValueChange={setSelectedCustomer}>
+                <SelectTrigger className="bg-slate-50/50 border-slate-200 rounded-xl text-sm">
+                  <SelectValue placeholder="All Customers" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Customers</SelectItem>
                   {customerGroups.map((group: any) => (
                     <SelectItem 
                       key={group.customer?.id || 'unknown'} 
@@ -469,16 +477,16 @@ export default function DueSalesPage() {
                 </SelectContent>
               </Select>
             </div>
-            <div className="space-y-2">
-              <label className="text-sm font-medium">&nbsp;</label>
+            <div className="space-y-1.5">
+              <label className="text-xs font-medium text-slate-600">&nbsp;</label>
               <Button 
                 variant="outline" 
-                                 onClick={() => {
-                   setSearchTerm("");
-                   setTimeFilter("all");
-                   setSelectedCustomer("all");
-                 }}
-                className="w-full"
+                onClick={() => {
+                  setSearchTerm("");
+                  setTimeFilter("all");
+                  setSelectedCustomer("all");
+                }}
+                className="w-full rounded-xl border-slate-200 hover:bg-slate-50 text-slate-700"
               >
                 Clear Filters
               </Button>
@@ -489,44 +497,44 @@ export default function DueSalesPage() {
 
       {/* Analytics Charts */}
       <Tabs defaultValue="monthly" className="space-y-4">
-        <TabsList>
-          <TabsTrigger value="monthly">Monthly Trends</TabsTrigger>
-          <TabsTrigger value="aging">Aging Analysis</TabsTrigger>
+        <TabsList className="bg-slate-100/80 p-1 rounded-xl border border-slate-200/80">
+          <TabsTrigger value="monthly" className="rounded-lg data-[state=active]:bg-white data-[state=active]:shadow-2xs text-xs font-medium">Monthly Trends</TabsTrigger>
+          <TabsTrigger value="aging" className="rounded-lg data-[state=active]:bg-white data-[state=active]:shadow-2xs text-xs font-medium">Aging Analysis</TabsTrigger>
         </TabsList>
         
         <TabsContent value="monthly" className="space-y-4">
           <div className="grid gap-6 md:grid-cols-2">
-            <Card>
-              <CardHeader>
-                <CardTitle>Monthly Due Amount</CardTitle>
-                <CardDescription>Outstanding amounts by month</CardDescription>
+            <Card className="rounded-2xl border border-slate-200/90 shadow-2xs bg-white overflow-hidden">
+              <CardHeader className="bg-slate-50/60 border-b border-slate-100 p-5">
+                <CardTitle className="text-base font-semibold text-slate-900">Monthly Due Amount</CardTitle>
+                <CardDescription className="text-xs text-slate-500">Outstanding amounts by month</CardDescription>
               </CardHeader>
-              <CardContent>
+              <CardContent className="p-5">
                 <ResponsiveContainer width="100%" height={300}>
                   <BarChart data={analytics.monthlyData}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="month" />
-                    <YAxis tickFormatter={(value) => formatCurrency(value)} />
+                    <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+                    <XAxis dataKey="month" stroke="#94a3b8" fontSize={12} />
+                    <YAxis tickFormatter={(value) => formatCurrency(value)} stroke="#94a3b8" fontSize={12} />
                     <Tooltip formatter={(value) => formatCurrency(Number(value))} />
-                    <Bar dataKey="amount" fill="#ef4444" />
+                    <Bar dataKey="amount" fill="#ef4444" radius={[6, 6, 0, 0]} />
                   </BarChart>
                 </ResponsiveContainer>
               </CardContent>
             </Card>
 
-            <Card>
-              <CardHeader>
-                <CardTitle>Monthly Due Count</CardTitle>
-                <CardDescription>Number of due sales by month</CardDescription>
+            <Card className="rounded-2xl border border-slate-200/90 shadow-2xs bg-white overflow-hidden">
+              <CardHeader className="bg-slate-50/60 border-b border-slate-100 p-5">
+                <CardTitle className="text-base font-semibold text-slate-900">Monthly Due Count</CardTitle>
+                <CardDescription className="text-xs text-slate-500">Number of due sales by month</CardDescription>
               </CardHeader>
-              <CardContent>
+              <CardContent className="p-5">
                 <ResponsiveContainer width="100%" height={300}>
                   <LineChart data={analytics.monthlyData}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="month" />
-                    <YAxis />
+                    <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+                    <XAxis dataKey="month" stroke="#94a3b8" fontSize={12} />
+                    <YAxis stroke="#94a3b8" fontSize={12} />
                     <Tooltip />
-                    <Line type="monotone" dataKey="count" stroke="#0088FE" strokeWidth={2} />
+                    <Line type="monotone" dataKey="count" stroke="#2563eb" strokeWidth={2.5} dot={{ r: 4 }} />
                   </LineChart>
                 </ResponsiveContainer>
               </CardContent>
@@ -536,12 +544,12 @@ export default function DueSalesPage() {
 
         <TabsContent value="aging" className="space-y-4">
           <div className="grid gap-6 md:grid-cols-2">
-            <Card>
-              <CardHeader>
-                <CardTitle>Due Age Distribution</CardTitle>
-                <CardDescription>Sales count by age groups</CardDescription>
+            <Card className="rounded-2xl border border-slate-200/90 shadow-2xs bg-white overflow-hidden">
+              <CardHeader className="bg-slate-50/60 border-b border-slate-100 p-5">
+                <CardTitle className="text-base font-semibold text-slate-900">Due Age Distribution</CardTitle>
+                <CardDescription className="text-xs text-slate-500">Sales count by age groups</CardDescription>
               </CardHeader>
-              <CardContent>
+              <CardContent className="p-5">
                 <ResponsiveContainer width="100%" height={300}>
                   <PieChart>
                     <Pie
@@ -564,19 +572,19 @@ export default function DueSalesPage() {
               </CardContent>
             </Card>
 
-            <Card>
-              <CardHeader>
-                <CardTitle>Due Amount by Age</CardTitle>
-                <CardDescription>Outstanding amounts by age groups</CardDescription>
+            <Card className="rounded-2xl border border-slate-200/90 shadow-2xs bg-white overflow-hidden">
+              <CardHeader className="bg-slate-50/60 border-b border-slate-100 p-5">
+                <CardTitle className="text-base font-semibold text-slate-900">Due Amount by Age</CardTitle>
+                <CardDescription className="text-xs text-slate-500">Outstanding amounts by age groups</CardDescription>
               </CardHeader>
-              <CardContent>
+              <CardContent className="p-5">
                 <ResponsiveContainer width="100%" height={300}>
                   <BarChart data={analytics.ageAnalysis} layout="horizontal">
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis type="number" tickFormatter={(value) => formatCurrency(value)} />
-                    <YAxis dataKey="name" type="category" width={80} />
+                    <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+                    <XAxis type="number" tickFormatter={(value) => formatCurrency(value)} stroke="#94a3b8" fontSize={12} />
+                    <YAxis dataKey="name" type="category" width={80} stroke="#94a3b8" fontSize={12} />
                     <Tooltip formatter={(value) => formatCurrency(Number(value))} />
-                    <Bar dataKey="amount" fill="#f59e0b" />
+                    <Bar dataKey="amount" fill="#f59e0b" radius={[0, 6, 6, 0]} />
                   </BarChart>
                 </ResponsiveContainer>
               </CardContent>
@@ -586,19 +594,19 @@ export default function DueSalesPage() {
       </Tabs>
 
       {/* Customer Cards */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Due Sales by Customer</CardTitle>
-          <CardDescription>
+      <Card className="rounded-2xl border border-slate-200/90 shadow-2xs bg-white overflow-hidden">
+        <CardHeader className="bg-slate-50/60 border-b border-slate-100 p-5">
+          <CardTitle className="text-base font-semibold text-slate-900">Due Sales by Customer</CardTitle>
+          <CardDescription className="text-xs text-slate-500">
             {customerGroups.length} customers with outstanding payments
           </CardDescription>
         </CardHeader>
-        <CardContent>
+        <CardContent className="p-5">
           {customerGroups.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-12 text-center">
-              <AlertCircle className="h-12 w-12 text-muted-foreground mb-4" />
-              <h3 className="text-lg font-semibold mb-2">No Due Sales Found</h3>
-              <p className="text-muted-foreground">
+              <AlertCircle className="h-12 w-12 text-slate-400 mb-4" />
+              <h3 className="text-base font-semibold text-slate-800 mb-1">No Due Sales Found</h3>
+              <p className="text-sm text-slate-500">
                 {searchTerm || selectedCustomer || timeFilter !== "all" 
                   ? "Try adjusting your filters to see more results."
                   : "All sales are paid up! Great job."}
@@ -607,98 +615,98 @@ export default function DueSalesPage() {
           ) : (
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
               {customerGroups.map((group: any) => (
-                <Card key={group.customer?.id || 'unknown'} className="border-l-4 border-l-red-500">
-                  <CardHeader className="pb-3">
-                    <div className="flex items-start justify-between">
+                <Card key={group.customer?.id || 'unknown'} className="rounded-2xl border border-slate-200/90 shadow-2xs hover:border-slate-300 transition-all bg-white overflow-hidden">
+                  <CardHeader className="bg-slate-50/40 border-b border-slate-100 p-4">
+                    <div className="flex items-start justify-between gap-2">
                       <div className="space-y-1">
-                        <CardTitle className="text-lg">{group.customerName}</CardTitle>
+                        <CardTitle className="text-base font-semibold text-slate-900">{group.customerName}</CardTitle>
                         {group.customerPhone && (
-                          <div className="flex items-center text-sm text-muted-foreground">
-                            <Phone className="h-3 w-3 mr-1" />
+                          <div className="flex items-center text-xs text-slate-500">
+                            <Phone className="h-3 w-3 mr-1 text-slate-400" />
                             {group.customerPhone}
                           </div>
                         )}
                         {group.customer?.email && (
-                          <div className="flex items-center text-sm text-muted-foreground">
-                            <Mail className="h-3 w-3 mr-1" />
+                          <div className="flex items-center text-xs text-slate-500">
+                            <Mail className="h-3 w-3 mr-1 text-slate-400" />
                             {group.customer.email}
                           </div>
                         )}
                       </div>
-                      <Badge variant="destructive">
+                      <Badge variant="outline" className="bg-rose-50 text-rose-700 border-rose-200/60 font-semibold text-xs px-2.5 py-0.5">
                         {formatCurrency(group.totalDue)}
                       </Badge>
                     </div>
                   </CardHeader>
-                  <CardContent className="space-y-3">
-                    <div className="text-sm">
+                  <CardContent className="p-4 space-y-3">
+                    <div className="text-xs space-y-1.5 text-slate-600">
                       <div className="flex justify-between">
-                        <span className="text-muted-foreground">Sales Count:</span>
-                        <span className="font-medium">{group.sales.length}</span>
+                        <span className="text-slate-500">Sales Count:</span>
+                        <span className="font-semibold text-slate-800">{group.sales.length}</span>
                       </div>
                       <div className="flex justify-between">
-                        <span className="text-muted-foreground">Oldest Due:</span>
-                         <span className="font-medium">
-                           {formatDate((group.oldestSale.date ?? group.oldestSale.created_at) || new Date().toISOString())}
-                         </span>
+                        <span className="text-slate-500">Oldest Due:</span>
+                        <span className="font-semibold text-slate-800">
+                          {formatDate((group.oldestSale.date ?? group.oldestSale.created_at) || new Date().toISOString())}
+                        </span>
                       </div>
                     </div>
                     
-                                         {/* Due Sales List */}
-                     <div className="space-y-2">
-                       <h4 className="text-sm font-medium">Due Sales ({group.sales.length}):</h4>
-                       <div className="space-y-1 max-h-32 overflow-y-auto">
-                         {group.sales.map((sale: Sale) => (
-                           <div key={sale.id} className="flex justify-between items-center text-xs bg-muted rounded p-2">
-                             <div className="flex-1">
-                               <div className="font-medium">{sale.invoice_number}</div>
-                               <div className="text-muted-foreground">
-                                  {formatDate((sale.date ?? sale.created_at) || new Date().toISOString())}
-                               </div>
-                             </div>
-                             <div className="text-right">
-                               <div className="font-medium">{formatCurrency(parseFloat(sale.amount_due?.toString() || '0') || 0)}</div>
-                               <Badge variant="outline" className="text-xs">
-                                 {sale.status}
-                               </Badge>
-                             </div>
-                           </div>
-                         ))}
-                       </div>
-                     </div>
+                    {/* Due Sales List */}
+                    <div className="space-y-1.5 pt-1 border-t border-slate-100">
+                      <h4 className="text-xs font-semibold text-slate-700">Due Sales ({group.sales.length}):</h4>
+                      <div className="space-y-1.5 max-h-32 overflow-y-auto pr-1">
+                        {group.sales.map((sale: Sale) => (
+                          <div key={sale.id} className="flex justify-between items-center text-xs bg-slate-50/70 border border-slate-100 rounded-lg p-2">
+                            <div className="flex-1 min-w-0 pr-2">
+                              <div className="font-medium text-slate-800 truncate">{sale.invoice_number}</div>
+                              <div className="text-[11px] text-slate-400">
+                                {formatDate((sale.date ?? sale.created_at) || new Date().toISOString())}
+                              </div>
+                            </div>
+                            <div className="text-right shrink-0">
+                              <div className="font-semibold text-slate-900">{formatCurrency(parseFloat(sale.amount_due?.toString() || '0') || 0)}</div>
+                              <Badge variant="outline" className="text-[10px] px-1.5 py-0 bg-white text-slate-600 border-slate-200">
+                                {sale.status}
+                              </Badge>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
 
-                                         {/* Action Buttons */}
-                     <div className="flex gap-2 pt-2">
-                       {group.sales.length === 1 ? (
-                         <Button 
-                           size="sm" 
-                           className="flex-1"
-                           onClick={() => setSelectedSale(group.sales[0])}
-                         >
-                           <CreditCard className="h-3 w-3 mr-1" />
-                           Pay Now
-                         </Button>
-                       ) : (
-                         <Button 
-                           size="sm" 
-                           className="flex-1"
-                           onClick={() => handleSelectCustomerSales(group)}
-                         >
-                           <CreditCard className="h-3 w-3 mr-1" />
-                           Select & Pay ({group.sales.length})
-                         </Button>
-                       )}
-                       <Button 
-                         size="sm" 
-                         variant="outline"
-                         onClick={() => {
-                           // Navigate to customer details
-                           window.open(`/customers/${group.customer?.id}`, '_blank');
-                         }}
-                       >
-                         View Details
-                       </Button>
-                     </div>
+                    {/* Action Buttons */}
+                    <div className="flex gap-2 pt-2">
+                      {group.sales.length === 1 ? (
+                        <Button 
+                          size="sm" 
+                          className="flex-1 bg-blue-600 hover:bg-blue-700 text-white rounded-xl shadow-2xs font-medium text-xs h-8"
+                          onClick={() => setSelectedSale(group.sales[0])}
+                        >
+                          <CreditCard className="h-3.5 w-3.5 mr-1" />
+                          Pay Now
+                        </Button>
+                      ) : (
+                        <Button 
+                          size="sm" 
+                          className="flex-1 bg-blue-600 hover:bg-blue-700 text-white rounded-xl shadow-2xs font-medium text-xs h-8"
+                          onClick={() => handleSelectCustomerSales(group)}
+                        >
+                          <CreditCard className="h-3.5 w-3.5 mr-1" />
+                          Select & Pay ({group.sales.length})
+                        </Button>
+                      )}
+                      <Button 
+                        size="sm" 
+                        variant="outline"
+                        className="rounded-xl border-slate-200 text-slate-700 hover:bg-slate-50 text-xs h-8"
+                        onClick={() => {
+                          window.open(`/customers/${group.customer?.id}`, '_blank');
+                        }}
+                      >
+                        View Details
+                      </Button>
+                    </div>
                   </CardContent>
                 </Card>
               ))}

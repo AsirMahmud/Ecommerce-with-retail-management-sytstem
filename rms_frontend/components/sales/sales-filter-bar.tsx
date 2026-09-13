@@ -15,7 +15,7 @@ import { DatePickerWithRange } from "@/components/ui/date-range-picker";
 import { addDays } from "date-fns";
 
 interface SalesFilterBarProps {
-  onFilterChange: (filters: {
+  onFilterChange?: (filters: {
     start_date?: string;
     end_date?: string;
     status?: string;
@@ -37,17 +37,19 @@ export function SalesFilterBar({ onFilterChange }: SalesFilterBarProps) {
   });
 
   useEffect(() => {
-    onFilterChange(filters);
+    if (onFilterChange) {
+      onFilterChange(filters);
+    }
   }, [filters, onFilterChange]);
 
   const handleDateRangeChange = (
-    range: { from: Date; to: Date } | undefined
+    range: { from?: Date; to?: Date } | undefined
   ) => {
-    if (range) {
+    if (range && range.from) {
       setFilters((prev) => ({
         ...prev,
-        start_date: range.from.toISOString(),
-        end_date: range.to.toISOString(),
+        start_date: range.from ? range.from.toISOString() : "",
+        end_date: range.to ? range.to.toISOString() : "",
       }));
     } else {
       setFilters((prev) => ({

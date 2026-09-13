@@ -229,11 +229,16 @@ export function PromotionalModalManager() {
 
     return (
         <div className="space-y-6">
-            <div className="flex justify-between items-center">
-                <div>
-                    <h2 className="text-xl font-bold">Promotional Modals</h2>
-                    <p className="text-muted-foreground">
-                        Manage popup modals for special offers and announcements.
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div className="space-y-1">
+                    <div className="flex items-center gap-2">
+                        <div className="w-9 h-9 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center border border-blue-100">
+                            <ImageIcon className="h-5 w-5" />
+                        </div>
+                        <h1 className="text-2xl font-bold tracking-tight text-slate-900">Promotional Modals</h1>
+                    </div>
+                    <p className="text-sm text-slate-500">
+                        Manage interactive storefront popups for flash sales, newsletters, and announcements.
                     </p>
                 </div>
                 <Dialog
@@ -244,8 +249,8 @@ export function PromotionalModalManager() {
                     }}
                 >
                     <DialogTrigger asChild>
-                        <Button>
-                            <Plus className="mr-2 h-4 w-4" /> Create Modal
+                        <Button className="bg-blue-600 hover:bg-blue-700 text-white rounded-xl shadow-xs">
+                            <Plus className="mr-2 h-4 w-4" /> Create Popup Modal
                         </Button>
                     </DialogTrigger>
                     <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
@@ -535,61 +540,64 @@ export function PromotionalModalManager() {
                     <Loader2 className="animate-spin h-8 w-8 text-primary" />
                 </div>
             ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
                     {modals.map((modal) => (
-                        <Card key={modal.id} className="relative overflow-hidden group">
-                            {modal.image_url && (
-                                <div className="relative h-32 w-full">
-                                    <Image
-                                        src={modal.image_url}
-                                        alt={modal.title}
-                                        fill
-                                        className="object-cover"
-                                    />
-                                    <div className="absolute inset-0 bg-black/40" />
-                                </div>
-                            )}
-                            <CardHeader className={cn(modal.image_url ? "" : "pt-6")}>
-                                <CardTitle className="flex justify-between items-start">
-                                    <span className="line-clamp-1">{modal.title}</span>
-                                    <span
-                                        className={cn(
-                                            "text-xs px-2 py-1 rounded-full border",
-                                            modal.is_active
-                                                ? "bg-green-100 text-green-700 border-green-200"
-                                                : "bg-gray-100 text-gray-700 border-gray-200"
-                                        )}
-                                    >
-                                        {modal.is_active ? "Active" : "Inactive"}
-                                    </span>
-                                </CardTitle>
-                                <CardDescription className="line-clamp-2">
-                                    {modal.description}
-                                </CardDescription>
-                            </CardHeader>
-                            <CardContent>
-                                <div className="text-sm space-y-1">
-                                    <p>
-                                        <strong>Rules:</strong> {modal.display_rules.trigger}{" "}
-                                        {modal.display_rules.trigger === "timer" &&
-                                            `(${modal.display_rules.delay_seconds}s)`}
-                                    </p>
-                                    <p>
-                                        <strong>Layout:</strong> {modal.layout}
-                                    </p>
-                                    <p className="text-muted-foreground text-xs">
-                                        {format(new Date(modal.start_date), "MMM d")} -{" "}
-                                        {format(new Date(modal.end_date), "MMM d, yyyy")}
-                                    </p>
-                                </div>
-                            </CardContent>
-                            <CardFooter className="flex justify-end gap-2">
-                                <Button size="sm" variant="outline" onClick={() => handleEdit(modal)}>
-                                    <Edit className="h-4 w-4 mr-2" /> Edit
+                        <Card key={modal.id} className="relative overflow-hidden group rounded-2xl border border-slate-200/90 shadow-2xs bg-white hover:border-slate-300 transition-all flex flex-col justify-between">
+                            <div>
+                                {modal.image_url && (
+                                    <div className="relative h-36 w-full bg-slate-100 border-b border-slate-100 overflow-hidden">
+                                        <Image
+                                            src={modal.image_url}
+                                            alt={modal.title}
+                                            fill
+                                            className="object-cover group-hover:scale-105 transition-transform duration-300"
+                                        />
+                                        <div className="absolute inset-0 bg-slate-900/20" />
+                                    </div>
+                                )}
+                                <CardHeader className={cn(modal.image_url ? "p-5" : "p-5")}>
+                                    <CardTitle className="flex justify-between items-start gap-2">
+                                        <span className="line-clamp-1 text-base font-semibold text-slate-900">{modal.title}</span>
+                                        <span
+                                            className={cn(
+                                                "text-xs px-2.5 py-0.5 rounded-full border font-medium",
+                                                modal.is_active
+                                                    ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                                                    : "bg-slate-100 text-slate-600 border-slate-200"
+                                            )}
+                                        >
+                                            {modal.is_active ? "Active" : "Inactive"}
+                                        </span>
+                                    </CardTitle>
+                                    <CardDescription className="line-clamp-2 text-xs text-slate-500 mt-1">
+                                        {modal.description}
+                                    </CardDescription>
+                                </CardHeader>
+                                <CardContent className="px-5 pb-4 pt-0">
+                                    <div className="text-xs space-y-1.5 text-slate-600 bg-slate-50/70 p-3 rounded-xl border border-slate-100">
+                                        <p>
+                                            <strong className="font-semibold text-slate-800">Trigger:</strong> {modal.display_rules.trigger}{" "}
+                                            {modal.display_rules.trigger === "timer" &&
+                                                `(${modal.display_rules.delay_seconds}s delay)`}
+                                        </p>
+                                        <p>
+                                            <strong className="font-semibold text-slate-800">Layout:</strong> {modal.layout}
+                                        </p>
+                                        <p className="text-slate-400 text-[11px] pt-1 border-t border-slate-200/60">
+                                            {format(new Date(modal.start_date), "MMM d")} –{" "}
+                                            {format(new Date(modal.end_date), "MMM d, yyyy")}
+                                        </p>
+                                    </div>
+                                </CardContent>
+                            </div>
+                            <CardFooter className="flex justify-end gap-2 p-4 border-t border-slate-100 bg-slate-50/40">
+                                <Button size="sm" variant="outline" onClick={() => handleEdit(modal)} className="rounded-xl border-slate-200 text-xs">
+                                    <Edit className="h-3.5 w-3.5 mr-1.5" /> Edit
                                 </Button>
                                 <Button
                                     size="sm"
-                                    variant="destructive"
+                                    variant="ghost"
+                                    className="text-rose-600 hover:bg-rose-50 hover:text-rose-700 rounded-xl h-8 w-8 p-0"
                                     onClick={() => handleDelete(modal.id)}
                                 >
                                     <Trash2 className="h-4 w-4" />
@@ -598,8 +606,10 @@ export function PromotionalModalManager() {
                         </Card>
                     ))}
                     {modals.length === 0 && (
-                        <div className="col-span-full py-12 text-center text-muted-foreground bg-muted/30 rounded-lg border border-dashed">
-                            <p>No promotional modals found. Create one to get started.</p>
+                        <div className="col-span-full py-16 text-center text-slate-500 bg-white rounded-2xl border border-dashed border-slate-200 shadow-2xs">
+                            <ImageIcon className="h-10 w-10 text-slate-300 mx-auto mb-3" />
+                            <p className="font-medium text-slate-700">No promotional modals configured</p>
+                            <p className="text-xs text-slate-400 mt-1">Create an interactive popup modal for announcements or flash sales.</p>
                         </div>
                     )}
                 </div>

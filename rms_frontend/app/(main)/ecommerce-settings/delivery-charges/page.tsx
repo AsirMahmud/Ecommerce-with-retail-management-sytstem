@@ -103,97 +103,160 @@ export default function DeliveryChargesSettingsPage() {
 
   if (loading) {
     return (
-      <div className="p-6">
-        <div className="flex items-center justify-center min-h-[400px]">
-          <p className="text-muted-foreground">Loading delivery settings...</p>
+      <div className="space-y-6">
+        <div className="h-8 w-48 bg-slate-200 rounded-lg animate-pulse" />
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {[1, 2, 3].map((i) => (
+            <div key={i} className="h-28 rounded-2xl bg-white border border-slate-200/90 shadow-2xs p-5 animate-pulse" />
+          ))}
         </div>
+        <div className="h-72 rounded-2xl bg-white border border-slate-200/90 shadow-2xs animate-pulse" />
       </div>
     );
   }
 
   return (
-    <div className="p-6 space-y-6">
-      <div className="flex items-center gap-2">
-        <Truck className="h-6 w-6" />
-        <h1 className="text-3xl font-bold tracking-tight">Delivery Charges</h1>
+    <div className="space-y-6">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div className="space-y-1">
+          <div className="flex items-center gap-2">
+            <div className="w-9 h-9 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center border border-blue-100">
+              <Truck className="h-5 w-5" />
+            </div>
+            <h1 className="text-2xl font-bold tracking-tight text-slate-900">Delivery Charges</h1>
+          </div>
+          <p className="text-sm text-slate-500">
+            Configure regional shipping rates applied across online pre-orders and storefront checkout.
+          </p>
+        </div>
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Configure Delivery Charges</CardTitle>
-          <CardDescription>
-            Set the delivery charges for inside Dhaka, inside Gazipur, and outside Dhaka. These charges will be applied during checkout.
+      {/* Summary Cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <div className="bg-white rounded-2xl border border-slate-200/90 shadow-2xs p-5 transition-all hover:border-slate-300">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Inside Dhaka</span>
+            <div className="w-8 h-8 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center">
+              <Truck className="w-4 h-4" />
+            </div>
+          </div>
+          <p className="text-2xl font-bold text-slate-900 tracking-tight">
+            ${parseFloat(inside || "0").toFixed(2)}
+          </p>
+          <span className="text-xs text-slate-500 mt-1 block">Dhaka Metropolitan Area</span>
+        </div>
+
+        <div className="bg-white rounded-2xl border border-slate-200/90 shadow-2xs p-5 transition-all hover:border-slate-300">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Inside Gazipur</span>
+            <div className="w-8 h-8 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
+              <Truck className="w-4 h-4" />
+            </div>
+          </div>
+          <p className="text-2xl font-bold text-slate-900 tracking-tight">
+            ${parseFloat(gazipur || "0").toFixed(2)}
+          </p>
+          <span className="text-xs text-slate-500 mt-1 block">Gazipur District & Suburbs</span>
+        </div>
+
+        <div className="bg-white rounded-2xl border border-slate-200/90 shadow-2xs p-5 transition-all hover:border-slate-300">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Outside Dhaka</span>
+            <div className="w-8 h-8 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center">
+              <Truck className="w-4 h-4" />
+            </div>
+          </div>
+          <p className="text-2xl font-bold text-slate-900 tracking-tight">
+            ${parseFloat(outside || "0").toFixed(2)}
+          </p>
+          <span className="text-xs text-slate-500 mt-1 block">All Other Districts Nationwide</span>
+        </div>
+      </div>
+
+      <Card className="rounded-2xl border border-slate-200/90 shadow-2xs bg-white overflow-hidden">
+        <CardHeader className="bg-slate-50/60 border-b border-slate-100 p-5">
+          <CardTitle className="text-base font-semibold text-slate-900">Configure Shipping Rates</CardTitle>
+          <CardDescription className="text-xs text-slate-500">
+            Set the standardized delivery fee in USD ($) for each shipping zone.
           </CardDescription>
         </CardHeader>
-        <CardContent className="space-y-6">
-          <div className="grid gap-6 md:grid-cols-3 max-w-4xl">
+        <CardContent className="p-6 space-y-6">
+          <div className="grid gap-6 md:grid-cols-3">
             <div className="space-y-2">
-              <Label htmlFor="inside" className="text-base font-semibold">
-                Inside Dhaka Charge (৳)
+              <Label htmlFor="inside" className="text-sm font-semibold text-slate-700">
+                Inside Dhaka Fee ($ USD)
               </Label>
-              <Input
-                id="inside"
-                type="number"
-                min="0"
-                step="0.01"
-                value={inside}
-                onChange={(e) => setInside(e.target.value)}
-                placeholder="Enter delivery charge"
-                className="text-base"
-              />
-              <p className="text-sm text-muted-foreground">
-                Delivery charge for orders within Dhaka city
+              <div className="relative">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-medium text-sm">$</span>
+                <Input
+                  id="inside"
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={inside}
+                  onChange={(e) => setInside(e.target.value)}
+                  placeholder="0.00"
+                  className="pl-7 bg-white rounded-xl border-slate-200 focus:border-blue-500 focus:ring-blue-500/20"
+                />
+              </div>
+              <p className="text-xs text-slate-500">
+                Applicable to local deliveries within Dhaka city limits.
               </p>
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="gazipur" className="text-base font-semibold">
-                Inside Gazipur Charge (৳)
+              <Label htmlFor="gazipur" className="text-sm font-semibold text-slate-700">
+                Inside Gazipur Fee ($ USD)
               </Label>
-              <Input
-                id="gazipur"
-                type="number"
-                min="0"
-                step="0.01"
-                value={gazipur}
-                onChange={(e) => setGazipur(e.target.value)}
-                placeholder="Enter delivery charge"
-                className="text-base"
-              />
-              <p className="text-sm text-muted-foreground">
-                Delivery charge for orders within Gazipur
+              <div className="relative">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-medium text-sm">$</span>
+                <Input
+                  id="gazipur"
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={gazipur}
+                  onChange={(e) => setGazipur(e.target.value)}
+                  placeholder="0.00"
+                  className="pl-7 bg-white rounded-xl border-slate-200 focus:border-blue-500 focus:ring-blue-500/20"
+                />
+              </div>
+              <p className="text-xs text-slate-500">
+                Applicable to Gazipur municipal and peripheral zones.
               </p>
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="outside" className="text-base font-semibold">
-                Outside Dhaka Charge (৳)
+              <Label htmlFor="outside" className="text-sm font-semibold text-slate-700">
+                Outside Dhaka Fee ($ USD)
               </Label>
-              <Input
-                id="outside"
-                type="number"
-                min="0"
-                step="0.01"
-                value={outside}
-                onChange={(e) => setOutside(e.target.value)}
-                placeholder="Enter delivery charge"
-                className="text-base"
-              />
-              <p className="text-sm text-muted-foreground">
-                Delivery charge for orders outside Dhaka city
+              <div className="relative">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-medium text-sm">$</span>
+                <Input
+                  id="outside"
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={outside}
+                  onChange={(e) => setOutside(e.target.value)}
+                  placeholder="0.00"
+                  className="pl-7 bg-white rounded-xl border-slate-200 focus:border-blue-500 focus:ring-blue-500/20"
+                />
+              </div>
+              <p className="text-xs text-slate-500">
+                Applicable to divisional and regional deliveries.
               </p>
             </div>
           </div>
 
-          <div className="flex items-center gap-3 pt-4">
+          <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-100">
             <Button
               onClick={handleSave}
               disabled={saving || loading}
-              size="lg"
-              className="min-w-[120px]"
+              className="bg-blue-600 hover:bg-blue-700 text-white rounded-xl px-5 shadow-xs"
             >
               <Save className="mr-2 h-4 w-4" />
-              {saving ? "Saving..." : "Save Changes"}
+              {saving ? "Saving Changes..." : "Save Delivery Settings"}
             </Button>
           </div>
         </CardContent>

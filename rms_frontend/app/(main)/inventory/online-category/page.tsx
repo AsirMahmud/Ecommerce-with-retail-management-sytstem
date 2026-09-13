@@ -593,8 +593,8 @@ export default function OnlineCategoriesPage() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 p-6">
-        <div className="max-w-7xl mx-auto space-y-6">
+      <div className="space-y-6">
+        <div className="space-y-6">
           <div className="flex items-center justify-between">
             <div className="space-y-2">
               <Skeleton className="h-8 w-48" />
@@ -614,65 +614,56 @@ export default function OnlineCategoriesPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
-      <div className="max-w-7xl mx-auto p-6">
-        <div className="mb-8">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-3">
-              <div className="w-12 h-12 bg-gradient-to-r from-blue-600 to-indigo-600 rounded-xl flex items-center justify-center shadow-lg">
-                <Tag className="h-6 w-6 text-white" />
-              </div>
-              <div>
-                <h1 className="text-4xl font-bold bg-gradient-to-r from-gray-900 to-gray-600 bg-clip-text text-transparent">
-                  Online Categories
-                </h1>
-                <p className="text-gray-600 mt-1">
-                  Create and manage online categories and subcategories
-                </p>
-              </div>
-            </div>
-            <Button
-              onClick={() => setIsAddDialogOpen(true)}
-              className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white shadow-lg hover:shadow-xl transition-all duration-300"
-            >
-              <PlusCircle className="mr-2 h-4 w-4" />
-              Add Online Category
-            </Button>
-          </div>
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight text-slate-900">
+            Online Categories
+          </h1>
+          <p className="text-sm text-slate-500 mt-1">
+            Create and manage online storefront categories, navigation tags, and display ordering
+          </p>
         </div>
+        <Button
+          onClick={() => setIsAddDialogOpen(true)}
+          className="gap-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl shadow-2xs font-medium"
+        >
+          <PlusCircle className="h-4 w-4" />
+          Add Online Category
+        </Button>
+      </div>
 
-        <div className="flex flex-col md:flex-row gap-4 mb-6">
-          <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input
-              placeholder="Search online categories..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-9 bg-white/70 backdrop-blur-sm border-white/20 shadow-lg"
-            />
-          </div>
-        </div>
+      <div className="relative">
+        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-slate-400" />
+        <Input
+          placeholder="Search online categories and subcategories..."
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          className="pl-9 bg-white border-slate-200 rounded-xl shadow-2xs text-sm"
+        />
+      </div>
 
-        <Card className="border-0 bg-white shadow-xl">
-          <CardHeader>
-            <CardTitle className="text-xl">All Online Categories</CardTitle>
-            <CardDescription>
-              Drag and drop to reorder categories. Click the arrow to expand/collapse subcategories.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <DndContext
-              sensors={sensors}
-              collisionDetection={closestCenter}
-              onDragEnd={handleDragEnd}
-            >
-              <div className="space-y-2">
-                <div className="grid grid-cols-4 gap-4 px-4 py-2 text-sm font-semibold text-gray-600 border-b">
-                  <div>Name</div>
-                  <div>Slug</div>
-                  <div>Gender</div>
-                  <div>Subcategories</div>
-                </div>
+      <Card className="rounded-2xl border border-slate-200/90 shadow-2xs bg-white overflow-hidden">
+        <CardHeader className="bg-slate-50/60 border-b border-slate-100 p-5">
+          <CardTitle className="text-base font-semibold text-slate-900">All Online Categories</CardTitle>
+          <CardDescription className="text-xs text-slate-500">
+            Drag and drop to reorder categories. Click the arrow to expand/collapse subcategories.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="p-5">
+          <DndContext
+            sensors={sensors}
+            collisionDetection={closestCenter}
+            onDragEnd={handleDragEnd}
+          >
+            <div className="space-y-2">
+              <div className="grid grid-cols-4 gap-4 px-4 py-2.5 text-xs font-semibold text-slate-600 bg-slate-50/80 rounded-xl border border-slate-100">
+                <div>Name</div>
+                <div>Slug</div>
+                <div>Gender</div>
+                <div>Subcategories</div>
+              </div>
                 <SortableContext
                   items={filteredParentCategories.map((cat) => `parent-${cat.id}`)}
                   strategy={verticalListSortingStrategy}
@@ -1130,7 +1121,6 @@ export default function OnlineCategoriesPage() {
             )}
           </DialogContent>
         </Dialog>
-      </div>
     </div>
   );
 }
