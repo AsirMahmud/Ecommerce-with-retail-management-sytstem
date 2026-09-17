@@ -11,6 +11,8 @@ class OnlinePreorder(models.Model):
         ('DELIVERED', 'Delivered'),
         ('COMPLETED', 'Completed'),
         ('CANCELLED', 'Cancelled'),
+        ('HOLD', 'Hold'),
+        ('RETURNED', 'Returned'),
     ]
 
     customer_name = models.CharField(max_length=200)
@@ -76,6 +78,16 @@ class OnlinePreorder(models.Model):
     courier_status = models.CharField(max_length=100, null=True, blank=True)
     courier_dispatched_at = models.DateTimeField(null=True, blank=True)
     courier_response = models.JSONField(null=True, blank=True)
+
+    # Return & Hold Management fields
+    return_delivery_charge_paid_by_customer = models.BooleanField(default=True, help_text="True if customer paid return delivery fee, False if store bears cost")
+    return_charge_amount = models.DecimalField(max_digits=10, decimal_places=2, default=Decimal('0.00'), help_text="Delivery charge amount counted when store bears return fee")
+    return_reason = models.CharField(max_length=255, blank=True, null=True)
+    return_expense = models.ForeignKey('expenses.Expense', on_delete=models.SET_NULL, null=True, blank=True, related_name='returned_preorders')
+    hold_reason = models.CharField(max_length=255, blank=True, null=True)
+    returned_at = models.DateTimeField(null=True, blank=True)
+    is_stock_restored = models.BooleanField(default=False, help_text="Whether items in this returned or cancelled order have been restocked to inventory")
+    is_stock_deducted = models.BooleanField(default=False, help_text="Whether items in this preorder have had stock deducted from inventory")
 
 
     def __str__(self):

@@ -267,7 +267,7 @@ export default function POSStyleProductGrid({
                                         className="h-8 px-3"
                                         disabled={currentStock === 0 || !selectedSizes[product.id] || !selectedColors[product.id]}
                                         onClick={() => {
-                                            const variation = product.variations.find(v =>
+                                            const variation = product.variations?.find(v =>
                                                 v.size === selectedSizes[product.id] &&
                                                 v.color === selectedColors[product.id]
                                             );

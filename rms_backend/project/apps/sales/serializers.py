@@ -5,6 +5,7 @@ from apps.customer.serializers import CustomerSerializer
 from apps.customer.models import Customer
 from apps.inventory.models import Product, ProductVariation
 from django.core.exceptions import ValidationError
+from django.db.models import Sum
 from decimal import Decimal
 
 class SaleItemSerializer(serializers.ModelSerializer):
@@ -25,13 +26,28 @@ class SaleItemSerializer(serializers.ModelSerializer):
         min_value=Decimal('0.00')
     )
 
+    returned_quantity = serializers.SerializerMethodField()
+    returnable_quantity = serializers.SerializerMethodField()
+
     class Meta:
         model = SaleItem
         fields = [
             'id', 'product', 'product_id', 'size', 'color',
-            'quantity', 'unit_price', 'discount', 'total', 'profit', 'loss', 'created_at'
+            'quantity', 'unit_price', 'discount', 'total', 'profit', 'loss',
+            'returned_quantity', 'returnable_quantity', 'created_at'
         ]
-        read_only_fields = ['total', 'profit', 'loss']
+        read_only_fields = ['total', 'profit', 'loss', 'returned_quantity', 'returnable_quantity']
+
+    def get_returned_quantity(self, obj):
+        from .models import ReturnItem
+        total = ReturnItem.objects.filter(
+            sale_item=obj,
+            return_order__status__in=['completed', 'approved']
+        ).aggregate(total=Sum('quantity'))['total'] or 0
+        return total
+
+    def get_returnable_quantity(self, obj):
+        return max(0, obj.quantity - self.get_returned_quantity(obj))
 
     def validate(self, data):
         if data['quantity'] <= 0:
@@ -121,12 +137,21 @@ class ReturnSerializer(serializers.ModelSerializer):
         read_only_fields = ['return_number', 'created_at', 'updated_at']
 
     def create(self, validated_data):
-        items_data = self.context.get('items', [])
+        items_data = validated_data.pop('items', []) or self.context.get('items', [])
         return_order = Return.objects.create(**validated_data)
         
         for item_data in items_data:
-            item_data['return_order'] = return_order
-            ReturnItem.objects.create(**item_data)
+            sale_item_id = item_data.get('sale_item_id') or item_data.get('sale_item')
+            if isinstance(sale_item_id, SaleItem):
+                sale_item = sale_item_id
+            else:
+                sale_item = SaleItem.objects.get(id=sale_item_id)
+            ReturnItem.objects.create(
+                return_order=return_order,
+                sale_item=sale_item,
+                quantity=item_data.get('quantity', 1),
+                reason=item_data.get('reason', '')
+            )
         
         return return_order
 

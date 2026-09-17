@@ -158,6 +158,12 @@ class PathaoService(BaseCourierService):
         if not (cfg['client_id'] and cfg['client_secret']):
             return None, "Pathao credentials (API token or Client ID & Client Secret) are missing."
 
+        from django.core.cache import cache
+        cache_key = f"pathao_auth_token_{cfg['client_id']}"
+        cached_token = cache.get(cache_key)
+        if cached_token:
+            return cached_token, None
+
         url = f"{cfg['base_url']}/aladdin/api/v1/issue-token"
         payload = {
             "client_id": cfg['client_id'],
@@ -170,10 +176,12 @@ class PathaoService(BaseCourierService):
             payload["password"] = cfg['password']
 
         try:
-            res = requests.post(url, json=payload, headers={'Content-Type': 'application/json'}, timeout=10)
+            res = requests.post(url, json=payload, headers={'Content-Type': 'application/json'}, timeout=15)
             data = res.json()
             token = data.get('access_token')
             if token:
+                expires_in = int(data.get('expires_in', 86400 * 7))
+                cache.set(cache_key, token, timeout=max(expires_in - 300, 3600 * 12))
                 return token, None
             return None, data.get('message') or "Failed to authenticate with Pathao"
         except Exception as e:
@@ -528,6 +536,52 @@ class CourierManager:
         return res
 
     @classmethod
+    def sync_orders_status(cls, order_ids=None):
+        """
+        Synchronizes live delivery status from couriers (Steadfast, Pathao, RedX, Carrybee)
+        for specified order IDs or all active dispatched orders.
+        """
+        from django.db.models import Q
+        if order_ids:
+            orders = OnlinePreorder.objects.filter(id__in=order_ids)
+        else:
+            orders = OnlinePreorder.objects.filter(
+                Q(courier_consignment_id__isnull=False) & ~Q(courier_consignment_id="") |
+                Q(steadfast_consignment_id__isnull=False) & ~Q(steadfast_consignment_id="")
+            ).exclude(status__in=['CANCELLED', 'RETURNED'])[:60]
+
+        synced = []
+        failed = []
+
+        for o in orders:
+            try:
+                res = cls.get_order_status(o)
+                if res.get('success'):
+                    synced.append({
+                        'id': o.id,
+                        'provider': o.courier_partner,
+                        'status': o.courier_status or o.steadfast_status
+                    })
+                else:
+                    failed.append({
+                        'id': o.id,
+                        'message': res.get('message')
+                    })
+            except Exception as e:
+                failed.append({
+                    'id': o.id,
+                    'message': str(e)
+                })
+
+        return {
+            'success': True,
+            'synced_count': len(synced),
+            'failed_count': len(failed),
+            'synced': synced,
+            'failed': failed
+        }
+
+    @classmethod
     def check_fraud(cls, phone: str, provider: str = None, order: OnlinePreorder = None):
         """
         Check customer delivery performance, cancellation rates, and fraud risk
@@ -573,6 +627,7 @@ class CourierManager:
                         'total_cancelled': sf_res.get('total_cancelled', 0),
                         'success_rate': sf_res.get('success_rate', 100.0),
                         'risk_level': sf_res.get('risk_level', 'NORMAL'),
+                        'fraud_reports': sf_res.get('fraud_reports', []),
                         'network_data': sf_res.get('data'),
                         'source': 'STEADFAST_NETWORK'
                     }
@@ -634,31 +689,81 @@ class CourierManager:
 
         success_rate = round((delivered_count / total_parcels * 100), 1) if total_parcels > 0 else 100.0
 
+        # Also get Steadfast network data if available for additional cross-courier verification
+        if provider != 'STEADFAST' and (steadfast_api_active or getattr(settings, 'STEADFAST_API_KEY', '')):
+            try:
+                sf_res = SteadfastService.check_fraud(clean_p)
+                if sf_res.get('success'):
+                    network_data = sf_res
+            except Exception:
+                pass
+
+        has_network = bool(network_data and network_data.get('total_parcels', 0) > 0)
+        net_parcels = network_data.get('total_parcels', 0) if network_data else 0
+        net_success = network_data.get('success_rate', 100.0) if network_data else 100.0
+        fraud_reps = (network_data.get('fraud_reports', []) if network_data else [])
+
+        is_new = (total_parcels == 0 and not has_network)
+
+        if total_parcels > 0:
+            effective_success = success_rate
+        elif has_network:
+            effective_success = net_success
+        else:
+            effective_success = 100.0
+
         if cancelled_count >= 2 or (total_parcels >= 2 and success_rate < 50.0):
             risk_level = 'HIGH_RISK'
-        elif network_data and network_data.get('risk_level') == 'HIGH_RISK':
+        elif len(fraud_reps) > 0 or (network_data and network_data.get('risk_level') == 'HIGH_RISK'):
             risk_level = 'HIGH_RISK'
-        elif delivered_count >= 1 and success_rate >= 80.0:
+        elif (delivered_count >= 1 and success_rate >= 80.0) or (total_parcels == 0 and has_network and net_success >= 80.0):
             risk_level = 'SAFE'
-        elif total_parcels == 0 and network_data:
-            risk_level = network_data.get('risk_level', 'NORMAL')
-            total_parcels = network_data.get('total_parcels', 0)
-            delivered_count = network_data.get('total_delivered', 0)
-            cancelled_count = network_data.get('total_cancelled', 0)
-            success_rate = network_data.get('success_rate', 100.0)
         else:
             risk_level = 'NORMAL'
+
+        # Compute Pathao-style 1 to 5 star rating & trust assessment
+        if is_new:
+            rating = 5.0
+            rating_label = "New Customer (Unrated)"
+            recommendation = "New customer with clean record. Standard COD dispatch."
+        elif risk_level == 'HIGH_RISK':
+            rating = max(1.0, round(1.0 + (effective_success / 100.0) * 1.5, 1))
+            rating_label = "Low Rating (High Return Risk)"
+            recommendation = "High risk of delivery rejection. Call customer or collect delivery fee in advance."
+        elif effective_success >= 90.0:
+            rating = min(5.0, round(4.5 + ((effective_success - 90.0) / 10.0) * 0.5, 1))
+            rating_label = "Top Rated (Verified Buyer)"
+            recommendation = "Excellent delivery track record. Safe to dispatch COD."
+        elif effective_success >= 75.0:
+            rating = round(3.8 + ((effective_success - 75.0) / 15.0) * 0.6, 1)
+            rating_label = "Good Rating (Reliable Buyer)"
+            recommendation = "Reliable buyer. Standard order confirmation."
+        else:
+            rating = round(2.5 + ((effective_success - 50.0) / 25.0) * 1.2, 1)
+            rating_label = "Moderate Rating (Caution Advised)"
+            recommendation = "Moderate delivery performance. Confirm order before dispatch."
+
+        # If scoped parcels are 0 but network data exists, populate summary fields
+        display_parcels = total_parcels if total_parcels > 0 else (net_parcels if provider == 'ALL' or provider == 'PATHAO' else 0)
+        display_delivered = delivered_count if total_parcels > 0 else (network_data.get('total_delivered', 0) if (provider == 'ALL' or provider == 'PATHAO') and network_data else 0)
+        display_cancelled = cancelled_count if total_parcels > 0 else (network_data.get('total_cancelled', 0) if (provider == 'ALL' or provider == 'PATHAO') and network_data else 0)
 
         return {
             'success': True,
             'provider': provider,
             'provider_name': provider_labels.get(provider, provider),
             'phone': clean_p,
-            'total_parcels': total_parcels,
-            'total_delivered': delivered_count,
-            'total_cancelled': cancelled_count,
-            'success_rate': success_rate,
+            'total_parcels': display_parcels,
+            'total_delivered': display_delivered,
+            'total_cancelled': display_cancelled,
+            'success_rate': effective_success,
             'risk_level': risk_level,
+            'rating': rating,
+            'rating_label': rating_label,
+            'trust_score': round(effective_success, 1),
+            'recommendation': recommendation,
+            'is_new_customer': is_new,
+            'fraud_reports': fraud_reps,
             'provider_breakdown': breakdown,
             'network_data': network_data,
             'source': f"{provider}_RECORD"

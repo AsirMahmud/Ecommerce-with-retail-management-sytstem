@@ -169,15 +169,26 @@ class SteadfastService:
             except Exception:
                 data = {'message': response.text or f"HTTP {response.status_code}"}
             if response.status_code == 200:
-                total_parcels = data.get('total_parcels', 0)
-                total_delivered = data.get('total_delivered', 0)
-                total_cancelled = data.get('total_cancelled', 0)
+                def _safe_int(val, default=0):
+                    try:
+                        if val is None or val == '':
+                            return default
+                        return int(float(str(val).strip()))
+                    except (ValueError, TypeError):
+                        return default
+
+                total_parcels = _safe_int(data.get('total_parcels'), 0)
+                total_delivered = _safe_int(data.get('total_delivered'), 0)
+                total_cancelled = _safe_int(data.get('total_cancelled'), 0)
+                fraud_reports = data.get('total_fraud_reports') or []
+                if not isinstance(fraud_reports, list):
+                    fraud_reports = []
                 
                 # Calculate success rate percentage
                 success_rate = (total_delivered / total_parcels * 100) if total_parcels > 0 else 100.0
                 
                 # Risk level decision
-                if total_parcels >= 3 and success_rate < 50:
+                if len(fraud_reports) > 0 or (total_parcels >= 3 and success_rate < 50):
                     risk_level = 'HIGH_RISK'
                 elif total_parcels >= 1 and success_rate >= 80:
                     risk_level = 'SAFE'
@@ -192,6 +203,7 @@ class SteadfastService:
                     'total_cancelled': total_cancelled,
                     'success_rate': round(success_rate, 1),
                     'risk_level': risk_level,
+                    'fraud_reports': fraud_reports,
                     'data': data
                 }
             return {

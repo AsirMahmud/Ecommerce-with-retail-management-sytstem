@@ -67,6 +67,7 @@
     "jwt-decode": "^4.0.0",
     "lucide-react": "^0.454.0",
     "next": "^15.2.4",
+    "next-intl": "^4.14.4",
     "next-themes": "latest",
     "next-transpile-modules": "^10.0.1",
     "qrcode.react": "^4.2.0",
@@ -83,6 +84,7 @@
     "tailwind-merge": "^2.5.5",
     "tailwindcss-animate": "^1.0.7",
     "vaul": "^0.9.6",
+    "xlsx": "^0.18.5",
     "zod": "^3.25.20",
     "zustand": "^5.0.5"
   },

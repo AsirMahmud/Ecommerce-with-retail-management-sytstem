@@ -59,6 +59,12 @@ export interface DispatchCourierResult {
   order?: OnlinePreorder;
 }
 
+export interface CourierFraudReport {
+  phone?: string;
+  name?: string;
+  details?: string;
+}
+
 export interface CourierFraudResult {
   success: boolean;
   provider: CourierProvider | string;
@@ -69,6 +75,12 @@ export interface CourierFraudResult {
   total_cancelled: number;
   success_rate: number;
   risk_level: 'SAFE' | 'NORMAL' | 'HIGH_RISK';
+  rating?: number;
+  rating_label?: string;
+  trust_score?: number;
+  recommendation?: string;
+  is_new_customer?: boolean;
+  fraud_reports?: CourierFraudReport[];
   provider_breakdown?: Record<string, { name: string; total: number; delivered: number; cancelled: number }>;
   network_data?: any;
   source?: string;
@@ -101,6 +113,17 @@ export const courierApi = {
     axios.get<{ success: boolean; message?: string; status?: string; order?: OnlinePreorder }>(
       `/online-preorder/orders/${orderId}/courier-status/`
     ),
+
+  syncCourierStatuses: (orderIds?: number[]) =>
+    axios.post<{
+      success: boolean;
+      synced_count: number;
+      failed_count: number;
+      synced: Array<{ id: number; provider: string; status: string }>;
+      failed: Array<{ id: number; message: string }>;
+    }>('/online-preorder/orders/sync-courier-status/', {
+      order_ids: orderIds,
+    }),
 
   getCourierParcels: (params?: { courier?: string; status?: string; search?: string }) =>
     axios.get<CourierParcelsResponse>('/online-preorder/orders/courier-parcels/', {

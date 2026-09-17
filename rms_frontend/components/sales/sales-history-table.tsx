@@ -77,6 +77,8 @@ import {
   CheckCircle,
   Smartphone,
   Zap,
+  Printer,
+  RotateCcw,
 } from "lucide-react";
 import { useSales } from "@/hooks/queries/use-sales";
 import type { SaleStatus, PaymentMethod, Sale, SaleItem, SalePayment, DuePayment, SaleType } from "@/types/sales";
@@ -97,6 +99,9 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { addPayment } from "@/lib/api/sales";
 import { useQueryClient } from '@tanstack/react-query';
+import { DataExportButton } from "@/components/data-export-button";
+import { printThermalReceipt, printA4Invoice } from "@/lib/print-utils";
+import { ProcessSaleReturnDialog } from "@/components/sales/process-sale-return-dialog";
 
 // The backend returns customer details in a nested object
 interface SaleWithCustomerDetails extends Omit<Sale, "customer"> {
@@ -144,6 +149,8 @@ export default function SalesHistory() {
   const [sortBy, setSortBy] = useState("date");
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
   const [selectedOrder, setSelectedOrder] =
+    useState<SaleWithCustomerDetails | null>(null);
+  const [saleToReturn, setSaleToReturn] =
     useState<SaleWithCustomerDetails | null>(null);
   const [selectedDuePayment, setSelectedDuePayment] =
     useState<SaleWithCustomerDetails | null>(null);
@@ -723,24 +730,38 @@ export default function SalesHistory() {
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2 sm:gap-3 w-full sm:w-auto">
-            <Button
-              variant="outline"
-              className="bg-white border-gray-200 shadow-sm hover:bg-gray-50 text-xs sm:text-sm h-8 sm:h-9 md:h-10"
-              onClick={handleExport}
-              disabled={isLoading}
-            >
-              <Download className="w-3.5 h-3.5 sm:w-4 sm:h-4 mr-1.5 sm:mr-2" />
-              Export
-            </Button>
+            <DataExportButton
+              title="Sales Transactions"
+              subtitle={`Showing ${typedSales.length} transaction records`}
+              headers={[
+                "Invoice #",
+                "Customer Name",
+                "Customer Phone",
+                "Date",
+                "Status",
+                "Payment Method",
+                "Total",
+                "Profit",
+                "Items",
+              ]}
+              getData={() =>
+                typedSales.map((sale) => [
+                  sale.invoice_number,
+                  sale.customer
+                    ? `${sale.customer.first_name} ${sale.customer.last_name}`
+                    : "Guest",
+                  sale.customer_phone || sale.customer?.phone || "-",
+                  formatDate(sale.date),
+                  sale.status,
+                  sale.payment_method,
+                  sale.total,
+                  sale.total_profit,
+                  sale.items?.length || 0,
+                ])
+              }
+              className="h-8 sm:h-9 md:h-10 bg-white"
+            />
             <DatePickerWithRange value={dateRange} onChange={setDateRange} />
-            <Button
-              className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 shadow-lg text-xs sm:text-sm h-8 sm:h-9 md:h-10"
-              onClick={handleReport}
-              disabled={isLoading}
-            >
-              <FileText className="w-3.5 h-3.5 sm:w-4 sm:h-4 mr-1.5 sm:mr-2" />
-              Report
-            </Button>
             <Button
               variant="destructive"
               className="bg-red-600 hover:bg-red-700 shadow-lg flex items-center text-xs sm:text-sm h-8 sm:h-9 md:h-10"
@@ -1144,6 +1165,20 @@ export default function SalesHistory() {
                                 <Eye className="w-4 h-4 mr-2" />
                                 View Details
                               </DropdownMenuItem>
+                              <DropdownMenuItem
+                                onClick={() => printThermalReceipt(sale)}
+                                className="cursor-pointer text-slate-700 hover:text-indigo-600 focus:text-indigo-600 focus:bg-indigo-50"
+                              >
+                                <Printer className="w-4 h-4 mr-2 text-slate-500" />
+                                Print Receipt
+                              </DropdownMenuItem>
+                              <DropdownMenuItem
+                                onClick={() => printA4Invoice(sale)}
+                                className="cursor-pointer text-slate-700 hover:text-indigo-600 focus:text-indigo-600 focus:bg-indigo-50"
+                              >
+                                <FileText className="w-4 h-4 mr-2 text-slate-500" />
+                                Print A4 Invoice
+                              </DropdownMenuItem>
                               {((sale.amount_due && sale.amount_due > 0) || sale.status === 'pending') && (
                                 <DropdownMenuItem
                                   onClick={() => setSelectedDuePayment(sale)}
@@ -1151,6 +1186,15 @@ export default function SalesHistory() {
                                 >
                                   <DollarSign className="w-4 h-4 mr-2" />
                                   Make Payment
+                                </DropdownMenuItem>
+                              )}
+                              {sale.status !== 'refunded' && sale.status !== 'cancelled' && (
+                                <DropdownMenuItem
+                                  onClick={() => setSaleToReturn(sale)}
+                                  className="cursor-pointer text-amber-600 focus:text-amber-600 focus:bg-amber-50"
+                                >
+                                  <RotateCcw className="w-4 h-4 mr-2" />
+                                  Process Return
                                 </DropdownMenuItem>
                               )}
                               <DropdownMenuItem
@@ -1752,6 +1796,42 @@ export default function SalesHistory() {
                   </div>
                 </div>
               </div>
+
+              {/* Print Actions */}
+              <div className="flex flex-wrap items-center justify-end gap-3 pt-2 border-t border-slate-100">
+                {selectedOrder.status !== 'refunded' && selectedOrder.status !== 'cancelled' && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => {
+                      const order = selectedOrder;
+                      setSelectedOrder(null);
+                      setSaleToReturn(order);
+                    }}
+                    className="rounded-xl border-amber-300 bg-amber-50 text-amber-700 hover:bg-amber-100 shadow-2xs gap-2"
+                  >
+                    <RotateCcw className="w-4 h-4 text-amber-600" />
+                    <span>Process Return</span>
+                  </Button>
+                )}
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => printThermalReceipt(selectedOrder)}
+                  className="rounded-xl border-slate-200 text-slate-700 hover:bg-slate-100 shadow-2xs gap-2"
+                >
+                  <Printer className="w-4 h-4 text-slate-500" />
+                  <span>Print Receipt (Thermal)</span>
+                </Button>
+                <Button
+                  type="button"
+                  onClick={() => printA4Invoice(selectedOrder)}
+                  className="rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white shadow-xs gap-2"
+                >
+                  <FileText className="w-4 h-4" />
+                  <span>Print Tax Invoice (A4)</span>
+                </Button>
+              </div>
             </div>
           </DialogContent>
         </Dialog>
@@ -1839,6 +1919,13 @@ export default function SalesHistory() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Process Sale Return Dialog */}
+      <ProcessSaleReturnDialog
+        sale={saleToReturn as any}
+        open={!!saleToReturn}
+        onOpenChange={(open) => !open && setSaleToReturn(null)}
+      />
     </div>
   );
 }

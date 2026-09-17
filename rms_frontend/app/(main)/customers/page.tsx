@@ -19,6 +19,7 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { DataTable } from "@/components/ui/data-table";
 import type { ColumnDef } from "@tanstack/react-table";
+import { DataExportButton } from "@/components/data-export-button";
 import {
   Download,
   Search,
@@ -695,9 +696,28 @@ export default function CustomersPage() {
                 size="icon"
                 className="shrink-0"
                 onClick={() => setSortOrder(sortOrder === "asc" ? "desc" : "asc")}
+                title="Toggle Sort Direction"
               >
                 <ArrowUpDown className="h-4 w-4" />
               </Button>
+              <DataExportButton
+                title="Customer Directory"
+                subtitle={`Showing ${customers.length} customer records`}
+                headers={["Rank", "Customer Name", "Email", "Phone", "Total Spent ($)", "Sales Count", "Last Sale", "Status"]}
+                getData={() =>
+                  customers.map((c: any) => [
+                    c.ranking || "-",
+                    c.name || `${c.first_name || ""} ${c.last_name || ""}`.trim() || "Customer",
+                    c.email || "-",
+                    c.phone || "-",
+                    c.total_sales || 0,
+                    c.sales_count || 0,
+                    c.last_sale_date ? new Date(c.last_sale_date).toLocaleDateString() : "-",
+                    c.is_active ? "Active" : "Inactive",
+                  ])
+                }
+                className="shrink-0"
+              />
             </div>
           </div>
         </CardHeader>

@@ -32,6 +32,8 @@ import {
   Check,
   ShieldCheck,
   ShieldAlert,
+  AlertTriangle,
+  Star,
 } from "lucide-react";
 import { onlinePreordersApi, type OnlinePreorder, type SteadfastFraudResult } from "@/lib/api/onlinePreorder";
 import { courierApi, type ActiveCourier, type CourierProvider, type CourierFraudResult } from "@/lib/api/courier";
@@ -42,6 +44,8 @@ import { OnlineCustomersTab } from "@/components/online-preorders/online-custome
 import { useDebounce } from "@/hooks/use-debounce";
 import { format } from "date-fns";
 import { useOnlinePreorderAnalytics } from "@/hooks/queries/use-reports";
+import { useOnlinePreorders, ONLINE_PREORDERS_QUERY_KEY } from "@/hooks/queries/use-online-preorders";
+import { useQueryClient } from "@tanstack/react-query";
 import { useMemo } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
@@ -80,8 +84,14 @@ export default function OnlinePreordersPage() {
   const [activeTab, setActiveTab] = useState("orders");
   const [status, setStatus] = useState<string>("all");
   const [search, setSearch] = useState("");
-  const [loading, setLoading] = useState(true);
-  const [rows, setRows] = useState<OnlinePreorder[]>([]);
+  const debouncedSearch = useDebounce(search, 500);
+  const queryClient = useQueryClient();
+  const {
+    data: rows = [],
+    isLoading: loading,
+    isFetching,
+    refetch: refetchOrders,
+  } = useOnlinePreorders(status, debouncedSearch);
   const [selectedOrder, setSelectedOrder] = useState<OnlinePreorder | null>(null);
   const [editingOrder, setEditingOrder] = useState<OnlinePreorder | null>(null);
   const [isSheetOpen, setIsSheetOpen] = useState(false);
@@ -134,6 +144,8 @@ export default function OnlinePreordersPage() {
   const [fraudData, setFraudData] = useState<CourierFraudResult | null>(null);
   const [selectedFraudProvider, setSelectedFraudProvider] = useState<string>("ALL");
   const [isFetchingFraud, setIsFetchingFraud] = useState(false);
+  const [isSyncingCouriers, setIsSyncingCouriers] = useState(false);
+  const [syncingOrderId, setSyncingOrderId] = useState<number | null>(null);
 
   // Quick Cancel Order state
   const [cancelOrderTarget, setCancelOrderTarget] = useState<OnlinePreorder | null>(null);
@@ -240,6 +252,47 @@ export default function OnlinePreordersPage() {
     }
   };
 
+  const handleSyncAllCouriers = async () => {
+    setIsSyncingCouriers(true);
+    try {
+      const res = await courierApi.syncCourierStatuses();
+      toast({
+        title: "Courier Statuses Synced",
+        description: `Refreshed ${res.data.synced_count} parcel(s) successfully.${res.data.failed_count > 0 ? ` (${res.data.failed_count} skipped)` : ""}`,
+      });
+      await queryClient.invalidateQueries({ queryKey: [ONLINE_PREORDERS_QUERY_KEY] });
+    } catch (err: any) {
+      toast({
+        title: "Sync Failed",
+        description: err?.response?.data?.message || err?.response?.data?.detail || "Failed to sync courier statuses",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSyncingCouriers(false);
+    }
+  };
+
+  const handleSyncSingleCourier = async (orderId: number, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    setSyncingOrderId(orderId);
+    try {
+      const res = await courierApi.getOrderStatus(orderId);
+      toast({
+        title: "Status Refreshed",
+        description: `Order #${orderId} courier status: ${res.data.status || "Updated"}`,
+      });
+      await queryClient.invalidateQueries({ queryKey: [ONLINE_PREORDERS_QUERY_KEY] });
+    } catch (err: any) {
+      toast({
+        title: "Status Refresh Failed",
+        description: err?.response?.data?.message || err?.response?.data?.detail || "Failed to fetch courier status",
+        variant: "destructive",
+      });
+    } finally {
+      setSyncingOrderId(null);
+    }
+  };
+
   const handleOpenFraudCheck = async (o: OnlinePreorder, providerOverride?: string) => {
     setFraudCheckOrder(o);
     setFraudCheckDialogOpen(true);
@@ -307,8 +360,6 @@ export default function OnlinePreordersPage() {
     }
   };
 
-  const debouncedSearch = useDebounce(search, 500);
-
   // Calculate date range for analytics (all time)
   const dateRange = useMemo(() => {
     const now = new Date();
@@ -324,12 +375,12 @@ export default function OnlinePreordersPage() {
   const stats = useMemo(() => {
     const totalOrders = rows.length;
     const totalRevenue = rows
-      .filter(o => o.status === 'COMPLETED')
+      .filter((o) => o.status === "COMPLETED")
       .reduce((sum, o) => sum + Number(o.total_amount || 0), 0);
-    const completedCount = rows.filter(o => o.status === 'COMPLETED').length;
+    const completedCount = rows.filter((o) => o.status === "COMPLETED").length;
     const averageOrderValue = completedCount > 0 ? totalRevenue / completedCount : 0;
     const totalProfit = rows
-      .filter(o => o.status === 'COMPLETED')
+      .filter((o) => o.status === "COMPLETED")
       .reduce((sum, o) => sum + Number(o.profit || 0), 0);
 
     return {
@@ -342,14 +393,7 @@ export default function OnlinePreordersPage() {
   }, [rows]);
 
   const loadData = async () => {
-    setLoading(true);
-    try {
-      const res = await onlinePreordersApi.getAll(status, debouncedSearch);
-      const data = Array.isArray(res.data) ? res.data : (res.data.results ?? []);
-      setRows(data as OnlinePreorder[]);
-    } finally {
-      setLoading(false);
-    }
+    await queryClient.invalidateQueries({ queryKey: [ONLINE_PREORDERS_QUERY_KEY] });
   };
 
   const handleEdit = (order: OnlinePreorder) => {
@@ -403,20 +447,18 @@ export default function OnlinePreordersPage() {
     handleEdit(order);
   };
 
-  useEffect(() => {
-    void loadData();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [status, debouncedSearch]);
 
   const getStatusBadge = (s: string) => {
     const config: any = {
       PENDING: "bg-yellow-100 text-yellow-800",
       CONFIRMED: "bg-blue-100 text-blue-800",
+      HOLD: "bg-amber-100 text-amber-800 border border-amber-300",
       DELIVERED: "bg-indigo-100 text-indigo-800",
       COMPLETED: "bg-green-100 text-green-800",
+      RETURNED: "bg-purple-100 text-purple-800 border border-purple-300",
       CANCELLED: "bg-red-100 text-red-800",
     };
-    return <Badge className={`${config[s] || "bg-gray-100"} border-none capitalize`}>{s.toLowerCase()}</Badge>;
+    return <Badge className={`${config[s] || "bg-gray-100"} border-none capitalize font-semibold`}>{s.toLowerCase()}</Badge>;
   };
 
   return (
@@ -427,8 +469,19 @@ export default function OnlinePreordersPage() {
           <p className="text-slate-500 mt-1 sm:mt-2 text-xs sm:text-sm font-medium">Manage and track your ecommerce COD orders from one place.</p>
         </div>
         <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+          <Button
+            variant="outline"
+            className="bg-white border-amber-300 text-amber-900 hover:bg-amber-50 text-xs sm:text-sm h-9 flex items-center gap-1.5 shadow-2xs font-semibold"
+            onClick={handleSyncAllCouriers}
+            disabled={isSyncingCouriers}
+            title="Sync live status from Steadfast, Pathao & all couriers"
+          >
+            <Truck className="w-3.5 h-3.5 text-amber-600" />
+            <RefreshCw className={`w-3 h-3 ${isSyncingCouriers ? 'animate-spin text-amber-600' : ''}`} />
+            {isSyncingCouriers ? "Syncing Couriers..." : "Sync Courier Statuses"}
+          </Button>
           <Button variant="outline" className="bg-white text-xs sm:text-sm h-9" onClick={loadData}>
-            <RefreshCw className={`w-3.5 h-3.5 mr-1.5 ${loading ? 'animate-spin' : ''}`} />
+            <RefreshCw className={`w-3.5 h-3.5 mr-1.5 ${isFetching ? 'animate-spin' : ''}`} />
             Refresh
           </Button>
           <Button className="bg-indigo-600 hover:bg-indigo-700 shadow-lg shadow-indigo-200 text-xs sm:text-sm h-9" onClick={() => { setEditingOrder(null); setActiveTab("manual"); }}>
@@ -548,8 +601,10 @@ export default function OnlinePreordersPage() {
                       <SelectItem value="all">All Status</SelectItem>
                       <SelectItem value="PENDING">Pending</SelectItem>
                       <SelectItem value="CONFIRMED">Confirmed</SelectItem>
+                      <SelectItem value="HOLD">Hold</SelectItem>
                       <SelectItem value="DELIVERED">Delivered</SelectItem>
                       <SelectItem value="COMPLETED">Completed</SelectItem>
+                      <SelectItem value="RETURNED">Returned</SelectItem>
                       <SelectItem value="CANCELLED">Cancelled</SelectItem>
                     </SelectContent>
                   </Select>
@@ -762,12 +817,21 @@ export default function OnlinePreordersPage() {
 
                                   return (
                                     <div className="flex flex-col items-start gap-1">
-                                      <div className="flex items-center gap-1">
+                                      <div className="flex items-center gap-1.5">
                                         <Badge variant="outline" className={`${badgeClass} text-[10px] font-bold uppercase tracking-wider flex items-center gap-1`}>
                                           <Truck className="w-3 h-3" />
                                           {p}
                                         </Badge>
-                                        <span className="text-[10px] text-slate-500 font-medium">({st})</span>
+                                        <span className="text-[10px] text-slate-500 font-medium capitalize">({st.replace(/_/g, " ")})</span>
+                                        <button
+                                          type="button"
+                                          onClick={(e) => handleSyncSingleCourier(o.id, e)}
+                                          disabled={syncingOrderId === o.id}
+                                          title={`Sync live status from ${p}`}
+                                          className="p-0.5 rounded text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 transition-colors inline-flex items-center justify-center"
+                                        >
+                                          <RefreshCw className={`w-3 h-3 ${syncingOrderId === o.id ? "animate-spin text-indigo-600" : ""}`} />
+                                        </button>
                                       </div>
                                       {trk && (
                                         <a
@@ -930,25 +994,13 @@ export default function OnlinePreordersPage() {
                                         </>
                                       ) : (
                                         <DropdownMenuItem
-                                          onClick={async (e) => {
+                                          onClick={(e) => {
                                             e.stopPropagation();
-                                            try {
-                                              const res = await courierApi.getOrderStatus(o.id);
-                                              toast({
-                                                title: `${o.courier_partner || "Courier"} Status Refreshed`,
-                                                description: `Current status: ${res.data.status}`,
-                                              });
-                                              void loadData();
-                                            } catch (err: any) {
-                                              toast({
-                                                title: "Status Check Failed",
-                                                description: err?.response?.data?.message || "Failed to fetch courier status",
-                                                variant: "destructive",
-                                              });
-                                            }
+                                            void handleSyncSingleCourier(o.id, e);
                                           }}
+                                          className="cursor-pointer"
                                         >
-                                          <RefreshCw className="mr-2 h-4 w-4 text-emerald-600" />
+                                          <RefreshCw className={`mr-2 h-4 w-4 text-emerald-600 ${syncingOrderId === o.id ? "animate-spin" : ""}`} />
                                           Check Status ({o.courier_partner || "Courier"})
                                         </DropdownMenuItem>
                                       )}
@@ -1410,24 +1462,137 @@ export default function OnlinePreordersPage() {
                   </Badge>
                 </div>
 
-                <div className="grid grid-cols-4 gap-2 bg-slate-50 p-3 rounded-lg text-center border">
-                  <div>
-                    <span className="text-slate-400 text-[10px] block font-medium">Total Parcels</span>
-                    <span className="font-bold text-slate-900 text-sm">{fraudData.total_parcels}</span>
+                {selectedFraudProvider === "PATHAO" ? (
+                  /* Dedicated Pathao Customer Rating & Trust System */
+                  <div className="space-y-3">
+                    <div className="bg-gradient-to-br from-red-50/90 via-white to-amber-50/40 border border-red-200/80 rounded-xl p-3.5 shadow-2xs space-y-3">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <div className="w-8 h-8 rounded-lg bg-red-600 text-white flex items-center justify-center font-black text-xs shadow-sm">
+                            <Truck className="w-4 h-4" />
+                          </div>
+                          <div>
+                            <span className="text-xs font-bold text-slate-900 block">Pathao Customer Rating</span>
+                            <span className="text-[10px] text-slate-500 font-medium">Delivery Behavior &amp; Reliability Score</span>
+                          </div>
+                        </div>
+                        <Badge
+                          className={`text-[11px] font-bold px-2 py-0.5 border-none ${
+                            fraudData.risk_level === 'HIGH_RISK'
+                              ? 'bg-rose-100 text-rose-800'
+                              : (fraudData.rating ?? 5.0) >= 4.0
+                              ? 'bg-emerald-100 text-emerald-800'
+                              : 'bg-amber-100 text-amber-800'
+                          }`}
+                        >
+                          {fraudData.rating_label || (fraudData.risk_level === 'SAFE' ? 'Verified Safe Buyer' : 'Normal Rating')}
+                        </Badge>
+                      </div>
+
+                      {/* Large Star & Trust Score Card */}
+                      <div className="flex items-center justify-between bg-white p-3 rounded-lg border border-red-100 shadow-2xs">
+                        <div>
+                          <span className="text-[10px] text-slate-400 uppercase font-bold tracking-wider block mb-0.5">
+                            Customer Rating
+                          </span>
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-2xl font-black text-slate-900 tracking-tight">
+                              {(fraudData.rating ?? 5.0).toFixed(1)}
+                            </span>
+                            <span className="text-xs font-bold text-slate-400">/ 5.0</span>
+                            <div className="flex items-center ml-1 text-amber-500">
+                              {[1, 2, 3, 4, 5].map((starIdx) => {
+                                const r = fraudData.rating ?? 5.0;
+                                const isFull = r >= starIdx;
+                                const isHalf = !isFull && r >= starIdx - 0.5;
+                                return (
+                                  <Star
+                                    key={starIdx}
+                                    className={`w-3.5 h-3.5 ${
+                                      isFull
+                                        ? "fill-amber-400 text-amber-400"
+                                        : isHalf
+                                        ? "fill-amber-300/60 text-amber-400"
+                                        : "text-slate-200"
+                                    }`}
+                                  />
+                                );
+                              })}
+                            </div>
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <span className="text-[10px] text-slate-400 uppercase font-bold tracking-wider block mb-0.5">
+                            COD Acceptance
+                          </span>
+                          <span className="text-lg font-black text-indigo-600">
+                            {Math.round(fraudData.trust_score ?? fraudData.success_rate ?? 100)}%
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Pathao Recommendation */}
+                      {fraudData.recommendation && (
+                        <div className="text-[11px] p-2.5 rounded-lg bg-red-50/70 border border-red-100 text-red-950 flex items-start gap-2">
+                          <ShieldCheck className="w-4 h-4 text-red-600 shrink-0 mt-0.5" />
+                          <p className="leading-relaxed font-medium">{fraudData.recommendation}</p>
+                        </div>
+                      )}
+
+                      {/* Mini Parcel Counts if any records */}
+                      <div className="grid grid-cols-3 gap-2 text-center text-xs pt-0.5">
+                        <div className="bg-white/80 p-2 rounded border border-slate-200/60">
+                          <span className="text-[10px] text-slate-400 block font-medium">History Parcels</span>
+                          <span className="font-bold text-slate-800">{fraudData.total_parcels}</span>
+                        </div>
+                        <div className="bg-white/80 p-2 rounded border border-slate-200/60">
+                          <span className="text-[10px] text-slate-400 block font-medium">Delivered</span>
+                          <span className="font-bold text-emerald-700">{fraudData.total_delivered}</span>
+                        </div>
+                        <div className="bg-white/80 p-2 rounded border border-slate-200/60">
+                          <span className="text-[10px] text-slate-400 block font-medium">Returned</span>
+                          <span className="font-bold text-rose-700">{fraudData.total_cancelled}</span>
+                        </div>
+                      </div>
+                    </div>
                   </div>
-                  <div>
-                    <span className="text-slate-400 text-[10px] block font-medium">Delivered</span>
-                    <span className="font-bold text-emerald-700 text-sm">{fraudData.total_delivered}</span>
+                ) : (
+                  /* Steadfast and General Couriers Parcel Grid */
+                  <div className="grid grid-cols-4 gap-2 bg-slate-50 p-3 rounded-lg text-center border">
+                    <div>
+                      <span className="text-slate-400 text-[10px] block font-medium">Total Parcels</span>
+                      <span className="font-bold text-slate-900 text-sm">{fraudData.total_parcels}</span>
+                    </div>
+                    <div>
+                      <span className="text-slate-400 text-[10px] block font-medium">Delivered</span>
+                      <span className="font-bold text-emerald-700 text-sm">{fraudData.total_delivered}</span>
+                    </div>
+                    <div>
+                      <span className="text-slate-400 text-[10px] block font-medium">Cancelled</span>
+                      <span className="font-bold text-rose-700 text-sm">{fraudData.total_cancelled}</span>
+                    </div>
+                    <div>
+                      <span className="text-slate-400 text-[10px] block font-medium">Success Rate</span>
+                      <span className="font-extrabold text-indigo-700 text-sm">{fraudData.success_rate}%</span>
+                    </div>
                   </div>
-                  <div>
-                    <span className="text-slate-400 text-[10px] block font-medium">Cancelled</span>
-                    <span className="font-bold text-rose-700 text-sm">{fraudData.total_cancelled}</span>
+                )}
+
+                {/* Fraud Reports Warning If Any Recorded on Courier Network */}
+                {fraudData.fraud_reports && fraudData.fraud_reports.length > 0 && (
+                  <div className="p-3 bg-rose-50 border border-rose-200 rounded-lg text-xs space-y-1.5 animate-in fade-in">
+                    <div className="font-bold text-rose-800 flex items-center gap-1.5">
+                      <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0" />
+                      <span>Reported Courier Fraud Incident ({fraudData.fraud_reports.length})</span>
+                    </div>
+                    {fraudData.fraud_reports.map((rep, idx) => (
+                      <div key={idx} className="text-[11px] text-rose-700 bg-white/80 p-2 rounded border border-rose-100">
+                        {rep.details && <p className="font-medium text-rose-900">{rep.details}</p>}
+                        {rep.name && <p className="text-[10px] text-rose-600 mt-0.5">Reported by / as: {rep.name}</p>}
+                      </div>
+                    ))}
                   </div>
-                  <div>
-                    <span className="text-slate-400 text-[10px] block font-medium">Success Rate</span>
-                    <span className="font-extrabold text-indigo-700 text-sm">{fraudData.success_rate}%</span>
-                  </div>
-                </div>
+                )}
 
                 {/* Per-courier breakdown if multi-courier data available */}
                 {fraudData.provider_breakdown && Object.keys(fraudData.provider_breakdown).length > 0 && (

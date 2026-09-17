@@ -6,6 +6,7 @@ import { authApi, type LoginCredentials } from "@/lib/api/auth";
 import axios from "axios";
 import Cookies from "js-cookie";
 import { jwtDecode } from "jwt-decode";
+import { Loader2 } from "lucide-react";
 
 interface AuthContextType {
   isAuthenticated: boolean;
@@ -15,6 +16,28 @@ interface AuthContextType {
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
+
+// Professional Loading Screen
+function AuthLoadingScreen() {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-gradient-to-br from-slate-50 via-blue-50/30 to-indigo-50/30">
+      <div className="flex flex-col items-center gap-4">
+        <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-indigo-600 to-blue-500 flex items-center justify-center text-white font-bold text-lg shadow-lg shadow-indigo-200/60">
+          RS
+        </div>
+        <div className="flex items-center gap-2">
+          <Loader2 className="w-4 h-4 animate-spin text-indigo-500" />
+          <span className="text-sm font-medium text-slate-500">
+            Loading...
+          </span>
+        </div>
+        <div className="w-48 h-1 bg-slate-200/60 rounded-full overflow-hidden">
+          <div className="h-full w-1/3 bg-gradient-to-r from-indigo-400 to-blue-400 rounded-full animate-pulse" />
+        </div>
+      </div>
+    </div>
+  );
+}
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -75,7 +98,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       axios.defaults.headers.common["Authorization"] = `Bearer ${access}`;
       setIsAuthenticated(true);
 
-      router.push("/");
+      // Check for redirect param from middleware
+      const params = new URLSearchParams(window.location.search);
+      const redirectTo = params.get("redirect") || "/";
+      router.push(redirectTo);
     } catch (error) {
       throw new Error("Invalid credentials");
     }
@@ -94,9 +120,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  // Show loading state while checking authentication
+  // Show professional loading state while checking authentication
   if (isLoading) {
-    return <div>Loading...</div>;
+    return <AuthLoadingScreen />;
   }
 
   return (

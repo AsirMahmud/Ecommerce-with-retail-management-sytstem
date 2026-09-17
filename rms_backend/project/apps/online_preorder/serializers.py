@@ -238,7 +238,18 @@ class OnlinePreorderCreateSerializer(serializers.ModelSerializer):
         # The Customer record is created/updated for CRM synchronization only.
         
         # Call super create
-        return super().create(validated_data)
+        order = super().create(validated_data)
+
+        # Automatically deduct stock for this newly placed online preorder
+        try:
+            from .stock_utils import deduct_preorder_stock
+            deduct_preorder_stock(order, reason="new")
+        except Exception as e:
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.error(f"Failed to auto-deduct stock for preorder #{order.id}: {str(e)}")
+
+        return order
 
     def update(self, instance, validated_data):
         from apps.customer.models import Customer
@@ -403,6 +414,18 @@ class OnlinePreorderSerializer(serializers.ModelSerializer):
             }
         except Exception:
             ret['fraud_summary'] = None
+
+        if instance.return_expense:
+            ret['return_expense_details'] = {
+                'id': instance.return_expense.id,
+                'description': instance.return_expense.description,
+                'amount': str(instance.return_expense.amount),
+                'category_name': instance.return_expense.category.name if instance.return_expense.category else '',
+                'date': str(instance.return_expense.date),
+                'status': instance.return_expense.status,
+            }
+        else:
+            ret['return_expense_details'] = None
 
         return ret
 

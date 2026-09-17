@@ -19,6 +19,7 @@ import {
   ChevronDown,
   ExternalLink,
   Truck,
+  History,
 } from "lucide-react";
 
 import { cn } from "@/lib/utils";
@@ -32,6 +33,7 @@ import {
 } from "@/components/ui/collapsible";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useAuth } from "@/contexts/auth-context";
+import { useLanguage } from "@/contexts/language-context";
 import { homePageSettingsApi, HomePageSettings } from "@/lib/api/ecommerce";
 import { BrandLogos } from "./brand-logos";
 
@@ -54,6 +56,7 @@ const mainNavItems = [
       { title: "Overview", href: "/sales" },
       { title: "Sales History", href: "/sales/sales-history" },
       { title: "Due", href: "/sales/due" },
+      { title: "Returns & Refunds", href: "/sales/returns" },
     ],
   },
   {
@@ -119,11 +122,18 @@ const mainNavItems = [
 
 const utilityNavItems = [
   {
+    title: "Activity Log",
+    icon: History,
+    href: "/activity-log",
+  },
+  {
     title: "Settings",
     icon: Settings,
     href: "/settings",
   },
 ];
+
+import { useTranslations } from "next-intl";
 
 export function SideNav() {
   const [open, setOpen] = useState(false);
@@ -131,7 +141,53 @@ export function SideNav() {
   const pathname = usePathname();
   const router = useRouter();
   const { logout } = useAuth();
+  const t = useTranslations();
   const [branding, setBranding] = useState<HomePageSettings | null>(null);
+
+  const getNavLabel = (title: string) => {
+    const map: Record<string, string> = {
+      "Dashboard": "nav.dashboard",
+      "POS": "nav.pos",
+      "Sales": "nav.sales",
+      "Overview": "nav.overview",
+      "Sales History": "nav.sales_history",
+      "Due": "nav.due",
+      "Returns & Refunds": "nav.returns",
+      "Customers": "nav.customers",
+      "Inventory": "nav.inventory",
+      "Products": "nav.products",
+      "Add Product": "nav.add_product",
+      "Categories": "nav.categories",
+      "Online Categories": "nav.online_categories",
+      "Suppliers": "nav.suppliers",
+      "Preorders": "nav.preorders",
+      "Create Preorder": "nav.create_preorder",
+      "Online Preorders": "nav.online_preorders",
+      "Courier Partners": "nav.courier_partners",
+      "Expenses": "nav.expenses",
+      "Reports": "nav.reports",
+      "Ecommerce Settings": "nav.ecommerce_settings",
+      "Home Page Settings": "nav.home_page_settings",
+      "Hero Settings": "nav.hero_settings",
+      "Discount Management": "nav.discounts",
+      "Coupon Management": "nav.coupons",
+      "Product Status": "nav.product_status",
+      "Delivery Charges": "nav.delivery_charges",
+      "Promotional Modals": "nav.promotional_modals",
+      "Open Ecommerce Site": "nav.open_ecommerce",
+      "Activity Log": "nav.activity",
+      "Settings": "nav.settings",
+    };
+    const key = map[title];
+    if (key) {
+      try {
+        return t(key);
+      } catch {
+        return title;
+      }
+    }
+    return title;
+  };
 
   useEffect(() => {
     const fetchBranding = async () => {
@@ -164,9 +220,9 @@ export function SideNav() {
   };
 
   const renderNavList = (isMobile = false) => (
-    <div className="flex flex-col h-full bg-white text-slate-700">
+    <div className="flex flex-col h-full bg-white dark:bg-slate-950 text-slate-700 dark:text-slate-200">
       {/* Brand Header */}
-      <div className="flex items-center px-5 py-4 border-b border-slate-100 bg-white">
+      <div className="flex items-center px-5 py-4 border-b border-slate-100 dark:border-slate-800/80 bg-white dark:bg-slate-950">
         <div className="flex items-center gap-3 w-full">
           {branding?.logo_image_url ? (
             <img
@@ -176,15 +232,15 @@ export function SideNav() {
             />
           ) : (
             <div className="flex items-center gap-2.5">
-              <div className="w-8 h-8 rounded-lg bg-blue-600 flex items-center justify-center text-white font-bold text-sm shadow-xs">
+              <div className="w-8 h-8 rounded-lg bg-indigo-600 flex items-center justify-center text-white font-bold text-sm shadow-xs">
                 RS
               </div>
               <div>
-                <h2 className="text-sm font-bold text-slate-900 tracking-tight leading-none">
+                <h2 className="text-sm font-bold text-slate-900 dark:text-slate-100 tracking-tight leading-none">
                   {branding?.logo_text || "RAW STITCH"}
                 </h2>
-                <p className="text-[11px] font-medium text-slate-400 mt-0.5">
-                  Retail Management
+                <p className="text-[11px] font-medium text-slate-400 dark:text-slate-500 mt-0.5">
+                  {t("brand.tagline")}
                 </p>
               </div>
             </div>
@@ -196,7 +252,7 @@ export function SideNav() {
       <ScrollArea className="flex-1 py-3 px-3">
         <div className="space-y-1">
           <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider px-3 py-1">
-            Menu
+            {t("nav.menu")}
           </p>
           {mainNavItems.map((item) => {
             const active = isActive(item.href);
@@ -227,7 +283,7 @@ export function SideNav() {
                             active ? "text-blue-600" : "text-slate-400 group-hover:text-slate-600"
                           )}
                         />
-                        <span>{item.title}</span>
+                        <span>{getNavLabel(item.title)}</span>
                       </div>
                       <ChevronDown
                         className={cn(
@@ -257,7 +313,7 @@ export function SideNav() {
                             rel="noopener noreferrer"
                             className={itemClass}
                           >
-                            <span>{subItem.title}</span>
+                            <span>{getNavLabel(subItem.title)}</span>
                             <ExternalLink className="w-3 h-3 text-slate-400" />
                           </a>
                         ) : (
@@ -267,7 +323,7 @@ export function SideNav() {
                             onClick={() => isMobile && setOpen(false)}
                             className={itemClass}
                           >
-                            <span>{subItem.title}</span>
+                            <span>{getNavLabel(subItem.title)}</span>
                           </Link>
                         );
                       })}
@@ -296,7 +352,7 @@ export function SideNav() {
                       active ? "text-blue-600" : "text-slate-400 group-hover:text-slate-600"
                     )}
                   />
-                  <span>{item.title}</span>
+                  <span>{getNavLabel(item.title)}</span>
                 </div>
               </Link>
             );
@@ -308,7 +364,7 @@ export function SideNav() {
         {/* System Settings */}
         <div className="space-y-1">
           <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider px-3 py-1">
-            System
+            {t("nav.system")}
           </p>
           {utilityNavItems.map((item) => {
             const active = isActive(item.href);
@@ -330,7 +386,7 @@ export function SideNav() {
                     active ? "text-blue-600" : "text-slate-400 group-hover:text-slate-600"
                   )}
                 />
-                <span>{item.title}</span>
+                <span>{getNavLabel(item.title)}</span>
               </Link>
             );
           })}
@@ -339,7 +395,7 @@ export function SideNav() {
         {/* Our Brands */}
         <div className="px-2 py-4 mt-2">
           <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-2 px-1">
-            Our Brands
+            {t("nav.brands")}
           </p>
           <BrandLogos
             className="justify-start gap-2.5 px-1"
@@ -349,23 +405,23 @@ export function SideNav() {
       </ScrollArea>
 
       {/* User Status & Logout Footer */}
-      <div className="p-3 border-t border-slate-100 bg-slate-50/50">
-        <div className="flex items-center justify-between p-2 rounded-xl bg-white border border-slate-200/80 shadow-2xs">
+      <div className="p-3 border-t border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/40">
+        <div className="flex items-center justify-between p-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-2xs">
           <div className="flex items-center gap-2.5 min-w-0">
-            <div className="w-8 h-8 rounded-lg bg-blue-600 text-white flex items-center justify-center font-bold text-xs shrink-0 shadow-2xs">
+            <div className="w-8 h-8 rounded-lg bg-indigo-600 text-white flex items-center justify-center font-bold text-xs shrink-0 shadow-2xs">
               RS
             </div>
             <div className="min-w-0">
-              <p className="text-xs font-bold text-slate-800 truncate">Administrator</p>
-              <p className="text-[10px] text-slate-500 truncate">Store Management</p>
+              <p className="text-xs font-bold text-slate-800 dark:text-slate-200 truncate">{t("user.admin")}</p>
+              <p className="text-[10px] text-slate-500 dark:text-slate-400 truncate">{t("user.store_management")}</p>
             </div>
           </div>
           <Button
             variant="ghost"
             size="icon"
             onClick={() => logout()}
-            className="h-8 w-8 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
-            title="Log out"
+            className="h-8 w-8 text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 rounded-lg transition-colors"
+            title={t("buttons.logout")}
           >
             <LogOut className="h-4 w-4" />
           </Button>
@@ -377,13 +433,13 @@ export function SideNav() {
   return (
     <>
       {/* Mobile Top Header Bar */}
-      <header className="md:hidden sticky top-0 z-40 w-full bg-white text-slate-900 border-b border-slate-200 px-4 h-14 flex items-center justify-between shadow-2xs">
-        <div className="flex items-center gap-3">
+      <header className="md:hidden sticky top-0 z-40 w-full bg-white dark:bg-slate-950 text-slate-900 dark:text-slate-100 border-b border-slate-200 dark:border-slate-800 px-3 sm:px-4 h-14 flex items-center justify-between shadow-2xs gap-2">
+        <div className="flex items-center gap-2">
           <Button
             variant="ghost"
             size="icon"
             onClick={() => setOpen(true)}
-            className="text-slate-700 hover:bg-slate-100 h-9 w-9 rounded-lg"
+            className="text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-900 h-9 w-9 rounded-lg shrink-0"
             aria-label="Open navigation menu"
           >
             <Menu className="h-5 w-5" />
@@ -396,33 +452,36 @@ export function SideNav() {
                 className="h-7 w-auto object-contain"
               />
             ) : (
-              <span className="font-bold text-sm text-slate-900 tracking-tight">
+              <span className="font-bold text-xs sm:text-sm text-slate-900 dark:text-slate-100 tracking-tight truncate max-w-[130px] sm:max-w-none">
                 {branding?.logo_text || "RAW STITCH RMS"}
               </span>
             )}
           </div>
         </div>
-        <Link
-          href="/pos"
-          className="text-xs font-semibold bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded-lg flex items-center gap-1.5 shadow-2xs"
-        >
-          <ShoppingBag className="w-3.5 h-3.5" />
-          <span>POS</span>
-        </Link>
+
+        <div className="flex items-center gap-1.5 shrink-0">
+          <Link
+            href="/pos"
+            className="text-xs font-semibold bg-indigo-600 hover:bg-indigo-700 text-white px-2.5 py-1.5 rounded-lg flex items-center gap-1.5 shadow-2xs"
+          >
+            <ShoppingBag className="w-3.5 h-3.5" />
+            <span className="hidden xs:inline">POS</span>
+          </Link>
+        </div>
       </header>
 
       {/* Mobile Drawer Sheet */}
       <Sheet open={open} onOpenChange={setOpen}>
         <SheetContent
           side="left"
-          className="p-0 w-[275px] bg-white border-r border-slate-200 z-50 text-slate-800"
+          className="p-0 w-[280px] bg-white dark:bg-slate-950 border-r border-slate-200 dark:border-slate-800 z-50 text-slate-800 dark:text-slate-100"
         >
           {renderNavList(true)}
         </SheetContent>
       </Sheet>
 
       {/* Desktop Fixed Left Sidebar */}
-      <aside className="hidden md:flex flex-col w-[270px] h-screen fixed top-0 left-0 border-r border-slate-200 bg-white z-40">
+      <aside className="hidden md:flex flex-col w-[270px] h-screen fixed top-0 left-0 border-r border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 z-40">
         {renderNavList(false)}
       </aside>
     </>

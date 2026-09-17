@@ -23,7 +23,9 @@ import {
     RefreshCw,
     ShieldCheck,
     ShieldAlert,
-    MoreHorizontal
+    MoreHorizontal,
+    RotateCcw,
+    PauseCircle,
 } from "lucide-react";
 import { format } from "date-fns";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -38,6 +40,9 @@ import {
     DropdownMenuSeparator,
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { useQueryClient } from "@tanstack/react-query";
+import { ONLINE_PREORDERS_QUERY_KEY } from "@/hooks/queries/use-online-preorders";
 
 interface OrderDetailsSheetProps {
     order: OnlinePreorder | null;
@@ -51,8 +56,10 @@ interface OrderDetailsSheetProps {
 const statusConfig: Record<string, { color: string; icon: any }> = {
     PENDING: { color: "bg-yellow-100 text-yellow-800", icon: Clock },
     CONFIRMED: { color: "bg-blue-100 text-blue-800", icon: CheckCircle2 },
+    HOLD: { color: "bg-amber-100 text-amber-800 border-amber-300", icon: PauseCircle },
     DELIVERED: { color: "bg-indigo-100 text-indigo-800", icon: Truck },
     COMPLETED: { color: "bg-green-100 text-green-800", icon: CheckCircle2 },
+    RETURNED: { color: "bg-purple-100 text-purple-800 border-purple-300", icon: RotateCcw },
     CANCELLED: { color: "bg-red-100 text-red-800", icon: XCircle },
 };
 
@@ -66,10 +73,22 @@ import { Textarea } from "@/components/ui/textarea";
 import { sendAdminPurchaseConfirmed, sendAdminPurchaseCancelled } from "@/lib/gtm";
 
 export function OrderDetailsSheet({ order, isOpen, onClose, onRefresh, onEdit, onStartVerification }: OrderDetailsSheetProps) {
+    const queryClient = useQueryClient();
     const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
     const [cancelReason, setCancelReason] = useState("Fake Customer / Fake Order");
     const [isFakeCustomer, setIsFakeCustomer] = useState(true);
     const [isSubmittingCancel, setIsSubmittingCancel] = useState(false);
+
+    // Return & Hold States
+    const [returnDialogOpen, setReturnDialogOpen] = useState(false);
+    const [returnDeliveryChargePaidByCustomer, setReturnDeliveryChargePaidByCustomer] = useState(true);
+    const [returnChargeAmount, setReturnChargeAmount] = useState("120");
+    const [returnReason, setReturnReason] = useState("Customer rejected / returned parcel");
+    const [isSubmittingReturn, setIsSubmittingReturn] = useState(false);
+
+    const [holdDialogOpen, setHoldDialogOpen] = useState(false);
+    const [holdReason, setHoldReason] = useState("");
+    const [isSubmittingHold, setIsSubmittingHold] = useState(false);
 
     // Multi-Courier States
     const [activeCouriers, setActiveCouriers] = useState<ActiveCourier[]>([]);
@@ -188,6 +207,7 @@ export function OrderDetailsSheet({ order, isOpen, onClose, onRefresh, onEdit, o
                 title: "Courier Status Refreshed",
                 description: `Current delivery status: ${res.data.status || 'Updated'}`,
             });
+            queryClient.invalidateQueries({ queryKey: [ONLINE_PREORDERS_QUERY_KEY] });
             onRefresh();
         } catch (error: any) {
             toast({
@@ -241,6 +261,20 @@ export function OrderDetailsSheet({ order, isOpen, onClose, onRefresh, onEdit, o
             return;
         }
 
+        if (newStatus === "RETURNED") {
+            setReturnDeliveryChargePaidByCustomer(true);
+            setReturnChargeAmount(order.delivery_charge ? String(order.delivery_charge) : "120");
+            setReturnReason(order.return_reason || "Customer rejected / returned parcel");
+            setReturnDialogOpen(true);
+            return;
+        }
+
+        if (newStatus === "HOLD") {
+            setHoldReason(order.hold_reason || "");
+            setHoldDialogOpen(true);
+            return;
+        }
+
         try {
             await onlinePreordersApi.updateStatus(order.id, newStatus);
             toast({ title: "Success", description: `Order status updated to ${newStatus}` });
@@ -249,9 +283,66 @@ export function OrderDetailsSheet({ order, isOpen, onClose, onRefresh, onEdit, o
                 sendAdminPurchaseConfirmed({ ...order, status: newStatus });
             }
 
+            queryClient.invalidateQueries({ queryKey: [ONLINE_PREORDERS_QUERY_KEY] });
             onRefresh();
         } catch (error) {
             toast({ title: "Error", description: "Failed to update status", variant: "destructive" });
+        }
+    };
+
+    const handleConfirmReturn = async () => {
+        if (!order) return;
+        setIsSubmittingReturn(true);
+        try {
+            await onlinePreordersApi.processReturn(order.id, {
+                return_delivery_charge_paid_by_customer: returnDeliveryChargePaidByCustomer,
+                return_charge_amount: returnDeliveryChargePaidByCustomer ? 0 : Number(returnChargeAmount) || 0,
+                return_reason: returnReason,
+            });
+            toast({
+                title: "Order Returned & Stock Restored",
+                description: returnDeliveryChargePaidByCustomer
+                    ? `Order #${order.id} marked as RETURNED. All items restocked (Customer paid return delivery fee).`
+                    : `Order #${order.id} marked as RETURNED. All items restocked & ৳${returnChargeAmount} courier expense recorded.`,
+            });
+            setReturnDialogOpen(false);
+            queryClient.invalidateQueries({ queryKey: [ONLINE_PREORDERS_QUERY_KEY] });
+            queryClient.invalidateQueries({ queryKey: ['products'] });
+            queryClient.invalidateQueries({ queryKey: ['inventory'] });
+            onRefresh();
+        } catch (error: any) {
+            console.error("Return error:", error);
+            toast({
+                title: "Return Failed",
+                description: error?.response?.data?.detail || error?.response?.data?.error || "Failed to process return.",
+                variant: "destructive",
+            });
+        } finally {
+            setIsSubmittingReturn(false);
+        }
+    };
+
+    const handleConfirmHold = async () => {
+        if (!order) return;
+        setIsSubmittingHold(true);
+        try {
+            await onlinePreordersApi.setHold(order.id, holdReason);
+            toast({
+                title: "Order Placed on HOLD",
+                description: `Order #${order.id} placed on HOLD. Reason: ${holdReason || "Unspecified"}`,
+            });
+            setHoldDialogOpen(false);
+            queryClient.invalidateQueries({ queryKey: [ONLINE_PREORDERS_QUERY_KEY] });
+            onRefresh();
+        } catch (error: any) {
+            console.error("Hold error:", error);
+            toast({
+                title: "Hold Failed",
+                description: error?.response?.data?.detail || "Failed to set order on hold.",
+                variant: "destructive",
+            });
+        } finally {
+            setIsSubmittingHold(false);
         }
     };
 
@@ -266,6 +357,9 @@ export function OrderDetailsSheet({ order, isOpen, onClose, onRefresh, onEdit, o
                 description: `Order #${order.id} status updated to CANCELLED.` 
             });
             setCancelDialogOpen(false);
+            queryClient.invalidateQueries({ queryKey: [ONLINE_PREORDERS_QUERY_KEY] });
+            queryClient.invalidateQueries({ queryKey: ['products'] });
+            queryClient.invalidateQueries({ queryKey: ['inventory'] });
             onRefresh();
         } catch (error) {
             toast({ title: "Error", description: "Failed to cancel order", variant: "destructive" });
@@ -334,7 +428,7 @@ export function OrderDetailsSheet({ order, isOpen, onClose, onRefresh, onEdit, o
                                 </span>
                             </div>
                             <div className="flex flex-wrap gap-2">
-                                {["PENDING", "CONFIRMED", "DELIVERED", "COMPLETED", "CANCELLED"].map((statusValue) => {
+                                {["PENDING", "CONFIRMED", "HOLD", "DELIVERED", "COMPLETED", "RETURNED", "CANCELLED"].map((statusValue) => {
                                     const isActive = order.status === statusValue;
                                     const isDisabled =
                                         (statusValue === "COMPLETED" && order.status !== "DELIVERED");
@@ -342,7 +436,12 @@ export function OrderDetailsSheet({ order, isOpen, onClose, onRefresh, onEdit, o
                                     const baseClasses =
                                         "px-3.5 py-1.5 text-xs font-semibold rounded-full border transition-colors min-h-[36px] flex items-center justify-center";
 
-                                    const activeClasses = "bg-indigo-600 text-white border-indigo-600";
+                                    let activeClasses = "bg-indigo-600 text-white border-indigo-600";
+                                    if (statusValue === "HOLD") activeClasses = "bg-amber-600 text-white border-amber-600";
+                                    else if (statusValue === "RETURNED") activeClasses = "bg-purple-600 text-white border-purple-600";
+                                    else if (statusValue === "CANCELLED") activeClasses = "bg-red-600 text-white border-red-600";
+                                    else if (statusValue === "COMPLETED") activeClasses = "bg-green-600 text-white border-green-600";
+
                                     const inactiveClasses =
                                         "bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100";
                                     const disabledClasses = "bg-slate-50 text-slate-400 border-slate-100 cursor-not-allowed";
@@ -370,6 +469,73 @@ export function OrderDetailsSheet({ order, isOpen, onClose, onRefresh, onEdit, o
                                     );
                                 })}
                             </div>
+
+                            {/* HOLD Banner */}
+                            {order.status === "HOLD" && (
+                                <div className="p-3.5 rounded-xl bg-amber-50 border border-amber-200 flex items-start justify-between gap-3 mt-3">
+                                    <div className="flex items-start gap-2.5">
+                                        <PauseCircle className="w-5 h-5 text-amber-600 mt-0.5 shrink-0" />
+                                        <div className="space-y-1">
+                                            <div className="text-xs font-bold text-amber-900">Order is on HOLD</div>
+                                            <div className="text-xs text-amber-800">
+                                                <span className="font-semibold">Reason:</span>{" "}
+                                                {order.hold_reason || "Customer requested temporary hold"}
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <Button
+                                        size="sm"
+                                        variant="outline"
+                                        onClick={() => {
+                                            setHoldReason(order.hold_reason || "");
+                                            setHoldDialogOpen(true);
+                                        }}
+                                        className="text-xs h-7 bg-white border-amber-300 text-amber-800 hover:bg-amber-100 shrink-0"
+                                    >
+                                        Edit Reason
+                                    </Button>
+                                </div>
+                            )}
+
+                            {/* RETURNED Banner */}
+                            {order.status === "RETURNED" && (
+                                <div className="p-3.5 rounded-xl bg-purple-50 border border-purple-200 space-y-2 mt-3">
+                                    <div className="flex items-center justify-between">
+                                        <div className="flex items-center gap-2 text-purple-900 font-bold text-xs">
+                                            <RotateCcw className="w-4 h-4 text-purple-600" />
+                                            <span>Order Returned & Restocked</span>
+                                        </div>
+                                        {order.returned_at && (
+                                            <span className="text-[11px] text-purple-600 font-medium">
+                                                {format(new Date(order.returned_at), "MMM dd, yyyy hh:mm a")}
+                                            </span>
+                                        )}
+                                    </div>
+                                    <div className="text-xs text-purple-900 space-y-1">
+                                        {order.return_reason && (
+                                            <div>
+                                                <span className="font-semibold">Reason:</span> {order.return_reason}
+                                            </div>
+                                        )}
+                                        <div className="flex items-center gap-2 flex-wrap pt-0.5">
+                                            <span className="font-semibold">Delivery Charge:</span>
+                                            {order.return_delivery_charge_paid_by_customer ? (
+                                                <Badge variant="outline" className="bg-emerald-50 text-emerald-700 border-emerald-300 text-[11px]">
+                                                    Paid by Customer (No Store Expense)
+                                                </Badge>
+                                            ) : (
+                                                <Badge variant="outline" className="bg-red-50 text-red-700 border-red-300 text-[11px]">
+                                                    Store Borne: ৳{order.return_charge_amount || "0.00"} (Added to Expenses)
+                                                </Badge>
+                                            )}
+                                        </div>
+                                        <div className="text-emerald-700 font-medium flex items-center gap-1 pt-1">
+                                            <CheckCircle2 className="w-3.5 h-3.5" />
+                                            <span>All item quantities credited back to inventory variation stock.</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
                         </div>
 
                         {/* Customer & Address Section */}
@@ -916,8 +1082,13 @@ export function OrderDetailsSheet({ order, isOpen, onClose, onRefresh, onEdit, o
                                             <XCircle className="w-3 h-3 text-white" />
                                         </div>
                                         <div>
-                                            <div className="text-sm font-bold text-red-600">Order Cancelled</div>
-                                            <div className="text-xs text-slate-500">Order was cancelled by admin</div>
+                                            <div className="text-sm font-bold text-red-600 flex items-center gap-2">
+                                                Order Cancelled
+                                                <span className="inline-flex items-center gap-1 text-[11px] font-medium bg-emerald-50 text-emerald-700 border border-emerald-200 px-2 py-0.5 rounded-full">
+                                                    <CheckCircle2 className="w-3 h-3 text-emerald-600" /> Stock Restored
+                                                </span>
+                                            </div>
+                                            <div className="text-xs text-slate-500">Order was cancelled and items were restocked to inventory</div>
                                         </div>
                                     </div>
                                 )}
@@ -935,7 +1106,7 @@ export function OrderDetailsSheet({ order, isOpen, onClose, onRefresh, onEdit, o
                                 Cancel Order #{order.id}
                             </DialogTitle>
                             <DialogDescription>
-                                Specify the reason for cancelling this order. This event will be logged and dispatched to Meta GTM tracking.
+                                Specify the reason for cancelling this order. All product items in this order will be automatically restored back to inventory.
                             </DialogDescription>
                         </DialogHeader>
                         <div className="space-y-4 py-3">
@@ -1151,6 +1322,204 @@ export function OrderDetailsSheet({ order, isOpen, onClose, onRefresh, onEdit, o
                                     <>
                                         <Zap className="w-3.5 h-3.5 fill-current" />
                                         Confirm &amp; Dispatch via {activeCouriers.find(c => c.provider === selectedCourierProvider)?.name || 'Courier'}
+                                    </>
+                                )}
+                            </Button>
+                        </DialogFooter>
+                    </DialogContent>
+                </Dialog>
+
+                {/* Process Return Dialog */}
+                <Dialog open={returnDialogOpen} onOpenChange={setReturnDialogOpen}>
+                    <DialogContent className="sm:max-w-md">
+                        <DialogHeader>
+                            <div className="flex items-center gap-2">
+                                <div className="p-2 rounded-xl bg-purple-100 text-purple-700">
+                                    <RotateCcw className="w-5 h-5" />
+                                </div>
+                                <div>
+                                    <DialogTitle className="text-lg font-bold text-slate-900">
+                                        Return Preorder #{order.id}
+                                    </DialogTitle>
+                                    <DialogDescription className="text-xs text-slate-500">
+                                        Mark as returned and restock items to inventory
+                                    </DialogDescription>
+                                </div>
+                            </div>
+                        </DialogHeader>
+
+                        <div className="space-y-4 py-2">
+                            {/* Restock alert */}
+                            <div className="p-3 rounded-xl bg-emerald-50 border border-emerald-200 flex items-start gap-2.5">
+                                <CheckCircle2 className="w-4 h-4 text-emerald-600 mt-0.5 shrink-0" />
+                                <div className="text-xs text-emerald-800 leading-relaxed">
+                                    <span className="font-semibold">Automated Restocking:</span> All items ({order.items?.length || 0} items) will be credited back to product variation stock and an incoming StockMovement will be logged.
+                                </div>
+                            </div>
+
+                            {/* Delivery Charge Expense Radio */}
+                            <div className="space-y-2">
+                                <Label className="text-xs font-semibold text-slate-700">
+                                    Delivery Charge Accounting
+                                </Label>
+                                <RadioGroup
+                                    value={returnDeliveryChargePaidByCustomer ? "customer" : "store"}
+                                    onValueChange={(val) => setReturnDeliveryChargePaidByCustomer(val === "customer")}
+                                    className="space-y-2"
+                                >
+                                    <div className="flex items-start gap-3 p-3 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 cursor-pointer">
+                                        <RadioGroupItem value="customer" id="rc-customer" className="mt-0.5" />
+                                        <label htmlFor="rc-customer" className="cursor-pointer text-xs space-y-0.5">
+                                            <div className="font-semibold text-slate-900">
+                                                Customer paid return delivery charge
+                                            </div>
+                                            <div className="text-slate-500">
+                                                No expense will be added to the store ledger.
+                                            </div>
+                                        </label>
+                                    </div>
+
+                                    <div className="flex items-start gap-3 p-3 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 cursor-pointer">
+                                        <RadioGroupItem value="store" id="rc-store" className="mt-0.5" />
+                                        <label htmlFor="rc-store" className="cursor-pointer text-xs space-y-0.5">
+                                            <div className="font-semibold text-slate-900">
+                                                Store bears delivery charge (Customer did not pay)
+                                            </div>
+                                            <div className="text-slate-500">
+                                                Admin counts return delivery fee and adds it automatically to store Expenses under "Courier Return Charges".
+                                            </div>
+                                        </label>
+                                    </div>
+                                </RadioGroup>
+                            </div>
+
+                            {/* Charge Amount Input (Only when store bears cost) */}
+                            {!returnDeliveryChargePaidByCustomer && (
+                                <div className="space-y-1.5 p-3 rounded-xl bg-red-50/60 border border-red-200">
+                                    <Label htmlFor="returnChargeAmount" className="text-xs font-semibold text-red-900">
+                                        Return Delivery Charge Amount (৳) to Add as Expense
+                                    </Label>
+                                    <Input
+                                        id="returnChargeAmount"
+                                        type="number"
+                                        step="0.01"
+                                        min="0"
+                                        value={returnChargeAmount}
+                                        onChange={(e) => setReturnChargeAmount(e.target.value)}
+                                        placeholder="120.00"
+                                        className="h-9 text-sm font-semibold bg-white"
+                                    />
+                                    <p className="text-[11px] text-red-600">
+                                        This amount will create a paid Expense under category "Courier Return Charges".
+                                    </p>
+                                </div>
+                            )}
+
+                            {/* Return Reason */}
+                            <div className="space-y-1.5">
+                                <Label htmlFor="returnReason" className="text-xs font-semibold text-slate-700">
+                                    Return Reason
+                                </Label>
+                                <Input
+                                    id="returnReason"
+                                    value={returnReason}
+                                    onChange={(e) => setReturnReason(e.target.value)}
+                                    placeholder="e.g., Customer unreachable / refused parcel / cancelled at door"
+                                    className="h-9 text-xs"
+                                />
+                            </div>
+                        </div>
+
+                        <DialogFooter className="gap-2 sm:gap-0">
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => setReturnDialogOpen(false)}
+                                disabled={isSubmittingReturn}
+                            >
+                                Cancel
+                            </Button>
+                            <Button
+                                size="sm"
+                                onClick={handleConfirmReturn}
+                                disabled={isSubmittingReturn || (!returnDeliveryChargePaidByCustomer && Number(returnChargeAmount) <= 0)}
+                                className="bg-purple-600 hover:bg-purple-700 text-white font-bold gap-1.5"
+                            >
+                                {isSubmittingReturn ? (
+                                    <>
+                                        <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                                        Processing Return...
+                                    </>
+                                ) : (
+                                    <>
+                                        <RotateCcw className="w-3.5 h-3.5" />
+                                        Confirm Return &amp; Restock
+                                    </>
+                                )}
+                            </Button>
+                        </DialogFooter>
+                    </DialogContent>
+                </Dialog>
+
+                {/* Hold Order Dialog */}
+                <Dialog open={holdDialogOpen} onOpenChange={setHoldDialogOpen}>
+                    <DialogContent className="sm:max-w-md">
+                        <DialogHeader>
+                            <div className="flex items-center gap-2">
+                                <div className="p-2 rounded-xl bg-amber-100 text-amber-700">
+                                    <PauseCircle className="w-5 h-5" />
+                                </div>
+                                <div>
+                                    <DialogTitle className="text-lg font-bold text-slate-900">
+                                        Put Order #{order.id} on HOLD
+                                    </DialogTitle>
+                                    <DialogDescription className="text-xs text-slate-500">
+                                        Pause processing for this order temporarily
+                                    </DialogDescription>
+                                </div>
+                            </div>
+                        </DialogHeader>
+
+                        <div className="space-y-3 py-2">
+                            <div className="space-y-1.5">
+                                <Label htmlFor="holdReasonInput" className="text-xs font-semibold text-slate-700">
+                                    Hold Reason / Note
+                                </Label>
+                                <Textarea
+                                    id="holdReasonInput"
+                                    rows={3}
+                                    value={holdReason}
+                                    onChange={(e) => setHoldReason(e.target.value)}
+                                    placeholder="e.g., Customer requested delivery next week / Verification pending / Phone switched off"
+                                    className="text-xs resize-none"
+                                />
+                            </div>
+                        </div>
+
+                        <DialogFooter className="gap-2 sm:gap-0">
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => setHoldDialogOpen(false)}
+                                disabled={isSubmittingHold}
+                            >
+                                Cancel
+                            </Button>
+                            <Button
+                                size="sm"
+                                onClick={handleConfirmHold}
+                                disabled={isSubmittingHold}
+                                className="bg-amber-600 hover:bg-amber-700 text-white font-bold gap-1.5"
+                            >
+                                {isSubmittingHold ? (
+                                    <>
+                                        <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                                        Saving...
+                                    </>
+                                ) : (
+                                    <>
+                                        <PauseCircle className="w-3.5 h-3.5" />
+                                        Put on HOLD
                                     </>
                                 )}
                             </Button>

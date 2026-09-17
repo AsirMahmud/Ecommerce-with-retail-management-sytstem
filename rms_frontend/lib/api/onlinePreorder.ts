@@ -64,6 +64,23 @@ export interface OnlinePreorder {
   courier_dispatched_at?: string;
   courier_response?: any;
 
+  return_delivery_charge_paid_by_customer?: boolean;
+  return_charge_amount?: number | string;
+  return_reason?: string;
+  hold_reason?: string;
+  returned_at?: string;
+  is_stock_restored?: boolean;
+  is_stock_deducted?: boolean;
+  return_expense_details?: {
+    id: number;
+    description: string;
+    amount: string;
+    category_name: string;
+    date: string;
+    status: string;
+  } | null;
+  profit?: number | string;
+
   fraud_summary?: {
     risk_score: number;
     risk_level: 'LOW' | 'MEDIUM' | 'HIGH';
@@ -135,27 +152,107 @@ export interface OnlinePreorderVerification {
   items: OnlinePreorderVerificationItem[];
 }
 
-export interface OnlinePreorderScanResult {
-  result: 'MATCHED' | 'NOT_IN_ORDER' | 'OVER_SCAN';
-  message: string;
-  verification: OnlinePreorderVerification;
+export interface OnlinePreordersQueryParams {
+  page?: number;
+  pageSize?: number;
+  status?: string;
+  search?: string;
+  courierPartner?: string;
+  dateFrom?: string;
+  dateTo?: string;
+  ordering?: string;
+  noPagination?: boolean;
+}
+
+export interface PaginatedResponse<T> {
+  count: number;
+  next: string | null;
+  previous: string | null;
+  results: T[];
+}
+
+export interface OnlinePreorderMetrics {
+  total_orders: number;
+  today_orders: number;
+  status_breakdown: {
+    PENDING: number;
+    CONFIRMED: number;
+    HOLD: number;
+    DELIVERED: number;
+    COMPLETED: number;
+    RETURNED: number;
+    CANCELLED: number;
+  };
+  financials: {
+    total_revenue: number;
+    completed_revenue: number;
+    average_order_value: number;
+    total_profit: number;
+  };
+  rates: {
+    fulfillment_rate: number;
+    return_rate: number;
+    cancellation_rate: number;
+  };
+  couriers: Record<string, number>;
 }
 
 const api = axios;
 
 export const onlinePreordersApi = {
-  getAll: (status?: string, search?: string) => {
-    const params = new URLSearchParams();
-    if (status && status !== 'all') params.append('status', status);
-    if (search) params.append('search', search);
-    const qs = params.toString();
-    return api.get<{ results?: OnlinePreorder[] } | OnlinePreorder[]>(`/online-preorder/orders/${qs ? `?${qs}` : ''}`);
+  getAll: (paramsOrStatus?: OnlinePreordersQueryParams | string, legacySearch?: string) => {
+    const query = new URLSearchParams();
+
+    if (typeof paramsOrStatus === 'string') {
+      if (paramsOrStatus && paramsOrStatus !== 'all') query.append('status', paramsOrStatus);
+      if (legacySearch) query.append('search', legacySearch);
+    } else if (paramsOrStatus && typeof paramsOrStatus === 'object') {
+      const { page, pageSize, status, search, courierPartner, dateFrom, dateTo, ordering, noPagination } = paramsOrStatus;
+      if (page) query.append('page', String(page));
+      if (pageSize) query.append('page_size', String(pageSize));
+      if (status && status !== 'all') query.append('status', status);
+      if (search) query.append('search', search);
+      if (courierPartner && courierPartner !== 'all') query.append('courier_partner', courierPartner);
+      if (dateFrom) query.append('date_from', dateFrom);
+      if (dateTo) query.append('date_to', dateTo);
+      if (ordering) query.append('ordering', ordering);
+      if (noPagination) query.append('no_pagination', 'true');
+    }
+
+    const qs = query.toString();
+    return api.get<PaginatedResponse<OnlinePreorder> | OnlinePreorder[]>(`/online-preorder/orders/${qs ? `?${qs}` : ''}`);
+  },
+  getMetrics: (dateRange?: { dateFrom?: string; dateTo?: string }) => {
+    const query = new URLSearchParams();
+    if (dateRange?.dateFrom) query.append('date_from', dateRange.dateFrom);
+    if (dateRange?.dateTo) query.append('date_to', dateRange.dateTo);
+    const qs = query.toString();
+    return api.get<OnlinePreorderMetrics>(`/online-preorder/orders/metrics/${qs ? `?${qs}` : ''}`);
   },
   getById: (id: number) => api.get<OnlinePreorder>(`/online-preorder/orders/${id}/`),
   create: (data: Partial<OnlinePreorder>) => api.post<OnlinePreorder>('/online-preorder/orders/', data),
   update: (id: number, data: Partial<OnlinePreorder>) => api.patch<OnlinePreorder>(`/online-preorder/orders/${id}/`, data),
   updateStatus: (id: number, status: string) => api.patch(`/online-preorder/orders/${id}/`, { status }),
   delete: (id: number) => api.delete(`/online-preorder/orders/${id}/`),
+
+  // Return & Hold Management APIs
+  processReturn: (
+    id: number,
+    data: {
+      return_delivery_charge_paid_by_customer: boolean;
+      return_charge_amount: number;
+      return_reason: string;
+    }
+  ) =>
+    api.post<{ success: boolean; message: string; order: OnlinePreorder }>(
+      `/online-preorder/orders/${id}/process-return/`,
+      data
+    ),
+  setHold: (id: number, hold_reason: string) =>
+    api.post<{ success: boolean; message: string; order: OnlinePreorder }>(
+      `/online-preorder/orders/${id}/set-hold/`,
+      { hold_reason }
+    ),
 
   // Verification APIs
   startVerification: (id: number) =>

@@ -3,8 +3,11 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import AllowAny
 from rest_framework.decorators import action
+from rest_framework.pagination import PageNumberPagination
 from django.db import models, transaction
+from django.db.models import Sum, Count, Q
 from django.utils import timezone
+from decimal import Decimal
 from rest_framework.exceptions import ValidationError
 
 from apps.inventory.models import Product
@@ -20,6 +23,12 @@ from .serializers import (
     OnlinePreorderVerificationSerializer,
     OnlinePreorderScanResultSerializer,
 )
+
+
+class OnlinePreorderPagination(PageNumberPagination):
+    page_size = 15
+    page_size_query_param = 'page_size'
+    max_page_size = 100
 
 
 class PublicCreateOnlinePreorderView(APIView):
@@ -51,6 +60,12 @@ class OnlinePreorderViewSet(
 ):
     queryset = OnlinePreorder.objects.all().order_by('-created_at')
     permission_classes = [AllowAny]
+    pagination_class = OnlinePreorderPagination
+
+    def paginate_queryset(self, queryset):
+        if self.request.query_params.get('no_pagination') == 'true':
+            return None
+        return super().paginate_queryset(queryset)
 
     def get_serializer_class(self):
         if self.action in ['create', 'update', 'partial_update']:
@@ -59,13 +74,143 @@ class OnlinePreorderViewSet(
 
     def get_queryset(self):
         qs = OnlinePreorder.objects.all()
+
+        # Filter by status (single or comma-separated list)
         status_filter = self.request.query_params.get('status')
         if status_filter and status_filter != 'all':
-            qs = qs.filter(status=status_filter)
+            if ',' in status_filter:
+                statuses = [s.strip() for s in status_filter.split(',') if s.strip()]
+                qs = qs.filter(status__in=statuses)
+            else:
+                qs = qs.filter(status=status_filter)
+
+        # Filter by courier partner
+        courier_filter = self.request.query_params.get('courier_partner')
+        if courier_filter and courier_filter != 'all':
+            qs = qs.filter(courier_partner__iexact=courier_filter)
+
+        # Filter by date range
+        date_from = self.request.query_params.get('date_from')
+        date_to = self.request.query_params.get('date_to')
+        if date_from:
+            qs = qs.filter(created_at__gte=date_from)
+        if date_to:
+            qs = qs.filter(created_at__lte=date_to)
+
+        # Multi-field search
         search = self.request.query_params.get('search')
         if search:
-            qs = qs.filter(models.Q(customer_name__icontains=search) | models.Q(customer_phone__icontains=search))
-        return qs.order_by('-created_at')
+            search = search.strip()
+            id_query = models.Q()
+            cleaned_search = search.lstrip('#')
+            if cleaned_search.isdigit():
+                id_query = models.Q(id=int(cleaned_search))
+
+            qs = qs.filter(
+                id_query |
+                models.Q(customer_name__icontains=search) |
+                models.Q(customer_phone__icontains=search) |
+                models.Q(customer_email__icontains=search) |
+                models.Q(notes__icontains=search) |
+                models.Q(steadfast_consignment_id__icontains=search) |
+                models.Q(steadfast_tracking_code__icontains=search) |
+                models.Q(courier_consignment_id__icontains=search) |
+                models.Q(courier_tracking_code__icontains=search)
+            )
+
+        # Dynamic ordering
+        ordering = self.request.query_params.get('ordering', '-created_at')
+        allowed_orderings = [
+            'created_at', '-created_at',
+            'total_amount', '-total_amount',
+            'id', '-id',
+            'status', '-status'
+        ]
+        if ordering in allowed_orderings:
+            qs = qs.order_by(ordering)
+        else:
+            qs = qs.order_by('-created_at')
+
+        return qs
+
+    @action(detail=False, methods=['get'], url_path='metrics', authentication_classes=[], permission_classes=[AllowAny])
+    def metrics(self, request):
+        """
+        Global summary metrics across all online preorders.
+        Provides instant counts by status, revenue, delivery rates, and courier distribution.
+        """
+        qs = OnlinePreorder.objects.all()
+
+        date_from = request.query_params.get('date_from')
+        date_to = request.query_params.get('date_to')
+        if date_from:
+            qs = qs.filter(created_at__gte=date_from)
+        if date_to:
+            qs = qs.filter(created_at__lte=date_to)
+
+        total_orders = qs.count()
+
+        status_aggregates = qs.aggregate(
+            pending=Count('id', filter=models.Q(status='PENDING')),
+            confirmed=Count('id', filter=models.Q(status='CONFIRMED')),
+            hold=Count('id', filter=models.Q(status='HOLD')),
+            delivered=Count('id', filter=models.Q(status='DELIVERED')),
+            completed=Count('id', filter=models.Q(status='COMPLETED')),
+            returned=Count('id', filter=models.Q(status='RETURNED')),
+            cancelled=Count('id', filter=models.Q(status='CANCELLED')),
+            total_revenue=Sum('total_amount'),
+            completed_revenue=Sum('total_amount', filter=models.Q(status='COMPLETED')),
+            delivered_revenue=Sum('total_amount', filter=models.Q(status='DELIVERED')),
+            total_profit=Sum('profit', filter=models.Q(status='COMPLETED')),
+        )
+
+        completed_count = status_aggregates['completed'] or 0
+        delivered_count = status_aggregates['delivered'] or 0
+        returned_count = status_aggregates['returned'] or 0
+        cancelled_count = status_aggregates['cancelled'] or 0
+        total_rev = status_aggregates['total_revenue'] or Decimal('0.00')
+        comp_rev = status_aggregates['completed_revenue'] or Decimal('0.00')
+
+        avg_order_value = (comp_rev / completed_count) if completed_count > 0 else (
+            (total_rev / total_orders) if total_orders > 0 else Decimal('0.00')
+        )
+
+        courier_counts = qs.values('courier_partner').annotate(count=Count('id'))
+        courier_map = {item['courier_partner'] or 'UNASSIGNED': item['count'] for item in courier_counts}
+
+        dispatched_or_closed = completed_count + delivered_count + returned_count
+        fulfillment_rate = round((((completed_count + delivered_count) / dispatched_or_closed) * 100), 1) if dispatched_or_closed > 0 else 0.0
+        return_rate = round(((returned_count / dispatched_or_closed) * 100), 1) if dispatched_or_closed > 0 else 0.0
+        cancellation_rate = round(((cancelled_count / total_orders) * 100), 1) if total_orders > 0 else 0.0
+
+        today_start = timezone.now().replace(hour=0, minute=0, second=0, microsecond=0)
+        today_orders = qs.filter(created_at__gte=today_start).count()
+
+        return Response({
+            'total_orders': total_orders,
+            'today_orders': today_orders,
+            'status_breakdown': {
+                'PENDING': status_aggregates['pending'] or 0,
+                'CONFIRMED': status_aggregates['confirmed'] or 0,
+                'HOLD': status_aggregates['hold'] or 0,
+                'DELIVERED': status_aggregates['delivered'] or 0,
+                'COMPLETED': status_aggregates['completed'] or 0,
+                'RETURNED': status_aggregates['returned'] or 0,
+                'CANCELLED': status_aggregates['cancelled'] or 0,
+            },
+            'financials': {
+                'total_revenue': float(total_rev),
+                'completed_revenue': float(comp_rev),
+                'average_order_value': float(avg_order_value),
+                'total_profit': float(status_aggregates['total_profit'] or Decimal('0.00')),
+            },
+            'rates': {
+                'fulfillment_rate': fulfillment_rate,
+                'return_rate': return_rate,
+                'cancellation_rate': cancellation_rate,
+            },
+            'couriers': courier_map,
+        })
 
     def perform_update(self, serializer):
         instance = serializer.instance
@@ -117,14 +262,25 @@ class OnlinePreorderViewSet(
                 logger = logging.getLogger(__name__)
                 logger.error(f"Error sending delivery notification for order {updated_instance.id}: {str(e)}")
 
+        # Automated inventory stock synchronization on status transitions
+        if old_status != 'CANCELLED' and new_status == 'CANCELLED':
+            self._restore_preorder_stock(updated_instance, reason="cancelled")
+        elif old_status == 'CANCELLED' and new_status not in ['CANCELLED', 'RETURNED']:
+            self._deduct_preorder_stock(updated_instance, reason="reactivated")
+        elif old_status != 'RETURNED' and new_status == 'RETURNED':
+            self._restore_preorder_stock(updated_instance, reason="returned")
+
     def perform_destroy(self, instance):
         """
         Perform deletion of an online preorder.
+        If stock was deducted and not yet restored, restore it to inventory before deletion.
         Related OnlineConversion will be automatically deleted via CASCADE.
         """
         import logging
         logger = logging.getLogger(__name__)
         logger.info(f"Deleting online preorder #{instance.id} - {instance.customer_name}")
+        if instance.is_stock_deducted and not instance.is_stock_restored:
+            self._restore_preorder_stock(instance, reason="cancelled")
         instance.delete()
 
     # --- Verification Actions ---
@@ -336,6 +492,104 @@ class OnlinePreorderViewSet(
 
         serializer = OnlinePreorderVerificationSerializer(verification, context={"request": request})
         return Response(serializer.data)
+
+    def _restore_preorder_stock(self, order, reason="returned"):
+        """
+        Helper to restore items in an online preorder back to inventory variations and products.
+        """
+        from .stock_utils import restore_preorder_stock
+        restore_preorder_stock(order, reason=reason)
+
+    def _deduct_preorder_stock(self, order, reason="new"):
+        """
+        Helper to deduct items in an online preorder from inventory variations and products.
+        """
+        from .stock_utils import deduct_preorder_stock
+        deduct_preorder_stock(order, reason=reason)
+
+    @action(detail=True, methods=["post"], url_path="process-return", authentication_classes=[], permission_classes=[AllowAny])
+    @transaction.atomic
+    def process_return(self, request, pk=None):
+        """
+        Process return for an online preorder:
+        1. Set status to RETURNED and update returned_at
+        2. Automatically restore inventory stock for all items in order and log StockMovement(movement_type='IN')
+        3. Delivery charge handling:
+           - If return_delivery_charge_paid_by_customer is True: no expense is added
+           - If return_delivery_charge_paid_by_customer is False and return_charge_amount > 0:
+             create an Expense under category "Courier Return Charges"
+        """
+        from decimal import Decimal
+        order = self.get_object()
+
+        if order.status == "RETURNED" and order.is_stock_restored:
+            return Response(
+                {"detail": "This order has already been processed as returned and restocked."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        customer_paid = request.data.get("return_delivery_charge_paid_by_customer", True)
+        if isinstance(customer_paid, str):
+            customer_paid = customer_paid.lower() in ["true", "1", "yes"]
+
+        charge_amount = Decimal(str(request.data.get("return_charge_amount", 0) or 0))
+        reason = request.data.get("return_reason", "").strip()
+
+        order.status = "RETURNED"
+        order.return_delivery_charge_paid_by_customer = customer_paid
+        order.return_charge_amount = charge_amount
+        order.return_reason = reason
+        order.returned_at = timezone.now()
+
+        # 1. Restore stock
+        self._restore_preorder_stock(order)
+
+        # 2. Expense handling if store bears the return delivery fee
+        if not customer_paid and charge_amount > Decimal("0.00"):
+            from apps.expenses.models import Expense, ExpenseCategory
+            category, _ = ExpenseCategory.objects.get_or_create(
+                name="Courier Return Charges",
+                defaults={
+                    "color": "#EF4444",
+                    "description": "Courier return charges borne by store for returned online orders"
+                }
+            )
+            expense = Expense.objects.create(
+                description=f"Return Courier Charge for Preorder #{order.id} ({order.customer_name})",
+                amount=charge_amount,
+                date=timezone.now().date(),
+                category=category,
+                payment_method="OTHER",
+                status="PAID",
+                reference_number=f"RET-ORD-{order.id}",
+                notes=f"Order #{order.id} returned by customer without paying delivery charge. Return reason: {reason}"
+            )
+            order.return_expense = expense
+
+        order.save()
+
+        return Response({
+            "success": True,
+            "message": "Order marked as RETURNED and stock restocked to inventory successfully.",
+            "order": OnlinePreorderSerializer(order, context={"request": request}).data
+        }, status=status.HTTP_200_OK)
+
+    @action(detail=True, methods=["post"], url_path="set-hold", authentication_classes=[], permission_classes=[AllowAny])
+    def set_hold(self, request, pk=None):
+        """
+        Put preorder on HOLD with hold reason.
+        """
+        order = self.get_object()
+        reason = request.data.get("hold_reason", "").strip()
+        order.status = "HOLD"
+        order.hold_reason = reason
+        order.save(update_fields=["status", "hold_reason", "updated_at"])
+
+        return Response({
+            "success": True,
+            "message": "Order put on HOLD successfully.",
+            "order": OnlinePreorderSerializer(order, context={"request": request}).data
+        }, status=status.HTTP_200_OK)
 
     # --- Steadfast Courier Actions ---
 
@@ -603,6 +857,17 @@ class OnlinePreorderViewSet(
             "data": res.get("data"),
             "order": OnlinePreorderSerializer(order, context={"request": request}).data
         })
+
+    @action(detail=False, methods=["post"], url_path="sync-courier-status", authentication_classes=[], permission_classes=[AllowAny])
+    def sync_courier_status(self, request):
+        """
+        Synchronize live status from couriers (Steadfast, Pathao, etc.) for dispatched orders.
+        Optional body: { "order_ids": [1, 2, ...] }
+        """
+        from .courier_services import CourierManager
+        order_ids = request.data.get("order_ids")
+        res = CourierManager.sync_orders_status(order_ids=order_ids)
+        return Response(res, status=status.HTTP_200_OK)
 
     @action(detail=False, methods=["get"], url_path="courier-parcels", authentication_classes=[], permission_classes=[AllowAny])
     def courier_parcels(self, request):

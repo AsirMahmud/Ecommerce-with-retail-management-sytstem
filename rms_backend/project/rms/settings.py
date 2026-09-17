@@ -34,7 +34,20 @@ SECRET_KEY = os.getenv('SECRET_KEY', 'django-insecure-=i3-$(--y)2nbeogrplsh-c1z%
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = ["rawstitch.info","localhost",'127.0.0.1']
+allowed_hosts_env = os.getenv('ALLOWED_HOSTS', '')
+if allowed_hosts_env:
+    ALLOWED_HOSTS = [h.strip() for h in allowed_hosts_env.split(',') if h.strip()]
+else:
+    ALLOWED_HOSTS = [
+        "api.rawstitch.com.bd",
+        "rawstitch.com.bd",
+        "www.rawstitch.com.bd",
+        ".rawstitch.com.bd",
+        "rawstitch.info",
+        ".rawstitch.info",
+        "localhost",
+        "127.0.0.1",
+    ]
 
 
 # Application definition
@@ -232,11 +245,24 @@ CORS_ALLOWED_ORIGINS = [
     "https://rawstitch.info",
     "https://rawstitch.vercel.app",
     "https://retail-management-sytstem-omega.vercel.app",
-    "https://www.rawstitch.com.bd"
-
+    "https://www.rawstitch.com.bd",
+    "https://rawstitch.com.bd",
+    "https://api.rawstitch.com.bd",
 ]
 
 CORS_ALLOW_CREDENTIALS = True
+
+# CSRF settings
+CSRF_TRUSTED_ORIGINS = [
+    "https://api.rawstitch.com.bd",
+    "https://rawstitch.com.bd",
+    "https://www.rawstitch.com.bd",
+    "https://rawstitch.info",
+    "https://rawstitch.vercel.app",
+    "https://retail-management-sytstem-omega.vercel.app",
+    "http://localhost:3000",
+    "http://127.0.0.1:3000",
+]
 
 # Email Configuration (Gmail)
 EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'

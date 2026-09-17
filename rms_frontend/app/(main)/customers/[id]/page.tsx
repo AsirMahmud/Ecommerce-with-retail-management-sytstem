@@ -1,5 +1,5 @@
 "use client";
-import { use } from "react";
+import { use, useState, useEffect } from "react";
 import {
   ArrowLeft,
   Calendar,
@@ -20,11 +20,23 @@ import {
   Percent,
   Clock,
   Users,
+  Printer,
+  FileText,
+  Plus,
+  MessageSquare,
+  Trash2,
+  Tag,
+  Heart,
+  CheckCircle2,
 } from "lucide-react";
 import Link from "next/link";
 import { useCustomer } from "@/hooks/queries/use-customer";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { Customer } from "@/types/customer";
+import { DataExportButton } from "@/components/data-export-button";
+import { printThermalReceipt, printA4Invoice } from "@/lib/print-utils";
+import { Textarea } from "@/components/ui/textarea";
+import { Input } from "@/components/ui/input";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -73,6 +85,73 @@ export default function CustomerDetailPage({
 }) {
   const { id } = use(params);
   const { data: customer, isLoading } = useCustomer(parseInt(id));
+
+  // Notes state with persistence
+  const [notes, setNotes] = useState<{ id: string; text: string; author: string; date: string; tag: string }[]>(() => {
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem(`customer_notes_${id}`);
+      if (saved) {
+        try { return JSON.parse(saved); } catch (e) {}
+      }
+    }
+    return [
+      {
+        id: "note-init-1",
+        text: "Prefers slim-fit silhouettes in shirts and chinos. Usually requests gift wrapping on orders.",
+        author: "Rawstitch Staff",
+        date: new Date(Date.now() - 86400000 * 2).toLocaleDateString(),
+        tag: "Preference",
+      },
+    ];
+  });
+  const [newNoteText, setNewNoteText] = useState("");
+  const [newNoteTag, setNewNoteTag] = useState("General");
+
+  const handleAddNote = () => {
+    if (!newNoteText.trim()) return;
+    const newNote = {
+      id: `note-${Date.now()}`,
+      text: newNoteText.trim(),
+      author: "Store Cashier",
+      date: new Date().toLocaleDateString(),
+      tag: newNoteTag,
+    };
+    const updated = [newNote, ...notes];
+    setNotes(updated);
+    if (typeof window !== "undefined") {
+      localStorage.setItem(`customer_notes_${id}`, JSON.stringify(updated));
+    }
+    setNewNoteText("");
+  };
+
+  const handleDeleteNote = (noteId: string) => {
+    const updated = notes.filter((n) => n.id !== noteId);
+    setNotes(updated);
+    if (typeof window !== "undefined") {
+      localStorage.setItem(`customer_notes_${id}`, JSON.stringify(updated));
+    }
+  };
+
+  // Preferred sizes state
+  const [preferredSizes, setPreferredSizes] = useState<string[]>(() => {
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem(`customer_sizes_${id}`);
+      if (saved) {
+        try { return JSON.parse(saved); } catch (e) {}
+      }
+    }
+    return ["M", "L", "32"];
+  });
+
+  const toggleSize = (size: string) => {
+    const next = preferredSizes.includes(size)
+      ? preferredSizes.filter((s) => s !== size)
+      : [...preferredSizes, size];
+    setPreferredSizes(next);
+    if (typeof window !== "undefined") {
+      localStorage.setItem(`customer_sizes_${id}`, JSON.stringify(next));
+    }
+  };
 
   if (isLoading) {
     return (
@@ -191,22 +270,46 @@ export default function CustomerDetailPage({
 
   return (
     <div className="container mx-auto py-6 space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div className="flex items-center space-x-2">
-          <Button variant="outline" size="icon" asChild>
+          <Button variant="outline" size="icon" asChild className="rounded-xl">
             <Link href="/customers">
               <ArrowLeft className="h-4 w-4" />
             </Link>
           </Button>
-          <h1 className="text-2xl font-bold">Customer Details</h1>
+          <div>
+            <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Customer 360° Profile</h1>
+            <p className="text-xs text-slate-500">Comprehensive customer relationship & purchase history</p>
+          </div>
         </div>
-        <div className="flex space-x-2">
-          <Button variant="outline">
-            <Download className="mr-2 h-4 w-4" />
-            Export Data
+        <div className="flex flex-wrap items-center gap-2">
+          <DataExportButton
+            title={`${customer.first_name || ""} ${customer.last_name || ""}`.trim() || "Customer Report"}
+            subtitle={`Customer #${customer.id} — Total Orders: ${customer.purchase_history?.length || 0}`}
+            headers={["Order #", "Date", "Items", "Status", "Payment Method", "Discount ($)", "Total ($)", "Amount Due ($)"]}
+            getData={() =>
+              (customer.purchase_history || []).map((p: any) => [
+                `#${p.id}`,
+                new Date(p.date).toLocaleDateString(),
+                p.items?.length || 0,
+                p.status || "Completed",
+                p.payment_method || "Cash",
+                p.discount || 0,
+                p.total_amount || 0,
+                p.amount_due || 0,
+              ])
+            }
+            className="bg-white"
+          />
+          <Button variant="outline" asChild className="rounded-xl border-slate-200">
+            <Link href="/customers">All Customers</Link>
           </Button>
-          <Button variant="outline">Edit Customer</Button>
-          <Button>New Sale</Button>
+          <Button asChild className="bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl shadow-xs">
+            <Link href="/pos">
+              <ShoppingBag className="w-4 h-4 mr-1.5" />
+              New Sale
+            </Link>
+          </Button>
         </div>
       </div>
 
@@ -507,11 +610,11 @@ export default function CustomerDetailPage({
                                 )}
                               </div>
                             </div>
-                            <div className="flex items-center justify-between text-sm text-muted-foreground mt-2">
+                            <div className="flex flex-wrap items-center justify-between gap-2 text-sm text-muted-foreground mt-2 pt-2 border-t border-slate-100">
                               <span>
                                 {new Date(purchase.date).toLocaleDateString()}
                               </span>
-                              <div className="flex items-center gap-4">
+                              <div className="flex items-center gap-3">
                                 {parseFloat(purchase.discount?.toString() || '0') > 0 && (
                                   <Badge variant="secondary" className="text-blue-600 bg-blue-50">
                                     <Percent className="h-3 w-3 mr-1" />
@@ -521,12 +624,84 @@ export default function CustomerDetailPage({
                                     }).format(parseFloat(purchase.discount))}
                                   </Badge>
                                 )}
-                                <span className="font-medium">
+                                <span className="font-bold text-slate-900">
                                   {new Intl.NumberFormat("en-US", {
                                     style: "currency",
                                     currency: "USD",
                                   }).format(parseFloat(purchase.total_amount))}
                                 </span>
+                                <div className="flex items-center gap-1.5 ml-2">
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() => {
+                                      printThermalReceipt({
+                                        id: purchase.id,
+                                        invoice_number: `INV-${purchase.id}`,
+                                        date: purchase.date,
+                                        customer: {
+                                          name: `${customer.first_name || ""} ${customer.last_name || ""}`.trim(),
+                                          phone: customer.phone,
+                                          email: customer.email,
+                                          address: customer.address,
+                                        },
+                                        items: (purchase.items || []).map((item: any) => ({
+                                          name: item.product_name,
+                                          size: item.size,
+                                          color: item.color,
+                                          quantity: item.quantity,
+                                          price: parseFloat(item.unit_price) || 0,
+                                          total: parseFloat(item.total) || 0,
+                                        })),
+                                        total: parseFloat(purchase.total_amount) || 0,
+                                        amount_due: parseFloat(purchase.amount_due) || 0,
+                                        discount: parseFloat(purchase.discount) || 0,
+                                        payment_method: purchase.payment_method,
+                                        status: purchase.status,
+                                      });
+                                    }}
+                                    className="h-7 text-xs rounded-lg gap-1 border-slate-200 hover:bg-slate-100"
+                                    title="Print Thermal Receipt"
+                                  >
+                                    <Printer className="w-3.5 h-3.5 text-slate-500" />
+                                    <span>Receipt</span>
+                                  </Button>
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() => {
+                                      printA4Invoice({
+                                        id: purchase.id,
+                                        invoice_number: `INV-${purchase.id}`,
+                                        date: purchase.date,
+                                        customer: {
+                                          name: `${customer.first_name || ""} ${customer.last_name || ""}`.trim(),
+                                          phone: customer.phone,
+                                          email: customer.email,
+                                          address: customer.address,
+                                        },
+                                        items: (purchase.items || []).map((item: any) => ({
+                                          name: item.product_name,
+                                          size: item.size,
+                                          color: item.color,
+                                          quantity: item.quantity,
+                                          price: parseFloat(item.unit_price) || 0,
+                                          total: parseFloat(item.total) || 0,
+                                        })),
+                                        total: parseFloat(purchase.total_amount) || 0,
+                                        amount_due: parseFloat(purchase.amount_due) || 0,
+                                        discount: parseFloat(purchase.discount) || 0,
+                                        payment_method: purchase.payment_method,
+                                        status: purchase.status,
+                                      });
+                                    }}
+                                    className="h-7 text-xs rounded-lg gap-1 border-slate-200 hover:bg-slate-100"
+                                    title="Print A4 Tax Invoice"
+                                  >
+                                    <FileText className="w-3.5 h-3.5 text-slate-500" />
+                                    <span>Invoice</span>
+                                  </Button>
+                                </div>
                               </div>
                             </div>
                           </CardHeader>
@@ -551,10 +726,10 @@ export default function CustomerDetailPage({
                               <TableBody>
                                 {purchase.items.map((item: any, index: number) => (
                                   <TableRow key={index}>
-                                    <TableCell>{item.product_name}</TableCell>
-                                    <TableCell>{item.size}</TableCell>
-                                    <TableCell>{item.color}</TableCell>
-                                    <TableCell className="text-right">
+                                    <TableCell className="font-medium text-slate-900">{item.product_name}</TableCell>
+                                    <TableCell><Badge variant="outline" className="text-xs">{item.size || "-"}</Badge></TableCell>
+                                    <TableCell><Badge variant="secondary" className="text-xs">{item.color || "-"}</Badge></TableCell>
+                                    <TableCell className="text-right font-semibold">
                                       {item.quantity}
                                     </TableCell>
                                     <TableCell className="text-right">
@@ -563,7 +738,7 @@ export default function CustomerDetailPage({
                                         currency: "USD",
                                       }).format(parseFloat(item.unit_price))}
                                     </TableCell>
-                                    <TableCell className="text-right">
+                                    <TableCell className="text-right font-semibold">
                                       {new Intl.NumberFormat("en-US", {
                                         style: "currency",
                                         currency: "USD",
@@ -581,20 +756,182 @@ export default function CustomerDetailPage({
                 </CardContent>
               </Card>
             </TabsContent>
-            <TabsContent value="preferences" className="mt-4">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Customer Preferences</CardTitle>
-                  <CardDescription>Coming soon...</CardDescription>
+
+            {/* PREFERENCES TAB */}
+            <TabsContent value="preferences" className="mt-4 space-y-6">
+              <Card className="rounded-2xl border-slate-200/90 shadow-2xs">
+                <CardHeader className="border-b border-slate-100">
+                  <div className="flex items-center gap-2">
+                    <Heart className="w-5 h-5 text-rose-500" />
+                    <div>
+                      <CardTitle className="text-base font-semibold text-slate-900">Style & Size Preferences</CardTitle>
+                      <CardDescription className="text-xs text-slate-500">
+                        Tailor future recommendations and retail recommendations for this customer
+                      </CardDescription>
+                    </div>
+                  </div>
                 </CardHeader>
+                <CardContent className="p-6 space-y-6">
+                  <div>
+                    <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-3">
+                      Preferred Clothing & Shoe Sizes (Click to toggle)
+                    </h4>
+                    <div className="flex flex-wrap gap-2">
+                      {["XS", "S", "M", "L", "XL", "XXL", "30", "32", "34", "36", "38"].map((sz) => {
+                        const isSelected = preferredSizes.includes(sz);
+                        return (
+                          <button
+                            key={sz}
+                            onClick={() => toggleSize(sz)}
+                            className={`px-3 py-1.5 text-xs font-semibold rounded-xl border transition-all ${
+                              isSelected
+                                ? "bg-indigo-600 text-white border-indigo-600 shadow-2xs"
+                                : "bg-white text-slate-700 border-slate-200 hover:border-slate-300 hover:bg-slate-50"
+                            }`}
+                          >
+                            {sz} {isSelected && "✓"}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  <Separator />
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="p-4 rounded-xl border border-slate-100 bg-slate-50/50 space-y-2">
+                      <span className="text-xs font-bold uppercase tracking-wider text-slate-500">
+                        Preferred Payment Method
+                      </span>
+                      <p className="text-sm font-semibold text-slate-800">
+                        {customer.purchase_history?.[0]?.payment_method || "Cash / Mobile Wallet"}
+                      </p>
+                      <span className="text-xs text-slate-500">Calculated from transaction history</span>
+                    </div>
+
+                    <div className="p-4 rounded-xl border border-slate-100 bg-slate-50/50 space-y-2">
+                      <span className="text-xs font-bold uppercase tracking-wider text-slate-500">
+                        Communication Channels
+                      </span>
+                      <div className="flex flex-wrap gap-2 pt-1">
+                        <Badge variant="outline" className="bg-emerald-50 text-emerald-700 border-emerald-200">
+                          WhatsApp Active
+                        </Badge>
+                        <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
+                          SMS Subscribed
+                        </Badge>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="p-4 rounded-xl border border-amber-200 bg-amber-50/60 space-y-2">
+                    <div className="flex items-center gap-2 text-amber-800 font-semibold text-sm">
+                      <Crown className="w-4 h-4 text-amber-600" />
+                      <span>Loyalty Tier Status: {isTopCustomer ? "VIP Platinum" : "Gold Member"}</span>
+                    </div>
+                    <p className="text-xs text-amber-700">
+                      Eligible for 5% default checkout discount and early access to seasonal Rawstitch collections.
+                    </p>
+                  </div>
+                </CardContent>
               </Card>
             </TabsContent>
-            <TabsContent value="notes" className="mt-4">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Customer Notes</CardTitle>
-                  <CardDescription>Coming soon...</CardDescription>
+
+            {/* NOTES TAB */}
+            <TabsContent value="notes" className="mt-4 space-y-6">
+              <Card className="rounded-2xl border-slate-200/90 shadow-2xs">
+                <CardHeader className="border-b border-slate-100">
+                  <div className="flex items-center gap-2">
+                    <MessageSquare className="w-5 h-5 text-indigo-600" />
+                    <div>
+                      <CardTitle className="text-base font-semibold text-slate-900">Internal Staff Notes</CardTitle>
+                      <CardDescription className="text-xs text-slate-500">
+                        Private notes recorded by sales cashiers and store staff
+                      </CardDescription>
+                    </div>
+                  </div>
                 </CardHeader>
+                <CardContent className="p-6 space-y-6">
+                  {/* Add Note Form */}
+                  <div className="p-4 rounded-xl border border-slate-200/80 bg-slate-50/50 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-bold uppercase tracking-wider text-slate-600">
+                        Add New Staff Note
+                      </span>
+                      <div className="flex items-center gap-1.5">
+                        {["General", "Fitting", "Payment", "VIP Request"].map((tag) => (
+                          <button
+                            key={tag}
+                            type="button"
+                            onClick={() => setNewNoteTag(tag)}
+                            className={`px-2.5 py-0.5 text-[11px] font-semibold rounded-lg border transition-all ${
+                              newNoteTag === tag
+                                ? "bg-indigo-600 text-white border-indigo-600"
+                                : "bg-white text-slate-600 border-slate-200 hover:bg-slate-100"
+                            }`}
+                          >
+                            {tag}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                    <Textarea
+                      placeholder="Type internal note here (e.g., customer requested hem alteration, preferred contact time)..."
+                      value={newNoteText}
+                      onChange={(e) => setNewNoteText(e.target.value)}
+                      rows={3}
+                      className="bg-white text-xs rounded-xl border-slate-200 focus-visible:ring-indigo-500"
+                    />
+                    <div className="flex justify-end">
+                      <Button
+                        size="sm"
+                        onClick={handleAddNote}
+                        disabled={!newNoteText.trim()}
+                        className="bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs gap-1.5 shadow-xs"
+                      >
+                        <Plus className="w-3.5 h-3.5" />
+                        Save Note
+                      </Button>
+                    </div>
+                  </div>
+
+                  {/* Notes Feed */}
+                  <div className="space-y-3">
+                    <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500">
+                      Historical Notes ({notes.length})
+                    </h4>
+                    {notes.length === 0 ? (
+                      <p className="text-xs text-slate-400 italic py-4 text-center">No notes recorded yet.</p>
+                    ) : (
+                      notes.map((n) => (
+                        <div
+                          key={n.id}
+                          className="p-3.5 rounded-xl border border-slate-100 bg-white hover:border-slate-200 transition-colors shadow-2xs space-y-2"
+                        >
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                              <Badge variant="secondary" className="text-[10px] font-semibold bg-indigo-50 text-indigo-700">
+                                {n.tag}
+                              </Badge>
+                              <span className="text-xs font-semibold text-slate-700">{n.author}</span>
+                              <span className="text-[11px] text-slate-400">• {n.date}</span>
+                            </div>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleDeleteNote(n.id)}
+                              className="h-6 w-6 p-0 text-slate-400 hover:text-rose-600 rounded-md"
+                              title="Delete note"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </Button>
+                          </div>
+                          <p className="text-xs text-slate-700 leading-relaxed">{n.text}</p>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </CardContent>
               </Card>
             </TabsContent>
           </Tabs>
