@@ -2,27 +2,93 @@ import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tansta
 import {
   onlinePreordersApi,
   type OnlinePreorder,
-  type SteadfastFraudResult,
+  type OnlinePreordersQueryParams,
+  type PaginatedResponse,
+  type OnlinePreorderMetrics,
 } from '@/lib/api/onlinePreorder';
 import { toast } from 'sonner';
 
 export const ONLINE_PREORDERS_QUERY_KEY = 'online-preorders';
+export const ONLINE_PREORDER_METRICS_QUERY_KEY = 'online-preorder-metrics';
 
 /**
- * Hook to fetch and cache list of online preorders with 5-min staleTime and keepPreviousData.
- * Navigating between pages will return cached orders instantaneously with zero reload flash.
+ * Hook to fetch and cache list of online preorders with pagination, sorting, and multi-filters.
+ * Uses keepPreviousData so navigating between pages or filters updates seamlessly with zero layout flash.
  */
-export const useOnlinePreorders = (status?: string, search?: string) => {
-  return useQuery({
-    queryKey: [ONLINE_PREORDERS_QUERY_KEY, status || 'all', search || ''],
+export const useOnlinePreorders = (
+  paramsOrStatus?: OnlinePreordersQueryParams | string,
+  legacySearch?: string
+) => {
+  const params: OnlinePreordersQueryParams =
+    typeof paramsOrStatus === 'string'
+      ? { status: paramsOrStatus, search: legacySearch }
+      : (paramsOrStatus || {});
+
+  const page = params.page || 1;
+  const pageSize = params.pageSize || 15;
+
+  const query = useQuery({
+    queryKey: [
+      ONLINE_PREORDERS_QUERY_KEY,
+      {
+        page,
+        pageSize,
+        status: params.status || 'all',
+        search: params.search || '',
+        courierPartner: params.courierPartner || 'all',
+        dateFrom: params.dateFrom || '',
+        dateTo: params.dateTo || '',
+        ordering: params.ordering || '-created_at',
+      },
+    ],
     queryFn: async () => {
-      const res = await onlinePreordersApi.getAll(status, search);
-      const data = Array.isArray(res.data) ? res.data : (res.data?.results ?? []);
-      return data as OnlinePreorder[];
+      const res = await onlinePreordersApi.getAll(params);
+      return res.data;
     },
     staleTime: 5 * 60 * 1000, // 5 minutes in cache
     gcTime: 30 * 60 * 1000, // 30 minutes in garbage collection
     placeholderData: keepPreviousData,
+    refetchOnWindowFocus: false,
+  });
+
+  const rawData = query.data;
+  let orders: OnlinePreorder[] = [];
+  let totalCount = 0;
+
+  if (Array.isArray(rawData)) {
+    orders = rawData;
+    totalCount = rawData.length;
+  } else if (rawData && typeof rawData === 'object' && 'results' in rawData) {
+    orders = rawData.results || [];
+    totalCount = rawData.count || 0;
+  }
+
+  const totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
+
+  return {
+    ...query,
+    orders,
+    totalCount,
+    page,
+    pageSize,
+    totalPages,
+    hasNextPage: page < totalPages,
+    hasPrevPage: page > 1,
+  };
+};
+
+/**
+ * Hook to fetch high-level real-time metrics across all online preorders.
+ */
+export const useOnlinePreorderMetrics = (dateRange?: { dateFrom?: string; dateTo?: string }) => {
+  return useQuery({
+    queryKey: [ONLINE_PREORDER_METRICS_QUERY_KEY, dateRange?.dateFrom || '', dateRange?.dateTo || ''],
+    queryFn: async () => {
+      const res = await onlinePreordersApi.getMetrics(dateRange);
+      return res.data;
+    },
+    staleTime: 2 * 60 * 1000,
+    gcTime: 15 * 60 * 1000,
     refetchOnWindowFocus: false,
   });
 };

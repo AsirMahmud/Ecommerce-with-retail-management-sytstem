@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import React, { useEffect, useState, useMemo } from "react";
 import Link from "next/link";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -34,6 +34,15 @@ import {
   ShieldAlert,
   AlertTriangle,
   Star,
+  ChevronLeft,
+  ChevronRight,
+  ChevronsLeft,
+  ChevronsRight,
+  Sparkles,
+  PhoneCall,
+  ArrowUpDown,
+  SlidersHorizontal,
+  X,
 } from "lucide-react";
 import { onlinePreordersApi, type OnlinePreorder, type SteadfastFraudResult } from "@/lib/api/onlinePreorder";
 import { courierApi, type ActiveCourier, type CourierProvider, type CourierFraudResult } from "@/lib/api/courier";
@@ -41,12 +50,17 @@ import { OrderDetailsSheet } from "@/components/online-preorders/order-details-s
 import { OnlinePreorderVerificationModal } from "@/components/online-preorders/verification-modal";
 import { ManualOrderForm } from "@/components/online-preorders/manual-order-form";
 import { OnlineCustomersTab } from "@/components/online-preorders/online-customers-tab";
+import { OnlinePreordersAnalyticsDeck } from "@/components/online-preorders/online-preorders-analytics-deck";
+import { OrderProductThumbnail } from "@/components/online-preorders/order-product-thumbnail";
 import { useDebounce } from "@/hooks/use-debounce";
 import { format } from "date-fns";
 import { useOnlinePreorderAnalytics } from "@/hooks/queries/use-reports";
-import { useOnlinePreorders, ONLINE_PREORDERS_QUERY_KEY } from "@/hooks/queries/use-online-preorders";
+import {
+  useOnlinePreorders,
+  useOnlinePreorderMetrics,
+  ONLINE_PREORDERS_QUERY_KEY,
+} from "@/hooks/queries/use-online-preorders";
 import { useQueryClient } from "@tanstack/react-query";
-import { useMemo } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   Dialog,
@@ -86,12 +100,46 @@ export default function OnlinePreordersPage() {
   const [search, setSearch] = useState("");
   const debouncedSearch = useDebounce(search, 500);
   const queryClient = useQueryClient();
+
+  // Pagination, Filter & Sorting States
+  const [page, setPage] = useState<number>(1);
+  const [pageSize, setPageSize] = useState<number>(15);
+  const [courierFilter, setCourierFilter] = useState<string>("all");
+  const [ordering, setOrdering] = useState<string>("-created_at");
+  const [showAnalyticsDeck, setShowAnalyticsDeck] = useState<boolean>(false);
+
+  // Reset to page 1 whenever search query changes
+  useEffect(() => {
+    setPage(1);
+  }, [debouncedSearch]);
+
+  const handleStatusChange = (newStatus: string) => {
+    setStatus(newStatus);
+    setPage(1);
+  };
+
+  const handleCourierFilterChange = (newCourier: string) => {
+    setCourierFilter(newCourier);
+    setPage(1);
+  };
+
   const {
-    data: rows = [],
+    orders: rows = [],
+    totalCount,
+    totalPages,
     isLoading: loading,
     isFetching,
     refetch: refetchOrders,
-  } = useOnlinePreorders(status, debouncedSearch);
+  } = useOnlinePreorders({
+    page,
+    pageSize,
+    status,
+    search: debouncedSearch,
+    courierPartner: courierFilter,
+    ordering,
+  });
+
+  const { data: metrics, isLoading: isMetricsLoading } = useOnlinePreorderMetrics();
   const [selectedOrder, setSelectedOrder] = useState<OnlinePreorder | null>(null);
   const [editingOrder, setEditingOrder] = useState<OnlinePreorder | null>(null);
   const [isSheetOpen, setIsSheetOpen] = useState(false);
@@ -449,26 +497,67 @@ export default function OnlinePreordersPage() {
 
 
   const getStatusBadge = (s: string) => {
-    const config: any = {
-      PENDING: "bg-yellow-100 text-yellow-800",
-      CONFIRMED: "bg-blue-100 text-blue-800",
-      HOLD: "bg-amber-100 text-amber-800 border border-amber-300",
-      DELIVERED: "bg-indigo-100 text-indigo-800",
-      COMPLETED: "bg-green-100 text-green-800",
-      RETURNED: "bg-purple-100 text-purple-800 border border-purple-300",
-      CANCELLED: "bg-red-100 text-red-800",
+    const config: Record<string, { bg: string; text: string; dot: string; border: string }> = {
+      PENDING: { bg: "bg-amber-50/90", text: "text-amber-800", dot: "bg-amber-500 animate-pulse", border: "border-amber-200/80" },
+      CONFIRMED: { bg: "bg-blue-50/90", text: "text-blue-800", dot: "bg-blue-500", border: "border-blue-200/80" },
+      HOLD: { bg: "bg-orange-50/90", text: "text-orange-900", dot: "bg-orange-500", border: "border-orange-300" },
+      DELIVERED: { bg: "bg-indigo-50/90", text: "text-indigo-800", dot: "bg-indigo-500", border: "border-indigo-200/80" },
+      COMPLETED: { bg: "bg-emerald-50/90", text: "text-emerald-800", dot: "bg-emerald-500", border: "border-emerald-200/80" },
+      RETURNED: { bg: "bg-purple-50/90", text: "text-purple-800", dot: "bg-purple-500", border: "border-purple-300" },
+      CANCELLED: { bg: "bg-rose-50/90", text: "text-rose-800", dot: "bg-rose-500", border: "border-rose-200/80" },
     };
-    return <Badge className={`${config[s] || "bg-gray-100"} border-none capitalize font-semibold`}>{s.toLowerCase()}</Badge>;
+    const c = config[s] || { bg: "bg-slate-100", text: "text-slate-700", dot: "bg-slate-400", border: "border-slate-200" };
+    return (
+      <Badge className={`${c.bg} ${c.text} ${c.border} border px-2.5 py-0.5 rounded-full capitalize font-bold text-xs inline-flex items-center gap-1.5 shadow-2xs`}>
+        <span className={`w-1.5 h-1.5 rounded-full ${c.dot} shrink-0`} />
+        {s.toLowerCase()}
+      </Badge>
+    );
+  };
+
+  const clearFilters = () => {
+    setSearch("");
+    setStatus("all");
+    setCourierFilter("all");
+    setOrdering("-created_at");
+    setPage(1);
+  };
+
+  const isFiltered = status !== "all" || search !== "" || courierFilter !== "all" || ordering !== "-created_at";
+
+  // Pagination calculation
+  const fromRecord = totalCount === 0 ? 0 : (page - 1) * pageSize + 1;
+  const toRecord = Math.min(page * pageSize, totalCount);
+
+  // Helper for customer initials avatar
+  const getCustomerInitials = (name?: string) => {
+    if (!name) return "C";
+    const parts = name.trim().split(" ");
+    if (parts.length >= 2) return `${parts[0][0]}${parts[1][0]}`.toUpperCase();
+    return name.slice(0, 2).toUpperCase();
   };
 
   return (
-    <div className="min-h-screen space-y-6 sm:space-y-8 animate-in fade-in duration-500">
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+    <div className="min-h-screen space-y-6 sm:space-y-7 animate-in fade-in duration-500">
+      {/* Module Title Header */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-5 rounded-2xl border border-slate-200/90 shadow-2xs">
         <div>
-          <h1 className="text-2xl sm:text-3xl md:text-4xl font-extrabold tracking-tight text-slate-900">Online Preorders</h1>
-          <p className="text-slate-500 mt-1 sm:mt-2 text-xs sm:text-sm font-medium">Manage and track your ecommerce COD orders from one place.</p>
+          <div className="flex items-center gap-2.5">
+            <div className="w-10 h-10 rounded-xl bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-600 shadow-2xs">
+              <ShoppingBag className="w-5 h-5" />
+            </div>
+            <div>
+              <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-slate-900">
+                Online Preorders
+              </h1>
+              <p className="text-slate-500 text-xs sm:text-sm font-medium mt-0.5">
+                Ecommerce cash on delivery consignments, live courier syncing, and inventory fulfillment.
+              </p>
+            </div>
+          </div>
         </div>
-        <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+
+        <div className="flex flex-wrap items-center gap-2 sm:gap-2.5">
           <Button
             variant="outline"
             className="bg-white border-amber-300 text-amber-900 hover:bg-amber-50 text-xs sm:text-sm h-9 flex items-center gap-1.5 shadow-2xs font-semibold"
@@ -477,157 +566,326 @@ export default function OnlinePreordersPage() {
             title="Sync live status from Steadfast, Pathao & all couriers"
           >
             <Truck className="w-3.5 h-3.5 text-amber-600" />
-            <RefreshCw className={`w-3 h-3 ${isSyncingCouriers ? 'animate-spin text-amber-600' : ''}`} />
-            {isSyncingCouriers ? "Syncing Couriers..." : "Sync Courier Statuses"}
+            <RefreshCw className={`w-3 h-3 ${isSyncingCouriers ? "animate-spin text-amber-600" : ""}`} />
+            {isSyncingCouriers ? "Syncing Couriers..." : "Sync Live Status"}
           </Button>
-          <Button variant="outline" className="bg-white text-xs sm:text-sm h-9" onClick={loadData}>
-            <RefreshCw className={`w-3.5 h-3.5 mr-1.5 ${isFetching ? 'animate-spin' : ''}`} />
+          <Button
+            variant="outline"
+            className="bg-white border-slate-200 text-slate-700 text-xs sm:text-sm h-9 hover:bg-slate-50"
+            onClick={loadData}
+          >
+            <RefreshCw className={`w-3.5 h-3.5 mr-1.5 ${isFetching ? "animate-spin text-indigo-600" : ""}`} />
             Refresh
           </Button>
-          <Button className="bg-indigo-600 hover:bg-indigo-700 shadow-lg shadow-indigo-200 text-xs sm:text-sm h-9" onClick={() => { setEditingOrder(null); setActiveTab("manual"); }}>
+          <Button
+            className="bg-indigo-600 hover:bg-indigo-700 shadow-md shadow-indigo-200 text-xs sm:text-sm h-9 font-bold"
+            onClick={() => {
+              setEditingOrder(null);
+              setActiveTab("manual");
+            }}
+          >
             <Plus className="w-3.5 h-3.5 mr-1.5" />
             Create Order
           </Button>
         </div>
       </div>
 
-      {/* Stats Cards */}
+      {/* Top Executive KPI Metric Cards */}
       <div className="grid gap-3 sm:gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
-        <div className="bg-white border border-slate-200/90 rounded-2xl p-4 shadow-2xs">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-xs font-semibold text-slate-500">Total Orders</span>
-            <div className="w-8 h-8 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center">
+        {/* Card 1: Total Orders */}
+        <div className="bg-white border border-slate-200/90 rounded-2xl p-4 sm:p-5 shadow-2xs relative overflow-hidden group hover:border-indigo-300 transition-all">
+          <div className="flex items-center justify-between mb-2.5">
+            <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Total Preorders</span>
+            <div className="w-9 h-9 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center shadow-2xs group-hover:scale-105 transition-transform">
               <ShoppingBag className="h-4 w-4" />
             </div>
           </div>
-          <div className="text-2xl font-bold text-slate-900">
-            {isLoadingAnalytics ? (
-              <Skeleton className="h-7 w-20" />
+          <div className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">
+            {isMetricsLoading ? (
+              <Skeleton className="h-8 w-24" />
             ) : (
-              analyticsData?.total_orders ?? stats.totalOrders
+              metrics?.total_orders ?? totalCount
             )}
           </div>
-          <p className="text-[11px] text-indigo-600 font-medium mt-1">All online preorders</p>
+          <div className="flex items-center gap-1.5 mt-2">
+            <Badge variant="outline" className="bg-indigo-50/80 text-indigo-700 border-indigo-200 text-[10px] font-bold px-1.5 py-0.5">
+              +{metrics?.today_orders || 0} today
+            </Badge>
+            <span className="text-[11px] text-slate-500 font-medium">All-time consignments</span>
+          </div>
         </div>
 
-        <div className="bg-white border border-slate-200/90 rounded-2xl p-4 shadow-2xs">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-xs font-semibold text-slate-500">Total Revenue</span>
-            <div className="w-8 h-8 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
+        {/* Card 2: Total Revenue */}
+        <div className="bg-white border border-slate-200/90 rounded-2xl p-4 sm:p-5 shadow-2xs relative overflow-hidden group hover:border-emerald-300 transition-all">
+          <div className="flex items-center justify-between mb-2.5">
+            <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Completed Revenue</span>
+            <div className="w-9 h-9 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center shadow-2xs group-hover:scale-105 transition-transform">
               <DollarSign className="h-4 w-4" />
             </div>
           </div>
-          <div className="text-2xl font-bold text-slate-900">
-            {isLoadingAnalytics ? (
-              <Skeleton className="h-7 w-24" />
+          <div className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">
+            {isMetricsLoading ? (
+              <Skeleton className="h-8 w-28" />
             ) : (
-              formatCurrency(analyticsData?.total_revenue ?? stats.totalRevenue)
+              formatCurrency(metrics?.financials?.completed_revenue ?? 0)
             )}
           </div>
-          <p className="text-[11px] text-emerald-600 font-medium mt-1">Completed orders</p>
+          <div className="flex items-center gap-1.5 mt-2">
+            <Badge variant="outline" className="bg-emerald-50/80 text-emerald-700 border-emerald-200 text-[10px] font-bold px-1.5 py-0.5">
+              {metrics?.status_breakdown?.COMPLETED ?? 0} completed
+            </Badge>
+            <span className="text-[11px] text-slate-500 font-medium">COD collected</span>
+          </div>
         </div>
 
-        <div className="bg-white border border-slate-200/90 rounded-2xl p-4 shadow-2xs">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-xs font-semibold text-slate-500">Total Sales</span>
-            <div className="w-8 h-8 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center">
-              <BarChart3 className="h-4 w-4" />
+        {/* Card 3: Delivery Success Rate */}
+        <div className="bg-white border border-slate-200/90 rounded-2xl p-4 sm:p-5 shadow-2xs relative overflow-hidden group hover:border-blue-300 transition-all">
+          <div className="flex items-center justify-between mb-2.5">
+            <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Fulfillment Rate</span>
+            <div className="w-9 h-9 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center shadow-2xs group-hover:scale-105 transition-transform">
+              <Truck className="h-4 w-4" />
             </div>
           </div>
-          <div className="text-2xl font-bold text-slate-900">
-            {isLoadingAnalytics ? (
-              <Skeleton className="h-7 w-20" />
+          <div className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">
+            {isMetricsLoading ? (
+              <Skeleton className="h-8 w-24" />
             ) : (
-              analyticsData?.total_sales_count ?? stats.completedCount
+              `${metrics?.rates?.fulfillment_rate ?? 0}%`
             )}
           </div>
-          <p className="text-[11px] text-blue-600 font-medium mt-1">Completed orders</p>
+          <div className="flex items-center gap-1.5 mt-2">
+            <Badge variant="outline" className="bg-purple-50/80 text-purple-700 border-purple-200 text-[10px] font-bold px-1.5 py-0.5">
+              {metrics?.rates?.return_rate ?? 0}% return rate
+            </Badge>
+            <span className="text-[11px] text-slate-500 font-medium">Delivered vs returned</span>
+          </div>
         </div>
 
-        <div className="bg-white border border-slate-200/90 rounded-2xl p-4 shadow-2xs">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-xs font-semibold text-slate-500">Avg Order Value</span>
-            <div className="w-8 h-8 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center">
+        {/* Card 4: Avg Order Value */}
+        <div className="bg-white border border-slate-200/90 rounded-2xl p-4 sm:p-5 shadow-2xs relative overflow-hidden group hover:border-purple-300 transition-all">
+          <div className="flex items-center justify-between mb-2.5">
+            <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Avg Order Value</span>
+            <div className="w-9 h-9 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center shadow-2xs group-hover:scale-105 transition-transform">
               <TrendingUp className="h-4 w-4" />
             </div>
           </div>
-          <div className="text-2xl font-bold text-slate-900">
-            {isLoadingAnalytics ? (
-              <Skeleton className="h-7 w-24" />
+          <div className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">
+            {isMetricsLoading ? (
+              <Skeleton className="h-8 w-28" />
             ) : (
-              formatCurrency(analyticsData?.average_order_value ?? stats.averageOrderValue)
+              formatCurrency(metrics?.financials?.average_order_value ?? 0)
             )}
           </div>
-          <p className="text-[11px] text-purple-600 font-medium mt-1">Per completed order</p>
+          <div className="flex items-center gap-1.5 mt-2">
+            <span className="text-[11px] text-slate-500 font-medium">
+              Total preordered: <span className="font-semibold text-slate-700">{formatCurrency(metrics?.financials?.total_revenue ?? 0)}</span>
+            </span>
+          </div>
         </div>
       </div>
 
-      <Tabs value={activeTab} onValueChange={(v) => { setActiveTab(v); if (v !== "manual") setEditingOrder(null); }} className="w-full">
-        <TabsList className="bg-white border p-1 h-auto flex flex-wrap sm:inline-flex sm:h-12 shadow-sm rounded-xl mb-6">
-          <TabsTrigger value="orders" className="rounded-lg data-[state=active]:bg-indigo-50 data-[state=active]:text-indigo-600 px-3 sm:px-6 py-2 sm:py-0 text-xs sm:text-sm font-semibold transition-all">
-            <ShoppingBag className="w-3.5 h-3.5 sm:w-4 sm:h-4 mr-1.5 sm:mr-2" />
+      {/* Interactive Status Pills Filter Strip */}
+      <div className="bg-white p-2 sm:p-2.5 rounded-2xl border border-slate-200/90 shadow-2xs flex items-center gap-1.5 overflow-x-auto no-scrollbar">
+        {[
+          { key: "all", label: "All Orders", count: metrics?.total_orders ?? totalCount, color: "text-slate-700" },
+          { key: "PENDING", label: "Pending", count: metrics?.status_breakdown?.PENDING ?? 0, color: "text-amber-700" },
+          { key: "CONFIRMED", label: "Confirmed", count: metrics?.status_breakdown?.CONFIRMED ?? 0, color: "text-blue-700" },
+          { key: "HOLD", label: "Hold", count: metrics?.status_breakdown?.HOLD ?? 0, color: "text-orange-700" },
+          { key: "DELIVERED", label: "Delivered", count: metrics?.status_breakdown?.DELIVERED ?? 0, color: "text-indigo-700" },
+          { key: "COMPLETED", label: "Completed", count: metrics?.status_breakdown?.COMPLETED ?? 0, color: "text-emerald-700" },
+          { key: "RETURNED", label: "Returned", count: metrics?.status_breakdown?.RETURNED ?? 0, color: "text-purple-700" },
+          { key: "CANCELLED", label: "Cancelled", count: metrics?.status_breakdown?.CANCELLED ?? 0, color: "text-rose-700" },
+        ].map((item) => {
+          const isActive = status === item.key;
+          return (
+            <button
+              key={item.key}
+              type="button"
+              onClick={() => handleStatusChange(item.key)}
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all shrink-0 flex items-center gap-2 ${
+                isActive
+                  ? "bg-indigo-600 text-white shadow-xs scale-102"
+                  : "bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200/60"
+              }`}
+            >
+              <span>{item.label}</span>
+              <span
+                className={`text-[10px] px-1.5 py-0.2 rounded-full font-mono font-black ${
+                  isActive ? "bg-white/20 text-white" : "bg-white text-slate-600 border border-slate-200"
+                }`}
+              >
+                {item.count}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Main Tabs Navigation */}
+      <Tabs
+        value={activeTab}
+        onValueChange={(v) => {
+          setActiveTab(v);
+          if (v !== "manual") setEditingOrder(null);
+        }}
+        className="w-full space-y-4"
+      >
+        <TabsList className="bg-white border p-1 h-auto flex flex-wrap sm:inline-flex sm:h-12 shadow-sm rounded-xl">
+          <TabsTrigger
+            value="orders"
+            className="rounded-lg data-[state=active]:bg-indigo-50 data-[state=active]:text-indigo-600 px-4 sm:px-6 py-2 sm:py-0 text-xs sm:text-sm font-semibold transition-all"
+          >
+            <ShoppingBag className="w-4 h-4 mr-2" />
             Orders
           </TabsTrigger>
-          <TabsTrigger value="manual" className="rounded-lg data-[state=active]:bg-indigo-50 data-[state=active]:text-indigo-600 px-3 sm:px-6 py-2 sm:py-0 text-xs sm:text-sm font-semibold transition-all">
-            {editingOrder ? <Edit className="w-3.5 h-3.5 sm:w-4 sm:h-4 mr-1.5 sm:mr-2" /> : <Plus className="w-3.5 h-3.5 sm:w-4 sm:h-4 mr-1.5 sm:mr-2" />}
+          <TabsTrigger
+            value="analytics"
+            className="rounded-lg data-[state=active]:bg-indigo-50 data-[state=active]:text-indigo-600 px-4 sm:px-6 py-2 sm:py-0 text-xs sm:text-sm font-semibold transition-all"
+          >
+            <BarChart3 className="w-4 h-4 mr-2" />
+            Analytics &amp; Trends
+          </TabsTrigger>
+          <TabsTrigger
+            value="manual"
+            className="rounded-lg data-[state=active]:bg-indigo-50 data-[state=active]:text-indigo-600 px-4 sm:px-6 py-2 sm:py-0 text-xs sm:text-sm font-semibold transition-all"
+          >
+            {editingOrder ? <Edit className="w-4 h-4 mr-2" /> : <Plus className="w-4 h-4 mr-2" />}
             {editingOrder ? "Edit Order" : "Manual Order"}
           </TabsTrigger>
-          <TabsTrigger value="customers" className="rounded-lg data-[state=active]:bg-indigo-50 data-[state=active]:text-indigo-600 px-3 sm:px-6 py-2 sm:py-0 text-xs sm:text-sm font-semibold transition-all">
-            <User className="w-3.5 h-3.5 sm:w-4 sm:h-4 mr-1.5 sm:mr-2" />
+          <TabsTrigger
+            value="customers"
+            className="rounded-lg data-[state=active]:bg-indigo-50 data-[state=active]:text-indigo-600 px-4 sm:px-6 py-2 sm:py-0 text-xs sm:text-sm font-semibold transition-all"
+          >
+            <User className="w-4 h-4 mr-2" />
             Customers
           </TabsTrigger>
         </TabsList>
 
-        <TabsContent value="orders">
-          <Card className="border-none shadow-xl bg-white overflow-hidden">
-            <CardHeader className="border-b bg-slate-50/50 pb-6">
-              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        {/* Analytics Tab Content */}
+        <TabsContent value="analytics" className="space-y-4 mt-0">
+          <OnlinePreordersAnalyticsDeck
+            onSelectStatus={(s) => {
+              handleStatusChange(s);
+              setActiveTab("orders");
+            }}
+          />
+        </TabsContent>
+
+        {/* Master Orders Tab Content */}
+        <TabsContent value="orders" className="space-y-4 mt-0">
+          {/* Optional Collapsible Inline Analytics Deck */}
+          {showAnalyticsDeck && (
+            <div className="animate-in fade-in slide-in-from-top-3 duration-300">
+              <OnlinePreordersAnalyticsDeck
+                onSelectStatus={(s) => {
+                  handleStatusChange(s);
+                  setShowAnalyticsDeck(false);
+                }}
+              />
+            </div>
+          )}
+
+          <Card className="border border-slate-200/90 shadow-xl bg-white overflow-hidden rounded-2xl">
+            {/* Filter and Search Bar Header */}
+            <CardHeader className="border-b bg-slate-50/60 p-4 sm:p-5">
+              <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
+                {/* Search Input */}
                 <div className="relative flex-1 max-w-md">
-                  <Search className="absolute left-3 top-3 h-4 w-4 text-slate-400" />
+                  <Search className="absolute left-3.5 top-3 h-4 w-4 text-slate-400" />
                   <Input
-                    placeholder="Search by customer, phone..."
+                    placeholder="Search by ID (#123), customer, phone, tracking..."
                     value={search}
                     onChange={(e) => setSearch(e.target.value)}
-                    className="pl-10 h-10 bg-white border-slate-200"
+                    className="pl-10 pr-9 h-10 bg-white border-slate-200 shadow-2xs rounded-xl text-xs sm:text-sm"
                   />
+                  {search && (
+                    <button
+                      type="button"
+                      onClick={() => setSearch("")}
+                      className="absolute right-3 top-3 text-slate-400 hover:text-slate-600"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  )}
                 </div>
-                <div className="flex items-center gap-3">
-                  <Select value={status} onValueChange={setStatus}>
-                    <SelectTrigger className="w-[180px] h-10 bg-white border-slate-200">
-                      <Filter className="w-4 h-4 mr-2 text-slate-400" />
-                      <SelectValue placeholder="Status" />
+
+                {/* Filters Row */}
+                <div className="flex flex-wrap items-center gap-2 sm:gap-2.5">
+                  {/* Courier Partner Filter */}
+                  <Select value={courierFilter} onValueChange={handleCourierFilterChange}>
+                    <SelectTrigger className="w-[155px] h-10 bg-white border-slate-200 rounded-xl text-xs font-semibold shadow-2xs">
+                      <Truck className="w-3.5 h-3.5 mr-1.5 text-slate-400" />
+                      <SelectValue placeholder="Delivery Partner" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="all">All Status</SelectItem>
-                      <SelectItem value="PENDING">Pending</SelectItem>
-                      <SelectItem value="CONFIRMED">Confirmed</SelectItem>
-                      <SelectItem value="HOLD">Hold</SelectItem>
-                      <SelectItem value="DELIVERED">Delivered</SelectItem>
-                      <SelectItem value="COMPLETED">Completed</SelectItem>
-                      <SelectItem value="RETURNED">Returned</SelectItem>
-                      <SelectItem value="CANCELLED">Cancelled</SelectItem>
+                      <SelectItem value="all">All Delivery Agents</SelectItem>
+                      <SelectItem value="STEADFAST">Steadfast</SelectItem>
+                      <SelectItem value="PATHAO">Pathao</SelectItem>
+                      <SelectItem value="REDX">RedX</SelectItem>
+                      <SelectItem value="CARRYBEE">Carrybee</SelectItem>
                     </SelectContent>
                   </Select>
+
+                  {/* Ordering Filter */}
+                  <Select value={ordering} onValueChange={(val) => { setOrdering(val); setPage(1); }}>
+                    <SelectTrigger className="w-[145px] h-10 bg-white border-slate-200 rounded-xl text-xs font-semibold shadow-2xs">
+                      <ArrowUpDown className="w-3.5 h-3.5 mr-1.5 text-slate-400" />
+                      <SelectValue placeholder="Sort Order" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="-created_at">Newest First</SelectItem>
+                      <SelectItem value="created_at">Oldest First</SelectItem>
+                      <SelectItem value="-total_amount">Amount: High to Low</SelectItem>
+                      <SelectItem value="total_amount">Amount: Low to High</SelectItem>
+                    </SelectContent>
+                  </Select>
+
+                  {/* Toggle Inline Analytics Deck Button */}
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setShowAnalyticsDeck((prev) => !prev)}
+                    className={`h-10 px-3 rounded-xl text-xs font-bold border-slate-200 shadow-2xs flex items-center gap-1.5 ${
+                      showAnalyticsDeck ? "bg-indigo-50 text-indigo-700 border-indigo-200" : "bg-white text-slate-700"
+                    }`}
+                  >
+                    <Sparkles className="w-3.5 h-3.5 text-indigo-600" />
+                    {showAnalyticsDeck ? "Hide Trends" : "Analytics Deck"}
+                  </Button>
+
+                  {/* Reset Filters */}
+                  {isFiltered && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={clearFilters}
+                      className="h-10 px-2.5 text-xs text-rose-600 hover:text-rose-700 hover:bg-rose-50"
+                    >
+                      Clear Filters
+                    </Button>
+                  )}
                 </div>
               </div>
             </CardHeader>
+
             <CardContent className="p-0">
               {/* Bulk Selection Action Bar */}
               {selectedOrderIds.length > 0 && (
-                <div className="bg-amber-50 border-b border-amber-200 px-4 py-2.5 flex items-center justify-between animate-in fade-in slide-in-from-top duration-200">
+                <div className="bg-gradient-to-r from-amber-50 via-amber-100/60 to-amber-50 border-b border-amber-200/80 px-4 py-2.5 flex items-center justify-between animate-in fade-in slide-in-from-top duration-200">
                   <div className="flex items-center gap-2">
-                    <span className="text-xs font-bold text-amber-900">
-                      {selectedOrderIds.length} order{selectedOrderIds.length > 1 ? "s" : ""} selected
-                    </span>
+                    <Badge className="bg-amber-600 text-white font-bold text-xs">
+                      {selectedOrderIds.length} Selected
+                    </Badge>
                     <Button
                       variant="ghost"
                       size="sm"
                       onClick={() => setSelectedOrderIds([])}
-                      className="h-6 text-[11px] text-slate-500 hover:text-slate-800"
+                      className="h-6 text-[11px] text-amber-900 hover:text-amber-950 hover:bg-amber-200/60"
                     >
                       Deselect All
                     </Button>
                   </div>
+
                   <div className="flex items-center gap-2">
                     {activeCouriers.length <= 1 ? (
                       <Button
@@ -637,7 +895,9 @@ export default function OnlinePreordersPage() {
                         className="h-8 text-xs font-bold bg-amber-600 hover:bg-amber-700 text-white shadow-sm flex items-center gap-1.5"
                       >
                         <Zap className="w-3.5 h-3.5 fill-current" />
-                        {isBulkDispatching ? "Dispatching..." : `⚡ Bulk Dispatch via ${activeCouriers[0]?.name || 'Courier'} (${selectedOrderIds.length})`}
+                        {isBulkDispatching
+                          ? "Dispatching..."
+                          : `⚡ Bulk Dispatch via ${activeCouriers[0]?.name || "Courier"} (${selectedOrderIds.length})`}
                       </Button>
                     ) : (
                       <DropdownMenu>
@@ -672,23 +932,24 @@ export default function OnlinePreordersPage() {
                 </div>
               )}
 
+              {/* Table Data View */}
               {loading && rows.length === 0 ? (
-                <div className="flex flex-col items-center justify-center py-24 gap-4">
-                  <div className="animate-spin rounded-full h-10 w-10 border-4 border-indigo-600 border-t-transparent shadow-md"></div>
-                  <p className="text-slate-500 font-medium">Loading orders...</p>
+                <div className="flex flex-col items-center justify-center py-24 gap-3">
+                  <div className="animate-spin rounded-full h-9 w-9 border-3 border-indigo-600 border-t-transparent shadow-md" />
+                  <p className="text-xs text-slate-500 font-medium">Loading preorders from database...</p>
                 </div>
               ) : (
-                <div className="overflow-x-auto max-h-[600px] min-w-0">
+                <div className="overflow-x-auto min-w-0">
                   <Table>
-                    <TableHeader className="bg-slate-50/80 sticky top-0 z-10 backdrop-blur-sm">
-                      <TableRow>
-                        <TableHead className="w-10">
+                    <TableHeader className="bg-slate-50/90 sticky top-0 z-10 backdrop-blur-xs border-b border-slate-200/80">
+                      <TableRow className="hover:bg-transparent">
+                        <TableHead className="w-10 pl-4">
                           <input
                             type="checkbox"
-                            checked={rows.length > 0 && selectedOrderIds.length === rows.filter(r => r.status !== "CANCELLED").length}
+                            checked={rows.length > 0 && selectedOrderIds.length === rows.filter((r) => r.status !== "CANCELLED").length}
                             onChange={(e) => {
                               if (e.target.checked) {
-                                setSelectedOrderIds(rows.filter(r => r.status !== "CANCELLED").map(r => r.id));
+                                setSelectedOrderIds(rows.filter((r) => r.status !== "CANCELLED").map((r) => r.id));
                               } else {
                                 setSelectedOrderIds([]);
                               }
@@ -696,101 +957,137 @@ export default function OnlinePreordersPage() {
                             className="w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer"
                           />
                         </TableHead>
-                        <TableHead className="font-bold text-slate-700">Preview</TableHead>
-                        <TableHead className="font-bold text-slate-700">Order ID</TableHead>
-                        <TableHead className="font-bold text-slate-700">Customer</TableHead>
-                        <TableHead className="font-bold text-slate-700 text-center">Items</TableHead>
-                        <TableHead className="font-bold text-slate-700">Total Price</TableHead>
-                        <TableHead className="font-bold text-slate-700">Discount</TableHead>
-                        <TableHead className="font-bold text-slate-700">Status</TableHead>
-                        <TableHead className="font-bold text-slate-700">Courier Partner</TableHead>
-                        <TableHead className="font-bold text-slate-700">Date</TableHead>
-                        <TableHead className="font-bold text-slate-700 text-right">Actions</TableHead>
+                        <TableHead className="font-bold text-slate-700 text-xs">Preview</TableHead>
+                        <TableHead className="font-bold text-slate-700 text-xs">Order ID</TableHead>
+                        <TableHead className="font-bold text-slate-700 text-xs">Customer</TableHead>
+                        <TableHead className="font-bold text-slate-700 text-xs text-center">Items</TableHead>
+                        <TableHead className="font-bold text-slate-700 text-xs">Amount</TableHead>
+                        <TableHead className="font-bold text-slate-700 text-xs">Discount</TableHead>
+                        <TableHead className="font-bold text-slate-700 text-xs">Status</TableHead>
+                        <TableHead className="font-bold text-slate-700 text-xs">Courier Partner</TableHead>
+                        <TableHead className="font-bold text-slate-700 text-xs">Date</TableHead>
+                        <TableHead className="font-bold text-slate-700 text-xs text-right pr-4">Actions</TableHead>
                       </TableRow>
                     </TableHeader>
+
                     <TableBody>
                       {rows.map((o) => {
                         const totalDiscount = o.items?.reduce((sum, item) => sum + (Number(item.discount) || 0), 0) || 0;
-                        const images = o.items?.map(i => i.product_image).filter(Boolean) || [];
-                        const displayImages = images.slice(0, 3);
-                        const remainingCount = images.length - 3;
-                        const isMulti = images.length > 1;
+                        const images = o.items?.map((i) => i.product_image).filter(Boolean) as string[] || [];
+                        const customerCity = (o.shipping_address as any)?.city || (o.shipping_address as any)?.thana || (o.shipping_address as any)?.district || "";
 
                         return (
                           <TableRow
                             key={o.id}
-                            className="cursor-pointer hover:bg-slate-50/90 transition-colors odd:bg-white even:bg-slate-50/40"
-                            onClick={() => { setSelectedOrder(o); setIsSheetOpen(true); }}
+                            className="cursor-pointer hover:bg-indigo-50/30 transition-colors border-b border-slate-100 last:border-none"
+                            onClick={() => {
+                              setSelectedOrder(o);
+                              setIsSheetOpen(true);
+                            }}
                           >
-                            <TableCell onClick={(e) => e.stopPropagation()}>
+                            {/* Checkbox */}
+                            <TableCell className="pl-4" onClick={(e) => e.stopPropagation()}>
                               <input
                                 type="checkbox"
                                 checked={selectedOrderIds.includes(o.id)}
                                 disabled={o.status === "CANCELLED"}
                                 onChange={(e) => {
                                   if (e.target.checked) {
-                                    setSelectedOrderIds(prev => [...prev, o.id]);
+                                    setSelectedOrderIds((prev) => [...prev, o.id]);
                                   } else {
-                                    setSelectedOrderIds(prev => prev.filter(id => id !== o.id));
+                                    setSelectedOrderIds((prev) => prev.filter((id) => id !== o.id));
                                   }
                                 }}
-                                className="w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer disabled:opacity-40"
+                                className="w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer disabled:opacity-30"
                               />
                             </TableCell>
+
+                            {/* Product Image Thumbnail */}
                             <TableCell>
-                              <div className="flex gap-1.5 items-center">
-                                {images.length > 0 ? (
-                                  <>
-                                    <div
-                                      className="w-14 h-16 sm:w-16 sm:h-20 rounded-md border bg-white overflow-hidden flex-shrink-0 relative transition-all"
-                                    >
-                                      <img src={images[0]} alt="Order preview" className="w-full h-full object-cover" />
-                                      {images.length > 1 && (
-                                        <div className="sm:hidden absolute inset-0 bg-black/60 flex items-center justify-center">
-                                          <span className="text-white text-xs font-bold">+{images.length - 1}</span>
-                                        </div>
-                                      )}
-                                    </div>
-                                    {displayImages.slice(1).map((img, idx) => (
-                                      <div
-                                        key={idx}
-                                        className="hidden sm:block w-16 h-20 rounded-md border bg-white overflow-hidden flex-shrink-0 relative transition-all"
-                                      >
-                                        <img src={img} alt="Order preview" className="w-full h-full object-cover" />
-                                        {idx === 1 && remainingCount > 0 && (
-                                          <div className="absolute inset-0 bg-black/60 flex items-center justify-center">
-                                            <span className="text-white text-xs font-bold">+{remainingCount}</span>
-                                          </div>
-                                        )}
-                                      </div>
-                                    ))}
-                                  </>
-                                ) : (
-                                  <div className="w-14 h-16 sm:w-20 sm:h-24 rounded-md border bg-white overflow-hidden flex items-center justify-center flex-shrink-0">
-                                    <Package className="w-6 h-6 text-slate-300" />
-                                  </div>
-                                )}
+                              <OrderProductThumbnail
+                                images={images}
+                                orderId={o.id}
+                                productName={o.items?.[0]?.product_name}
+                              />
+                            </TableCell>
+
+                            {/* Order ID */}
+                            <TableCell>
+                              <div className="flex items-center gap-1.5">
+                                <span className="font-black text-xs font-mono text-indigo-600">
+                                  #{o.id}
+                                </span>
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    navigator.clipboard.writeText(String(o.id));
+                                    toast({ title: `Copied #${o.id}` });
+                                  }}
+                                  className="text-slate-400 hover:text-slate-700 opacity-0 group-hover:opacity-100 transition-opacity"
+                                  title="Copy Order ID"
+                                >
+                                  <Copy className="w-3 h-3" />
+                                </button>
                               </div>
                             </TableCell>
-                            <TableCell className="font-bold text-indigo-600">#{o.id}</TableCell>
+
+                            {/* Customer Column */}
                             <TableCell>
-                              <div className="font-bold text-slate-900">{o.customer_name}</div>
-                              <div className="text-xs text-slate-500 font-medium mt-0.5">{o.customer_phone}</div>
+                              <div className="flex items-center gap-2.5">
+                                <div className="w-8 h-8 rounded-full bg-slate-100 border border-slate-200/80 flex items-center justify-center text-[11px] font-black text-slate-700 shrink-0">
+                                  {getCustomerInitials(o.customer_name)}
+                                </div>
+                                <div className="min-w-0">
+                                  <div className="font-bold text-slate-900 text-xs truncate max-w-[160px]">
+                                    {o.customer_name}
+                                  </div>
+                                  <div className="flex items-center gap-1.5 text-[11px] text-slate-500 font-mono mt-0.5">
+                                    <span>{o.customer_phone}</span>
+                                    {customerCity && (
+                                      <span className="text-[10px] text-slate-400 font-sans truncate max-w-[90px]">
+                                        • {customerCity}
+                                      </span>
+                                    )}
+                                  </div>
+                                </div>
+                              </div>
                             </TableCell>
+
+                            {/* Items count badge */}
                             <TableCell className="text-center">
-                              <Badge variant="secondary" className="bg-slate-100 text-slate-600 font-bold border-none">
-                                {o.items?.length || 0}
+                              <Badge variant="secondary" className="bg-slate-100 text-slate-700 font-bold border-none text-[11px] px-2 py-0.5">
+                                {o.items?.length || 0} unit{o.items?.length === 1 ? "" : "s"}
                               </Badge>
                             </TableCell>
-                            <TableCell className="font-semibold text-slate-900">{formatCurrency(o.total_amount)}</TableCell>
+
+                            {/* Total Price */}
                             <TableCell>
-                              {totalDiscount > 0 ? (
-                                <span className="text-rose-600 font-semibold text-sm">{formatCurrency(totalDiscount)}</span>
-                              ) : (
-                                <span className="text-slate-400 text-xs">-</span>
+                              <div className="font-black text-xs text-slate-900">
+                                {formatCurrency(o.total_amount)}
+                              </div>
+                              {Number(o.delivery_charge || 0) > 0 && (
+                                <div className="text-[10px] text-slate-400 font-medium">
+                                  incl. {formatCurrency(o.delivery_charge)} del.
+                                </div>
                               )}
                             </TableCell>
+
+                            {/* Discount */}
+                            <TableCell>
+                              {totalDiscount > 0 ? (
+                                <span className="text-rose-600 font-bold text-xs bg-rose-50 px-2 py-0.5 rounded-full border border-rose-100">
+                                  -{formatCurrency(totalDiscount)}
+                                </span>
+                              ) : (
+                                <span className="text-slate-300 text-xs">-</span>
+                              )}
+                            </TableCell>
+
+                            {/* Status */}
                             <TableCell>{getStatusBadge(o.status)}</TableCell>
+
+                            {/* Courier Partner */}
                             <TableCell onClick={(e) => e.stopPropagation()}>
                               {o.courier_consignment_id || o.steadfast_consignment_id || o.courier_tracking_code || o.steadfast_tracking_code ? (
                                 (() => {
@@ -805,7 +1102,7 @@ export default function OnlinePreordersPage() {
                                       : p === "REDX"
                                       ? "bg-orange-50 text-orange-700 border-orange-200"
                                       : "bg-blue-50 text-blue-700 border-blue-200";
-                                  
+
                                   const trackUrl =
                                     p === "STEADFAST"
                                       ? `https://steadfast.com.bd/tracking`
@@ -818,17 +1115,19 @@ export default function OnlinePreordersPage() {
                                   return (
                                     <div className="flex flex-col items-start gap-1">
                                       <div className="flex items-center gap-1.5">
-                                        <Badge variant="outline" className={`${badgeClass} text-[10px] font-bold uppercase tracking-wider flex items-center gap-1`}>
+                                        <Badge variant="outline" className={`${badgeClass} text-[10px] font-bold uppercase tracking-wider flex items-center gap-1 shadow-2xs`}>
                                           <Truck className="w-3 h-3" />
                                           {p}
                                         </Badge>
-                                        <span className="text-[10px] text-slate-500 font-medium capitalize">({st.replace(/_/g, " ")})</span>
+                                        <span className="text-[10px] text-slate-500 font-semibold capitalize">
+                                          ({st.replace(/_/g, " ")})
+                                        </span>
                                         <button
                                           type="button"
                                           onClick={(e) => handleSyncSingleCourier(o.id, e)}
                                           disabled={syncingOrderId === o.id}
                                           title={`Sync live status from ${p}`}
-                                          className="p-0.5 rounded text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 transition-colors inline-flex items-center justify-center"
+                                          className="p-1 rounded text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 transition-colors inline-flex items-center justify-center"
                                         >
                                           <RefreshCw className={`w-3 h-3 ${syncingOrderId === o.id ? "animate-spin text-indigo-600" : ""}`} />
                                         </button>
@@ -842,7 +1141,7 @@ export default function OnlinePreordersPage() {
                                             try { navigator.clipboard.writeText(trk); } catch {}
                                           }}
                                           className="text-[11px] font-mono text-indigo-600 hover:text-indigo-800 hover:underline flex items-center gap-0.5"
-                                          title={`Track on ${p} (Copies code)`}
+                                          title={`Track on ${p} (Click to copy)`}
                                         >
                                           {trk}
                                           <ExternalLink className="w-2.5 h-2.5 ml-0.5 inline opacity-70" />
@@ -852,32 +1151,18 @@ export default function OnlinePreordersPage() {
                                   );
                                 })()
                               ) : o.status !== "CANCELLED" ? (
-                                activeCouriers.length === 0 ? (
+                                activeCouriers.length <= 1 ? (
                                   <Button
                                     size="sm"
                                     variant="outline"
-                                    className="h-7 px-2.5 text-xs font-bold border-amber-300 bg-amber-50/70 text-amber-800 hover:bg-amber-100 flex items-center gap-1 shadow-sm transition-all"
+                                    className="h-7 px-2.5 text-xs font-bold border-amber-300 bg-amber-50/80 text-amber-900 hover:bg-amber-100 flex items-center gap-1 shadow-2xs transition-all"
                                     onClick={(e) => {
                                       e.stopPropagation();
-                                      void openFastDispatchDialog(o);
+                                      void openFastDispatchDialog(o, activeCouriers[0]?.provider);
                                     }}
                                   >
                                     <Zap className="w-3 h-3 text-amber-600 fill-amber-500" />
-                                    Setup Courier
-                                  </Button>
-                                ) : activeCouriers.length === 1 ? (
-                                  <Button
-                                    size="sm"
-                                    variant="outline"
-                                    className="h-7 px-2.5 text-xs font-bold border-amber-300 bg-amber-50/80 text-amber-900 hover:bg-amber-100 hover:border-amber-400 flex items-center gap-1 shadow-sm transition-all"
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      void openFastDispatchDialog(o, activeCouriers[0].provider);
-                                    }}
-                                    title={`Fast Dispatch via ${activeCouriers[0].name}`}
-                                  >
-                                    <Zap className="w-3 h-3 text-amber-600 fill-amber-500" />
-                                    Dispatch ({activeCouriers[0].name.replace(" Courier", "").replace(" Logistics", "")})
+                                    Dispatch
                                   </Button>
                                 ) : (
                                   <DropdownMenu>
@@ -885,7 +1170,7 @@ export default function OnlinePreordersPage() {
                                       <Button
                                         size="sm"
                                         variant="outline"
-                                        className="h-7 px-2 text-xs font-bold border-amber-300 bg-amber-50/80 text-amber-900 hover:bg-amber-100 flex items-center gap-1 shadow-sm"
+                                        className="h-7 px-2.5 text-xs font-bold border-amber-300 bg-amber-50/80 text-amber-900 hover:bg-amber-100 flex items-center gap-1 shadow-2xs"
                                         onClick={(e) => e.stopPropagation()}
                                       >
                                         <Zap className="w-3 h-3 text-amber-600 fill-amber-500" />
@@ -913,26 +1198,32 @@ export default function OnlinePreordersPage() {
                                   </DropdownMenu>
                                 )
                               ) : (
-                                <span className="text-slate-400 text-xs">-</span>
+                                <span className="text-slate-300 text-xs">-</span>
                               )}
                             </TableCell>
-                            <TableCell className="text-slate-500 font-medium whitespace-nowrap">
+
+                            {/* Date */}
+                            <TableCell className="text-slate-500 text-xs font-medium whitespace-nowrap">
                               {format(new Date(o.created_at), "MMM dd, yyyy")}
                             </TableCell>
-                            <TableCell className="text-right">
+
+                            {/* Row Action Dropdown */}
+                            <TableCell className="text-right pr-4">
                               <DropdownMenu>
                                 <DropdownMenuTrigger asChild>
                                   <Button
                                     variant="ghost"
                                     size="icon"
-                                    className="h-8 w-8 p-0 hover:bg-slate-100"
+                                    className="h-8 w-8 p-0 hover:bg-slate-100 rounded-lg"
                                     onClick={(e) => e.stopPropagation()}
                                   >
-                                    <MoreHorizontal className="h-4 w-4" />
+                                    <MoreHorizontal className="h-4 w-4 text-slate-500" />
                                   </Button>
                                 </DropdownMenuTrigger>
-                                <DropdownMenuContent align="end" className="w-48">
-                                  <DropdownMenuLabel>Order #{o.id}</DropdownMenuLabel>
+                                <DropdownMenuContent align="end" className="w-52">
+                                  <DropdownMenuLabel className="text-xs font-bold text-slate-600">
+                                    Order #{o.id}
+                                  </DropdownMenuLabel>
                                   <DropdownMenuSeparator />
                                   <DropdownMenuItem
                                     onClick={() => {
@@ -940,13 +1231,11 @@ export default function OnlinePreordersPage() {
                                       setIsSheetOpen(true);
                                     }}
                                   >
-                                    <Edit className="mr-2 h-4 w-4" />
-                                    View &amp; Edit
+                                    <Edit className="mr-2 h-4 w-4 text-slate-500" />
+                                    View &amp; Edit Details
                                   </DropdownMenuItem>
-                                  <DropdownMenuItem
-                                    onClick={() => handleStartVerification(o)}
-                                  >
-                                    <Package className="mr-2 h-4 w-4" />
+                                  <DropdownMenuItem onClick={() => handleStartVerification(o)}>
+                                    <Package className="mr-2 h-4 w-4 text-indigo-600" />
                                     Verify &amp; Deliver
                                   </DropdownMenuItem>
                                   <DropdownMenuItem
@@ -955,50 +1244,32 @@ export default function OnlinePreordersPage() {
                                       setIsSheetOpen(true);
                                     }}
                                   >
-                                    <Clock className="mr-2 h-4 w-4" />
+                                    <Clock className="mr-2 h-4 w-4 text-amber-600" />
                                     Change Status
                                   </DropdownMenuItem>
 
-                                  {/* Delivery Partner Actions */}
+                                  {/* Courier partner actions */}
                                   {o.status !== "CANCELLED" && (
                                     <>
                                       <DropdownMenuSeparator />
                                       {!(o.courier_consignment_id || o.steadfast_consignment_id) ? (
-                                        <>
-                                          {activeCouriers.length > 0 ? (
-                                            activeCouriers.map((c) => (
-                                              <DropdownMenuItem
-                                                key={c.provider}
-                                                onClick={(e) => {
-                                                  e.stopPropagation();
-                                                  void openFastDispatchDialog(o, c.provider);
-                                                }}
-                                                className="text-amber-800 focus:text-amber-900 font-semibold cursor-pointer"
-                                              >
-                                                <Zap className="mr-2 h-4 w-4 fill-amber-500 text-amber-600" />
-                                                Dispatch via {c.name}
-                                              </DropdownMenuItem>
-                                            ))
-                                          ) : (
-                                            <DropdownMenuItem
-                                              onClick={(e) => {
-                                                e.stopPropagation();
-                                                void openFastDispatchDialog(o);
-                                              }}
-                                              className="text-amber-700 focus:text-amber-800 font-semibold cursor-pointer"
-                                            >
-                                              <Zap className="mr-2 h-4 w-4 fill-amber-500 text-amber-600" />
-                                              Dispatch to Courier Partner
-                                            </DropdownMenuItem>
-                                          )}
-                                        </>
+                                        <DropdownMenuItem
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            void openFastDispatchDialog(o);
+                                          }}
+                                          className="text-amber-800 font-semibold cursor-pointer"
+                                        >
+                                          <Zap className="mr-2 h-4 w-4 fill-amber-500 text-amber-600" />
+                                          Dispatch Consignment
+                                        </DropdownMenuItem>
                                       ) : (
                                         <DropdownMenuItem
                                           onClick={(e) => {
                                             e.stopPropagation();
                                             void handleSyncSingleCourier(o.id, e);
                                           }}
-                                          className="cursor-pointer"
+                                          className="cursor-pointer font-medium"
                                         >
                                           <RefreshCw className={`mr-2 h-4 w-4 text-emerald-600 ${syncingOrderId === o.id ? "animate-spin" : ""}`} />
                                           Check Status ({o.courier_partner || "Courier"})
@@ -1017,28 +1288,30 @@ export default function OnlinePreordersPage() {
                                   )}
 
                                   {o.status !== "CANCELLED" && (
-                                    <DropdownMenuItem
-                                      onClick={(e) => {
-                                        e.stopPropagation?.();
-                                        setCancelOrderTarget(o);
-                                        setCancelReason("Fake Customer / Fake Order");
-                                        setIsFakeCustomer(true);
-                                        setCancelDialogOpen(true);
-                                      }}
-                                      className="text-amber-600 focus:text-amber-700 font-medium"
-                                    >
-                                      <XCircle className="mr-2 h-4 w-4" />
-                                      Cancel Order
-                                    </DropdownMenuItem>
+                                    <>
+                                      <DropdownMenuSeparator />
+                                      <DropdownMenuItem
+                                        onClick={(e) => {
+                                          e.stopPropagation?.();
+                                          setCancelOrderTarget(o);
+                                          setCancelReason("Fake Customer / Fake Order");
+                                          setIsFakeCustomer(true);
+                                          setCancelDialogOpen(true);
+                                        }}
+                                        className="text-amber-600 focus:text-amber-700 font-semibold"
+                                      >
+                                        <XCircle className="mr-2 h-4 w-4" />
+                                        Cancel Order
+                                      </DropdownMenuItem>
+                                    </>
                                   )}
                                   <DropdownMenuSeparator />
                                   <DropdownMenuItem
                                     onClick={(e) => {
-                                      // e is the synthetic event from menu; stop menu closing from bubbling to row
                                       e.stopPropagation?.();
                                       openDeleteDialog(o);
                                     }}
-                                    className="text-red-600 focus:text-red-700"
+                                    className="text-red-600 focus:text-red-700 font-semibold"
                                   >
                                     <Trash2 className="mr-2 h-4 w-4" />
                                     Delete Order
@@ -1049,12 +1322,30 @@ export default function OnlinePreordersPage() {
                           </TableRow>
                         );
                       })}
-                      {rows.length === 0 && (
+
+                      {rows.length === 0 && !loading && (
                         <TableRow>
                           <TableCell colSpan={11} className="text-center py-20">
-                            <div className="flex flex-col items-center justify-center gap-2 opacity-30">
-                              <ShoppingBag className="w-16 h-16" />
-                              <p className="font-bold text-lg">No online preorders found</p>
+                            <div className="flex flex-col items-center justify-center gap-3 text-slate-400">
+                              <div className="w-14 h-14 rounded-2xl bg-slate-100 flex items-center justify-center">
+                                <ShoppingBag className="w-7 h-7 text-slate-400" />
+                              </div>
+                              <div className="space-y-1">
+                                <p className="font-extrabold text-slate-800 text-sm">No online preorders found</p>
+                                <p className="text-xs text-slate-500">
+                                  {isFiltered ? "Try adjusting your filters or search keywords" : "No orders have been placed yet."}
+                                </p>
+                              </div>
+                              {isFiltered && (
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={clearFilters}
+                                  className="h-8 text-xs font-semibold mt-1"
+                                >
+                                  Reset Filters
+                                </Button>
+                              )}
                             </div>
                           </TableCell>
                         </TableRow>
@@ -1063,8 +1354,123 @@ export default function OnlinePreordersPage() {
                   </Table>
                 </div>
               )}
-            </CardContent>
 
+              {/* Backend Pagination Footer Controls */}
+              <div className="p-4 border-t border-slate-100 bg-slate-50/50 flex flex-col sm:flex-row items-center justify-between gap-4">
+                <div className="text-xs text-slate-500 font-medium">
+                  Showing <span className="font-bold text-slate-900">{fromRecord}</span> to{" "}
+                  <span className="font-bold text-slate-900">{toRecord}</span> of{" "}
+                  <span className="font-black text-slate-900">{totalCount}</span> preorders
+                  {isFetching && (
+                    <span className="ml-2 inline-flex items-center gap-1 text-indigo-600">
+                      <RefreshCw className="w-3 h-3 animate-spin" />
+                      Updating...
+                    </span>
+                  )}
+                </div>
+
+                <div className="flex items-center gap-3">
+                  {/* Page Navigation */}
+                  <div className="flex items-center gap-1">
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      className="h-8 w-8 rounded-lg bg-white border-slate-200"
+                      onClick={() => setPage(1)}
+                      disabled={page <= 1 || loading}
+                      title="First Page"
+                    >
+                      <ChevronsLeft className="w-4 h-4" />
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      className="h-8 w-8 rounded-lg bg-white border-slate-200"
+                      onClick={() => setPage((p) => Math.max(1, p - 1))}
+                      disabled={page <= 1 || loading}
+                      title="Previous Page"
+                    >
+                      <ChevronLeft className="w-4 h-4" />
+                    </Button>
+
+                    <div className="flex items-center gap-1 px-1">
+                      {Array.from({ length: totalPages }, (_, i) => i + 1)
+                        .filter((p) => {
+                          if (totalPages <= 7) return true;
+                          if (p === 1 || p === totalPages) return true;
+                          return Math.abs(p - page) <= 1;
+                        })
+                        .map((p, idx, arr) => {
+                          const prev = arr[idx - 1];
+                          const showEllipsis = prev && p - prev > 1;
+                          return (
+                            <React.Fragment key={p}>
+                              {showEllipsis && <span className="text-slate-400 text-xs px-1">...</span>}
+                              <Button
+                                variant={p === page ? "default" : "outline"}
+                                size="sm"
+                                onClick={() => setPage(p)}
+                                disabled={loading}
+                                className={`h-8 w-8 p-0 rounded-lg text-xs font-bold ${
+                                  p === page
+                                    ? "bg-indigo-600 text-white shadow-xs"
+                                    : "bg-white border-slate-200 text-slate-700 hover:bg-slate-100"
+                                }`}
+                              >
+                                {p}
+                              </Button>
+                            </React.Fragment>
+                          );
+                        })}
+                    </div>
+
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      className="h-8 w-8 rounded-lg bg-white border-slate-200"
+                      onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                      disabled={page >= totalPages || loading}
+                      title="Next Page"
+                    >
+                      <ChevronRight className="w-4 h-4" />
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      className="h-8 w-8 rounded-lg bg-white border-slate-200"
+                      onClick={() => setPage(totalPages)}
+                      disabled={page >= totalPages || loading}
+                      title="Last Page"
+                    >
+                      <ChevronsRight className="w-4 h-4" />
+                    </Button>
+                  </div>
+
+                  {/* Rows per page selector */}
+                  <div className="flex items-center gap-2 pl-2 border-l border-slate-200">
+                    <span className="text-xs text-slate-500 font-medium hidden sm:inline">Rows:</span>
+                    <Select
+                      value={String(pageSize)}
+                      onValueChange={(val) => {
+                        setPageSize(Number(val));
+                        setPage(1);
+                      }}
+                    >
+                      <SelectTrigger className="w-[72px] h-8 bg-white border-slate-200 text-xs font-bold rounded-lg">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent align="end">
+                        <SelectItem value="10">10</SelectItem>
+                        <SelectItem value="15">15</SelectItem>
+                        <SelectItem value="30">30</SelectItem>
+                        <SelectItem value="50">50</SelectItem>
+                        <SelectItem value="100">100</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+              </div>
+            </CardContent>
           </Card>
         </TabsContent>
 

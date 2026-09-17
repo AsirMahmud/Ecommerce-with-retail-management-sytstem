@@ -152,6 +152,12 @@ export interface OnlinePreorderVerification {
   items: OnlinePreorderVerificationItem[];
 }
 
+export interface OnlinePreorderScanResult {
+  result: 'MATCHED' | 'NOT_IN_ORDER' | 'OVER_SCAN';
+  message: string;
+  verification: OnlinePreorderVerification;
+}
+
 export interface OnlinePreordersQueryParams {
   page?: number;
   pageSize?: number;
