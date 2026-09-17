@@ -106,7 +106,7 @@ export default function OnlinePreordersPage() {
   const [pageSize, setPageSize] = useState<number>(15);
   const [courierFilter, setCourierFilter] = useState<string>("all");
   const [ordering, setOrdering] = useState<string>("-created_at");
-  const [showAnalyticsDeck, setShowAnalyticsDeck] = useState<boolean>(false);
+  const [showKpis, setShowKpis] = useState<boolean>(true);
 
   // Reset to page 1 whenever search query changes
   useEffect(() => {
@@ -538,225 +538,195 @@ export default function OnlinePreordersPage() {
   };
 
   return (
-    <div className="min-h-screen space-y-6 sm:space-y-7 animate-in fade-in duration-500">
-      {/* Module Title Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-5 rounded-2xl border border-slate-200/90 shadow-2xs">
-        <div>
-          <div className="flex items-center gap-2.5">
-            <div className="w-10 h-10 rounded-xl bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-600 shadow-2xs">
-              <ShoppingBag className="w-5 h-5" />
-            </div>
-            <div>
-              <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-slate-900">
+    <div className="min-h-screen space-y-3 sm:space-y-4 animate-in fade-in duration-300">
+      {/* 1. Sleek Compact Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white px-4 py-3 rounded-xl border border-slate-200/90 shadow-2xs">
+        <div className="flex items-center gap-3">
+          <div className="w-9 h-9 rounded-lg bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-600 shrink-0">
+            <ShoppingBag className="w-4 h-4" />
+          </div>
+          <div>
+            <div className="flex items-center gap-2">
+              <h1 className="text-xl sm:text-2xl font-black tracking-tight text-slate-900">
                 Online Preorders
               </h1>
-              <p className="text-slate-500 text-xs sm:text-sm font-medium mt-0.5">
-                Ecommerce cash on delivery consignments, live courier syncing, and inventory fulfillment.
-              </p>
+              <Badge className="bg-indigo-50 text-indigo-700 border-indigo-200 text-xs font-bold px-2 py-0.5">
+                {metrics?.total_orders ?? totalCount} Orders
+              </Badge>
+              {(metrics?.today_orders || 0) > 0 && (
+                <span className="text-[11px] text-emerald-600 font-semibold hidden sm:inline">
+                  +{metrics?.today_orders} today
+                </span>
+              )}
             </div>
+            <p className="text-slate-400 text-xs font-medium">
+              Consignment dispatching, live courier syncing &amp; inventory fulfillment
+            </p>
           </div>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2 sm:gap-2.5">
+        <div className="flex items-center gap-2 shrink-0">
           <Button
             variant="outline"
-            className="bg-white border-amber-300 text-amber-900 hover:bg-amber-50 text-xs sm:text-sm h-9 flex items-center gap-1.5 shadow-2xs font-semibold"
+            size="sm"
+            onClick={() => setShowKpis((prev) => !prev)}
+            className="h-8 px-2.5 text-xs text-slate-600 border-slate-200 bg-white hover:bg-slate-50 font-medium"
+            title="Toggle KPI Summary Ribbon"
+          >
+            <BarChart3 className="w-3.5 h-3.5 mr-1 text-slate-500" />
+            {showKpis ? "Hide Stats" : "Show Stats"}
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-8 px-2.5 bg-white border-amber-300 text-amber-900 hover:bg-amber-50 text-xs flex items-center gap-1.5 font-semibold"
             onClick={handleSyncAllCouriers}
             disabled={isSyncingCouriers}
             title="Sync live status from Steadfast, Pathao & all couriers"
           >
-            <Truck className="w-3.5 h-3.5 text-amber-600" />
+            <Truck className="w-3 h-3 text-amber-600" />
             <RefreshCw className={`w-3 h-3 ${isSyncingCouriers ? "animate-spin text-amber-600" : ""}`} />
-            {isSyncingCouriers ? "Syncing Couriers..." : "Sync Live Status"}
+            {isSyncingCouriers ? "Syncing..." : "Sync Live Status"}
           </Button>
           <Button
             variant="outline"
-            className="bg-white border-slate-200 text-slate-700 text-xs sm:text-sm h-9 hover:bg-slate-50"
+            size="sm"
+            className="h-8 px-2.5 bg-white border-slate-200 text-slate-700 text-xs hover:bg-slate-50"
             onClick={loadData}
           >
-            <RefreshCw className={`w-3.5 h-3.5 mr-1.5 ${isFetching ? "animate-spin text-indigo-600" : ""}`} />
+            <RefreshCw className={`w-3 h-3 mr-1 ${isFetching ? "animate-spin text-indigo-600" : ""}`} />
             Refresh
           </Button>
           <Button
-            className="bg-indigo-600 hover:bg-indigo-700 shadow-md shadow-indigo-200 text-xs sm:text-sm h-9 font-bold"
+            size="sm"
+            className="h-8 px-3 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs shadow-xs"
             onClick={() => {
               setEditingOrder(null);
               setActiveTab("manual");
             }}
           >
-            <Plus className="w-3.5 h-3.5 mr-1.5" />
-            Create Order
+            <Plus className="w-3.5 h-3.5 mr-1" />
+            New Order
           </Button>
         </div>
       </div>
 
-      {/* Top Executive KPI Metric Cards */}
-      <div className="grid gap-3 sm:gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
-        {/* Card 1: Total Orders */}
-        <div className="bg-white border border-slate-200/90 rounded-2xl p-4 sm:p-5 shadow-2xs relative overflow-hidden group hover:border-indigo-300 transition-all">
-          <div className="flex items-center justify-between mb-2.5">
-            <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Total Preorders</span>
-            <div className="w-9 h-9 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center shadow-2xs group-hover:scale-105 transition-transform">
+      {/* 2. Compact Horizontal Executive Ribbon (Only ~50px tall, collapsible) */}
+      {showKpis && (
+        <div className="bg-white border border-slate-200/90 rounded-xl px-4 py-2.5 shadow-2xs grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4 divide-y sm:divide-y-0 sm:divide-x divide-slate-100 animate-in fade-in duration-200">
+          {/* Metric 1: Total Orders */}
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center shrink-0">
               <ShoppingBag className="h-4 w-4" />
             </div>
+            <div>
+              <div className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Preorders</div>
+              <div className="flex items-baseline gap-1.5">
+                <span className="text-lg font-black text-slate-900">
+                  {isMetricsLoading ? "..." : (metrics?.total_orders ?? totalCount)}
+                </span>
+                <span className="text-[10px] text-emerald-600 font-bold bg-emerald-50 px-1 rounded">
+                  +{metrics?.today_orders || 0} today
+                </span>
+              </div>
+            </div>
           </div>
-          <div className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">
-            {isMetricsLoading ? (
-              <Skeleton className="h-8 w-24" />
-            ) : (
-              metrics?.total_orders ?? totalCount
-            )}
-          </div>
-          <div className="flex items-center gap-1.5 mt-2">
-            <Badge variant="outline" className="bg-indigo-50/80 text-indigo-700 border-indigo-200 text-[10px] font-bold px-1.5 py-0.5">
-              +{metrics?.today_orders || 0} today
-            </Badge>
-            <span className="text-[11px] text-slate-500 font-medium">All-time consignments</span>
-          </div>
-        </div>
 
-        {/* Card 2: Total Revenue */}
-        <div className="bg-white border border-slate-200/90 rounded-2xl p-4 sm:p-5 shadow-2xs relative overflow-hidden group hover:border-emerald-300 transition-all">
-          <div className="flex items-center justify-between mb-2.5">
-            <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Completed Revenue</span>
-            <div className="w-9 h-9 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center shadow-2xs group-hover:scale-105 transition-transform">
+          {/* Metric 2: Completed Revenue */}
+          <div className="flex items-center gap-3 sm:pl-4 pt-2 sm:pt-0">
+            <div className="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
               <DollarSign className="h-4 w-4" />
             </div>
+            <div>
+              <div className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Completed COD</div>
+              <div className="flex items-baseline gap-1.5">
+                <span className="text-lg font-black text-slate-900">
+                  {isMetricsLoading ? "..." : formatCurrency(metrics?.financials?.completed_revenue ?? 0)}
+                </span>
+                <span className="text-[10px] text-slate-500 font-medium">
+                  ({metrics?.status_breakdown?.COMPLETED ?? 0} del.)
+                </span>
+              </div>
+            </div>
           </div>
-          <div className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">
-            {isMetricsLoading ? (
-              <Skeleton className="h-8 w-28" />
-            ) : (
-              formatCurrency(metrics?.financials?.completed_revenue ?? 0)
-            )}
-          </div>
-          <div className="flex items-center gap-1.5 mt-2">
-            <Badge variant="outline" className="bg-emerald-50/80 text-emerald-700 border-emerald-200 text-[10px] font-bold px-1.5 py-0.5">
-              {metrics?.status_breakdown?.COMPLETED ?? 0} completed
-            </Badge>
-            <span className="text-[11px] text-slate-500 font-medium">COD collected</span>
-          </div>
-        </div>
 
-        {/* Card 3: Delivery Success Rate */}
-        <div className="bg-white border border-slate-200/90 rounded-2xl p-4 sm:p-5 shadow-2xs relative overflow-hidden group hover:border-blue-300 transition-all">
-          <div className="flex items-center justify-between mb-2.5">
-            <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Fulfillment Rate</span>
-            <div className="w-9 h-9 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center shadow-2xs group-hover:scale-105 transition-transform">
+          {/* Metric 3: Fulfillment Rate */}
+          <div className="flex items-center gap-3 sm:pl-4 pt-2 sm:pt-0">
+            <div className="w-8 h-8 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
               <Truck className="h-4 w-4" />
             </div>
-          </div>
-          <div className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">
-            {isMetricsLoading ? (
-              <Skeleton className="h-8 w-24" />
-            ) : (
-              `${metrics?.rates?.fulfillment_rate ?? 0}%`
-            )}
-          </div>
-          <div className="flex items-center gap-1.5 mt-2">
-            <Badge variant="outline" className="bg-purple-50/80 text-purple-700 border-purple-200 text-[10px] font-bold px-1.5 py-0.5">
-              {metrics?.rates?.return_rate ?? 0}% return rate
-            </Badge>
-            <span className="text-[11px] text-slate-500 font-medium">Delivered vs returned</span>
-          </div>
-        </div>
-
-        {/* Card 4: Avg Order Value */}
-        <div className="bg-white border border-slate-200/90 rounded-2xl p-4 sm:p-5 shadow-2xs relative overflow-hidden group hover:border-purple-300 transition-all">
-          <div className="flex items-center justify-between mb-2.5">
-            <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Avg Order Value</span>
-            <div className="w-9 h-9 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center shadow-2xs group-hover:scale-105 transition-transform">
-              <TrendingUp className="h-4 w-4" />
+            <div>
+              <div className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Delivery Rate</div>
+              <div className="flex items-baseline gap-1.5">
+                <span className="text-lg font-black text-slate-900">
+                  {isMetricsLoading ? "..." : `${metrics?.rates?.fulfillment_rate ?? 0}%`}
+                </span>
+                <span className="text-[10px] text-purple-600 font-medium bg-purple-50 px-1 rounded">
+                  {metrics?.rates?.return_rate ?? 0}% ret.
+                </span>
+              </div>
             </div>
           </div>
-          <div className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">
-            {isMetricsLoading ? (
-              <Skeleton className="h-8 w-28" />
-            ) : (
-              formatCurrency(metrics?.financials?.average_order_value ?? 0)
-            )}
-          </div>
-          <div className="flex items-center gap-1.5 mt-2">
-            <span className="text-[11px] text-slate-500 font-medium">
-              Total preordered: <span className="font-semibold text-slate-700">{formatCurrency(metrics?.financials?.total_revenue ?? 0)}</span>
-            </span>
+
+          {/* Metric 4: Avg Order Value */}
+          <div className="flex items-center gap-3 sm:pl-4 pt-2 sm:pt-0">
+            <div className="w-8 h-8 rounded-lg bg-purple-50 text-purple-600 flex items-center justify-center shrink-0">
+              <TrendingUp className="h-4 w-4" />
+            </div>
+            <div>
+              <div className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Avg Order Value</div>
+              <div className="flex items-baseline gap-1.5">
+                <span className="text-lg font-black text-slate-900">
+                  {isMetricsLoading ? "..." : formatCurrency(metrics?.financials?.average_order_value ?? 0)}
+                </span>
+                <span className="text-[10px] text-slate-400">
+                  / {formatCurrency(metrics?.financials?.total_revenue ?? 0)}
+                </span>
+              </div>
+            </div>
           </div>
         </div>
-      </div>
+      )}
 
-      {/* Interactive Status Pills Filter Strip */}
-      <div className="bg-white p-2 sm:p-2.5 rounded-2xl border border-slate-200/90 shadow-2xs flex items-center gap-1.5 overflow-x-auto no-scrollbar">
-        {[
-          { key: "all", label: "All Orders", count: metrics?.total_orders ?? totalCount, color: "text-slate-700" },
-          { key: "PENDING", label: "Pending", count: metrics?.status_breakdown?.PENDING ?? 0, color: "text-amber-700" },
-          { key: "CONFIRMED", label: "Confirmed", count: metrics?.status_breakdown?.CONFIRMED ?? 0, color: "text-blue-700" },
-          { key: "HOLD", label: "Hold", count: metrics?.status_breakdown?.HOLD ?? 0, color: "text-orange-700" },
-          { key: "DELIVERED", label: "Delivered", count: metrics?.status_breakdown?.DELIVERED ?? 0, color: "text-indigo-700" },
-          { key: "COMPLETED", label: "Completed", count: metrics?.status_breakdown?.COMPLETED ?? 0, color: "text-emerald-700" },
-          { key: "RETURNED", label: "Returned", count: metrics?.status_breakdown?.RETURNED ?? 0, color: "text-purple-700" },
-          { key: "CANCELLED", label: "Cancelled", count: metrics?.status_breakdown?.CANCELLED ?? 0, color: "text-rose-700" },
-        ].map((item) => {
-          const isActive = status === item.key;
-          return (
-            <button
-              key={item.key}
-              type="button"
-              onClick={() => handleStatusChange(item.key)}
-              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all shrink-0 flex items-center gap-2 ${
-                isActive
-                  ? "bg-indigo-600 text-white shadow-xs scale-102"
-                  : "bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200/60"
-              }`}
-            >
-              <span>{item.label}</span>
-              <span
-                className={`text-[10px] px-1.5 py-0.2 rounded-full font-mono font-black ${
-                  isActive ? "bg-white/20 text-white" : "bg-white text-slate-600 border border-slate-200"
-                }`}
-              >
-                {item.count}
-              </span>
-            </button>
-          );
-        })}
-      </div>
-
-      {/* Main Tabs Navigation */}
+      {/* 3. Main Tabs Navigation */}
       <Tabs
         value={activeTab}
         onValueChange={(v) => {
           setActiveTab(v);
           if (v !== "manual") setEditingOrder(null);
         }}
-        className="w-full space-y-4"
+        className="w-full space-y-3"
       >
-        <TabsList className="bg-white border p-1 h-auto flex flex-wrap sm:inline-flex sm:h-12 shadow-sm rounded-xl">
+        <TabsList className="bg-white border border-slate-200/90 p-1 h-10 shadow-2xs rounded-xl inline-flex">
           <TabsTrigger
             value="orders"
-            className="rounded-lg data-[state=active]:bg-indigo-50 data-[state=active]:text-indigo-600 px-4 sm:px-6 py-2 sm:py-0 text-xs sm:text-sm font-semibold transition-all"
+            className="rounded-lg data-[state=active]:bg-indigo-600 data-[state=active]:text-white px-4 py-1 text-xs font-bold transition-all flex items-center gap-1.5"
           >
-            <ShoppingBag className="w-4 h-4 mr-2" />
+            <ShoppingBag className="w-3.5 h-3.5" />
             Orders
+            <span className="text-[10px] px-1.5 py-0.2 rounded-full font-mono font-semibold bg-white/20">
+              {metrics?.total_orders ?? totalCount}
+            </span>
           </TabsTrigger>
           <TabsTrigger
             value="analytics"
-            className="rounded-lg data-[state=active]:bg-indigo-50 data-[state=active]:text-indigo-600 px-4 sm:px-6 py-2 sm:py-0 text-xs sm:text-sm font-semibold transition-all"
+            className="rounded-lg data-[state=active]:bg-indigo-600 data-[state=active]:text-white px-4 py-1 text-xs font-bold transition-all flex items-center gap-1.5"
           >
-            <BarChart3 className="w-4 h-4 mr-2" />
+            <BarChart3 className="w-3.5 h-3.5" />
             Analytics &amp; Trends
           </TabsTrigger>
           <TabsTrigger
             value="manual"
-            className="rounded-lg data-[state=active]:bg-indigo-50 data-[state=active]:text-indigo-600 px-4 sm:px-6 py-2 sm:py-0 text-xs sm:text-sm font-semibold transition-all"
+            className="rounded-lg data-[state=active]:bg-indigo-600 data-[state=active]:text-white px-4 py-1 text-xs font-bold transition-all flex items-center gap-1.5"
           >
-            {editingOrder ? <Edit className="w-4 h-4 mr-2" /> : <Plus className="w-4 h-4 mr-2" />}
+            {editingOrder ? <Edit className="w-3.5 h-3.5" /> : <Plus className="w-3.5 h-3.5" />}
             {editingOrder ? "Edit Order" : "Manual Order"}
           </TabsTrigger>
           <TabsTrigger
             value="customers"
-            className="rounded-lg data-[state=active]:bg-indigo-50 data-[state=active]:text-indigo-600 px-4 sm:px-6 py-2 sm:py-0 text-xs sm:text-sm font-semibold transition-all"
+            className="rounded-lg data-[state=active]:bg-indigo-600 data-[state=active]:text-white px-4 py-1 text-xs font-bold transition-all flex items-center gap-1.5"
           >
-            <User className="w-4 h-4 mr-2" />
+            <User className="w-3.5 h-3.5" />
             Customers
           </TabsTrigger>
         </TabsList>
@@ -772,53 +742,76 @@ export default function OnlinePreordersPage() {
         </TabsContent>
 
         {/* Master Orders Tab Content */}
-        <TabsContent value="orders" className="space-y-4 mt-0">
-          {/* Optional Collapsible Inline Analytics Deck */}
-          {showAnalyticsDeck && (
-            <div className="animate-in fade-in slide-in-from-top-3 duration-300">
-              <OnlinePreordersAnalyticsDeck
-                onSelectStatus={(s) => {
-                  handleStatusChange(s);
-                  setShowAnalyticsDeck(false);
-                }}
-              />
-            </div>
-          )}
+        <TabsContent value="orders" className="space-y-3 mt-0">
+          <Card className="border border-slate-200/90 shadow-sm bg-white overflow-hidden rounded-xl">
+            {/* Unified Filter & Toolbar Header */}
+            <CardHeader className="border-b bg-slate-50/70 p-3 sm:p-4 space-y-2.5">
+              {/* Row 1: Status Pills Strip */}
+              <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar pb-0.5">
+                {[
+                  { key: "all", label: "All", count: metrics?.total_orders ?? totalCount },
+                  { key: "PENDING", label: "Pending", count: metrics?.status_breakdown?.PENDING ?? 0 },
+                  { key: "CONFIRMED", label: "Confirmed", count: metrics?.status_breakdown?.CONFIRMED ?? 0 },
+                  { key: "HOLD", label: "Hold", count: metrics?.status_breakdown?.HOLD ?? 0 },
+                  { key: "DELIVERED", label: "Delivered", count: metrics?.status_breakdown?.DELIVERED ?? 0 },
+                  { key: "COMPLETED", label: "Completed", count: metrics?.status_breakdown?.COMPLETED ?? 0 },
+                  { key: "RETURNED", label: "Returned", count: metrics?.status_breakdown?.RETURNED ?? 0 },
+                  { key: "CANCELLED", label: "Cancelled", count: metrics?.status_breakdown?.CANCELLED ?? 0 },
+                ].map((item) => {
+                  const isActive = status === item.key;
+                  return (
+                    <button
+                      key={item.key}
+                      type="button"
+                      onClick={() => handleStatusChange(item.key)}
+                      className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all shrink-0 flex items-center gap-1.5 ${
+                        isActive
+                          ? "bg-indigo-600 text-white shadow-xs"
+                          : "bg-white hover:bg-slate-100 text-slate-700 border border-slate-200"
+                      }`}
+                    >
+                      <span>{item.label}</span>
+                      <span
+                        className={`text-[10px] px-1.5 py-0.2 rounded-full font-mono font-bold ${
+                          isActive ? "bg-white/20 text-white" : "bg-slate-100 text-slate-600"
+                        }`}
+                      >
+                        {item.count}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
 
-          <Card className="border border-slate-200/90 shadow-xl bg-white overflow-hidden rounded-2xl">
-            {/* Filter and Search Bar Header */}
-            <CardHeader className="border-b bg-slate-50/60 p-4 sm:p-5">
-              <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
-                {/* Search Input */}
+              {/* Row 2: Search Input & Dropdowns */}
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 pt-1 border-t border-slate-200/60">
                 <div className="relative flex-1 max-w-md">
-                  <Search className="absolute left-3.5 top-3 h-4 w-4 text-slate-400" />
+                  <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
                   <Input
                     placeholder="Search by ID (#123), customer, phone, tracking..."
                     value={search}
                     onChange={(e) => setSearch(e.target.value)}
-                    className="pl-10 pr-9 h-10 bg-white border-slate-200 shadow-2xs rounded-xl text-xs sm:text-sm"
+                    className="pl-9 pr-8 h-9 bg-white border-slate-200 rounded-lg text-xs"
                   />
                   {search && (
                     <button
                       type="button"
                       onClick={() => setSearch("")}
-                      className="absolute right-3 top-3 text-slate-400 hover:text-slate-600"
+                      className="absolute right-2.5 top-2.5 text-slate-400 hover:text-slate-600"
                     >
                       <X className="w-4 h-4" />
                     </button>
                   )}
                 </div>
 
-                {/* Filters Row */}
-                <div className="flex flex-wrap items-center gap-2 sm:gap-2.5">
-                  {/* Courier Partner Filter */}
+                <div className="flex flex-wrap items-center gap-2">
                   <Select value={courierFilter} onValueChange={handleCourierFilterChange}>
-                    <SelectTrigger className="w-[155px] h-10 bg-white border-slate-200 rounded-xl text-xs font-semibold shadow-2xs">
+                    <SelectTrigger className="w-[145px] h-9 bg-white border-slate-200 rounded-lg text-xs font-semibold">
                       <Truck className="w-3.5 h-3.5 mr-1.5 text-slate-400" />
                       <SelectValue placeholder="Delivery Partner" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="all">All Delivery Agents</SelectItem>
+                      <SelectItem value="all">All Couriers</SelectItem>
                       <SelectItem value="STEADFAST">Steadfast</SelectItem>
                       <SelectItem value="PATHAO">Pathao</SelectItem>
                       <SelectItem value="REDX">RedX</SelectItem>
@@ -826,42 +819,37 @@ export default function OnlinePreordersPage() {
                     </SelectContent>
                   </Select>
 
-                  {/* Ordering Filter */}
                   <Select value={ordering} onValueChange={(val) => { setOrdering(val); setPage(1); }}>
-                    <SelectTrigger className="w-[145px] h-10 bg-white border-slate-200 rounded-xl text-xs font-semibold shadow-2xs">
+                    <SelectTrigger className="w-[140px] h-9 bg-white border-slate-200 rounded-lg text-xs font-semibold">
                       <ArrowUpDown className="w-3.5 h-3.5 mr-1.5 text-slate-400" />
                       <SelectValue placeholder="Sort Order" />
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="-created_at">Newest First</SelectItem>
                       <SelectItem value="created_at">Oldest First</SelectItem>
-                      <SelectItem value="-total_amount">Amount: High to Low</SelectItem>
-                      <SelectItem value="total_amount">Amount: Low to High</SelectItem>
+                      <SelectItem value="-total_amount">Amount: High-Low</SelectItem>
+                      <SelectItem value="total_amount">Amount: Low-High</SelectItem>
                     </SelectContent>
                   </Select>
 
-                  {/* Toggle Inline Analytics Deck Button */}
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={() => setShowAnalyticsDeck((prev) => !prev)}
-                    className={`h-10 px-3 rounded-xl text-xs font-bold border-slate-200 shadow-2xs flex items-center gap-1.5 ${
-                      showAnalyticsDeck ? "bg-indigo-50 text-indigo-700 border-indigo-200" : "bg-white text-slate-700"
-                    }`}
+                    onClick={() => setActiveTab("analytics")}
+                    className="h-9 px-2.5 rounded-lg text-xs font-semibold border-slate-200 bg-white hover:bg-slate-50 text-indigo-600 flex items-center gap-1.5"
                   >
-                    <Sparkles className="w-3.5 h-3.5 text-indigo-600" />
-                    {showAnalyticsDeck ? "Hide Trends" : "Analytics Deck"}
+                    <BarChart3 className="w-3.5 h-3.5" />
+                    View Charts
                   </Button>
 
-                  {/* Reset Filters */}
                   {isFiltered && (
                     <Button
                       variant="ghost"
                       size="sm"
                       onClick={clearFilters}
-                      className="h-10 px-2.5 text-xs text-rose-600 hover:text-rose-700 hover:bg-rose-50"
+                      className="h-9 px-2 text-xs text-rose-600 hover:text-rose-700 hover:bg-rose-50"
                     >
-                      Clear Filters
+                      Clear
                     </Button>
                   )}
                 </div>
