@@ -16,9 +16,10 @@ import {
     lookupCustomer,
     getDashboardStats,
     PaginatedResponse,
-    deleteAllSales
+    deleteAllSales,
+    getSalesSummary
 } from '@/lib/api/sales';
-import type { Sale, Payment, Return } from '@/types/sales';
+import type { Sale, Payment, Return, SalesSummary } from '@/types/sales';
 import { useToast } from '../use-toast';
 
 export const useSales = (params?: {
@@ -42,10 +43,27 @@ export const useSales = (params?: {
         queryFn: () => getSales(params)
     });
 
+    const summaryParams = {
+        start_date: params?.start_date,
+        end_date: params?.end_date,
+        status: params?.status,
+        sale_type: params?.sale_type,
+        payment_method: params?.payment_method,
+        payment_status: params?.payment_status,
+        customer_phone: params?.customer_phone,
+        search: params?.search,
+    };
+
+    const summaryQuery = useQuery({
+        queryKey: ['sales-summary', summaryParams],
+        queryFn: () => getSalesSummary(summaryParams)
+    });
+
     const createSaleMutation = useMutation({
         mutationFn: createSale,
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['sales'] });
+            queryClient.invalidateQueries({ queryKey: ['sales-summary'] });
             toast({
                 title: 'Success',
                 description: 'Sale created successfully'
@@ -64,6 +82,7 @@ export const useSales = (params?: {
         mutationFn: ({ id, data }: { id: number; data: Partial<Sale> }) => updateSale(id, data),
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['sales'] });
+            queryClient.invalidateQueries({ queryKey: ['sales-summary'] });
             toast({
                 title: 'Success',
                 description: 'Sale updated successfully'
@@ -82,6 +101,7 @@ export const useSales = (params?: {
         mutationFn: deleteSale,
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['sales'] });
+            queryClient.invalidateQueries({ queryKey: ['sales-summary'] });
             toast({
                 title: 'Success',
                 description: 'Sale deleted successfully'
@@ -100,6 +120,7 @@ export const useSales = (params?: {
         mutationFn: bulkDeleteSales,
         onSuccess: (data) => {
             queryClient.invalidateQueries({ queryKey: ['sales'] });
+            queryClient.invalidateQueries({ queryKey: ['sales-summary'] });
             toast({
                 title: 'Success',
                 description: data.message || 'Sales deleted successfully'
@@ -118,6 +139,7 @@ export const useSales = (params?: {
         mutationFn: deleteAllSales,
         onSuccess: (data) => {
             queryClient.invalidateQueries({ queryKey: ['sales'] });
+            queryClient.invalidateQueries({ queryKey: ['sales-summary'] });
             toast({
                 title: 'Success',
                 description: data.message || 'All sales deleted successfully'
@@ -141,7 +163,14 @@ export const useSales = (params?: {
             currentPage: params?.page || 1,
             pageSize: params?.page_size || 10
         },
+        summary: summaryQuery.data,
+        isSummaryLoading: summaryQuery.isLoading,
         isLoading: salesQuery.isLoading,
+        isFetching: salesQuery.isFetching || summaryQuery.isFetching,
+        refetch: () => {
+            salesQuery.refetch();
+            summaryQuery.refetch();
+        },
         error: salesQuery.error,
         createSale: createSaleMutation.mutate,
         updateSale: updateSaleMutation.mutate,
@@ -153,6 +182,30 @@ export const useSales = (params?: {
         isDeleting: deleteSaleMutation.isPending,
         isBulkDeleting: bulkDeleteSalesMutation.isPending,
         isDeletingAll: deleteAllSalesMutation.isPending
+    };
+};
+
+export const useSalesSummary = (params?: {
+    start_date?: string;
+    end_date?: string;
+    status?: string;
+    sale_type?: string;
+    payment_method?: string;
+    payment_status?: string;
+    customer_phone?: string;
+    search?: string;
+}) => {
+    const query = useQuery({
+        queryKey: ['sales-summary', params],
+        queryFn: () => getSalesSummary(params)
+    });
+
+    return {
+        summary: query.data,
+        isLoading: query.isLoading,
+        isFetching: query.isFetching,
+        refetch: query.refetch,
+        error: query.error
     };
 };
 

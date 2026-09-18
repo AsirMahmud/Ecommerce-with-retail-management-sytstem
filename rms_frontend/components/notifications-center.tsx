@@ -24,6 +24,7 @@ import {
   Inbox,
   Trash2,
   TrendingDown,
+  BellRing,
 } from "lucide-react";
 import {
   Popover,
@@ -34,6 +35,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
+import { usePushNotifications } from "@/hooks/use-push-notifications";
 import {
   useNotifications,
   useMarkNotificationRead,
@@ -181,6 +183,7 @@ export function NotificationsCenter() {
   const dismissMutation = useDismissNotification();
   const clearAllReadMutation = useClearAllRead();
   const router = useRouter();
+  const push = usePushNotifications();
 
   // Initialize sound settings
   useEffect(() => {
@@ -426,6 +429,54 @@ export function NotificationsCenter() {
               </button>
             );
           })}
+        </div>
+
+        {/* Push Notification Bar */}
+        <div className="flex items-center justify-between px-3.5 py-1.5 border-b border-slate-100 dark:border-slate-800/60 bg-slate-50/70 dark:bg-slate-900/40 text-xs">
+          <div className="flex items-center gap-1.5">
+            <span
+              className={`flex h-2 w-2 rounded-full transition-colors ${
+                push.isEnabled
+                  ? "bg-emerald-500 animate-pulse"
+                  : "bg-slate-300 dark:bg-slate-600"
+              }`}
+            />
+            <span className="text-[11px] font-medium text-slate-600 dark:text-slate-400">
+              Desktop Push:{" "}
+              <strong
+                className={
+                  push.isEnabled
+                    ? "text-emerald-600 dark:text-emerald-400 font-semibold"
+                    : "text-slate-500 font-normal"
+                }
+              >
+                {push.isEnabled ? "Active" : "Off"}
+              </strong>
+            </span>
+          </div>
+          <div className="flex items-center gap-1">
+            {push.isEnabled && (
+              <button
+                type="button"
+                onClick={push.sendTestNotification}
+                className="text-[10px] font-semibold text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300 px-1.5 py-0.5 rounded hover:bg-indigo-50 dark:hover:bg-indigo-950/60 transition-colors"
+                title="Send a test notification to your desktop"
+              >
+                Test Push
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={() => push.toggleNotifications(!push.isEnabled)}
+              className={`text-[10px] font-semibold px-2 py-0.5 rounded-md transition-colors ${
+                push.isEnabled
+                  ? "text-slate-500 hover:text-slate-700 dark:text-slate-400 hover:bg-slate-200/60 dark:hover:bg-slate-800"
+                  : "bg-indigo-600 hover:bg-indigo-700 text-white shadow-2xs"
+              }`}
+            >
+              {push.isEnabled ? "Turn Off" : "Enable"}
+            </button>
+          </div>
         </div>
 
         {/* Search Filter Bar */}

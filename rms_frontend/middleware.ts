@@ -2,7 +2,18 @@ import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 
 // Routes that don't require authentication
-const publicPaths = ['/login', '/register', '/forgot-password'];
+const publicPaths = [
+    '/login',
+    '/register',
+    '/forgot-password',
+    '/manifest.json',
+    '/sw.js',
+    '/offline.html',
+    '/icons',
+    '/images',
+    '/torongox-logo',
+    '/favicon.ico',
+];
 
 export function middleware(request: NextRequest) {
     const { pathname } = request.nextUrl;
@@ -50,6 +61,6 @@ export function middleware(request: NextRequest) {
 
 export const config = {
     matcher: [
-        '/((?!_next/static|_next/image|favicon.ico|api).*)',
+        '/((?!_next/static|_next/image|favicon.ico|manifest.json|sw.js|offline.html|icons|images|torongox-logo|api).*)',
     ],
 };

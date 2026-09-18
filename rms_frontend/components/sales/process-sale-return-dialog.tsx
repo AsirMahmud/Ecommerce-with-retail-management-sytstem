@@ -109,6 +109,10 @@ export function ProcessSaleReturnDialog({
   const [reasonCategory, setReasonCategory] = useState(COMMON_REASONS[0]);
   const [customReason, setCustomReason] = useState("");
   const [customRefundAmount, setCustomRefundAmount] = useState<string>("");
+  const [refundMethod, setRefundMethod] = useState("cash");
+  const [deliveryChargePaidByCustomer, setDeliveryChargePaidByCustomer] = useState(true);
+  const [returnChargeAmount, setReturnChargeAmount] = useState("0");
+  const [returnNotes, setReturnNotes] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Initialize returnable items when dialog opens
@@ -136,6 +140,10 @@ export function ProcessSaleReturnDialog({
       setSelectedItems(initial);
       setCustomRefundAmount("");
       setCustomReason("");
+      setRefundMethod("cash");
+      setDeliveryChargePaidByCustomer(true);
+      setReturnChargeAmount("0");
+      setReturnNotes("");
     }
   }, [sale, open]);
 
@@ -307,6 +315,10 @@ export function ProcessSaleReturnDialog({
         sale_id: sale.id,
         reason: finalReason,
         refund_amount: finalRefundAmount,
+        refund_method: refundMethod,
+        delivery_charge_paid_by_customer: deliveryChargePaidByCustomer,
+        return_charge_amount: Number(returnChargeAmount) || 0,
+        notes: returnNotes.trim() || undefined,
         status: "completed",
         items: itemsPayload,
       });
@@ -318,6 +330,8 @@ export function ProcessSaleReturnDialog({
 
       // Invalidate queries to refresh list
       queryClient.invalidateQueries({ queryKey: ["sales"] });
+      queryClient.invalidateQueries({ queryKey: ["returns"] });
+      queryClient.invalidateQueries({ queryKey: ["expenses"] });
       queryClient.invalidateQueries({ queryKey: ["products"] });
       queryClient.invalidateQueries({ queryKey: ["stock-movements"] });
 
@@ -617,6 +631,79 @@ export function ProcessSaleReturnDialog({
                 />
               </div>
             )}
+
+            {/* Refund Method & Delivery Charge Accounting */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2 border-t border-slate-100">
+              <div>
+                <Label htmlFor="refund-method" className="text-xs font-semibold text-slate-700">
+                  Refund Method
+                </Label>
+                <Select value={refundMethod} onValueChange={setRefundMethod}>
+                  <SelectTrigger id="refund-method" className="mt-1">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="cash">Cash</SelectItem>
+                    <SelectItem value="card">Card</SelectItem>
+                    <SelectItem value="bkash">bKash</SelectItem>
+                    <SelectItem value="store_credit">Store Credit</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div>
+                <Label htmlFor="return-charge-paid" className="text-xs font-semibold text-slate-700">
+                  Return Delivery Charge Accounting
+                </Label>
+                <Select
+                  value={deliveryChargePaidByCustomer ? "customer" : "store"}
+                  onValueChange={(val) => setDeliveryChargePaidByCustomer(val === "customer")}
+                >
+                  <SelectTrigger id="return-charge-paid" className="mt-1">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="customer">Customer Paid Fee</SelectItem>
+                    <SelectItem value="store">Store Bears Fee (Log Expense)</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            {!deliveryChargePaidByCustomer && (
+              <div className="p-3 bg-red-50/70 border border-red-200/80 rounded-xl space-y-2">
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="return-charge-amount" className="text-xs font-semibold text-red-900">
+                    Courier Return Charge Amount (৳)
+                  </Label>
+                  <span className="text-[11px] text-red-700 font-medium">Auto-recorded as Courier Return Expense</span>
+                </div>
+                <Input
+                  id="return-charge-amount"
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={returnChargeAmount}
+                  onChange={(e) => setReturnChargeAmount(e.target.value)}
+                  className="bg-white border-red-200 text-red-900 font-semibold"
+                  placeholder="0.00"
+                />
+              </div>
+            )}
+
+            <div>
+              <Label htmlFor="return-notes" className="text-xs font-semibold text-slate-700">
+                Return Notes / Remarks
+              </Label>
+              <Textarea
+                id="return-notes"
+                rows={2}
+                value={returnNotes}
+                onChange={(e) => setReturnNotes(e.target.value)}
+                placeholder="Additional details for records..."
+                className="mt-1 text-xs"
+              />
+            </div>
           </div>
 
           {/* Return Summary */}

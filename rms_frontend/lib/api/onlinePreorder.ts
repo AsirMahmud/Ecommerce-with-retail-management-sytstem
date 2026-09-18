@@ -360,6 +360,8 @@ export const onlinePreordersApi = {
     }>('/online-preorder/orders/bulk-dispatch-steadfast/', { order_ids }),
 };
 
+export const onlinePreorderApi = onlinePreordersApi;
+
 
 
 

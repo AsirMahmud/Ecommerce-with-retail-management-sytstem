@@ -115,7 +115,12 @@ export interface Payment {
 export interface ReturnItem {
     id: number;
     return_order: number;
-    sale_item: number;
+    sale_item: number | SaleItem;
+    product_name?: string;
+    sku?: string;
+    size?: string;
+    color?: string;
+    unit_price?: number | string;
     quantity: number;
     reason: string;
     created_at: string;
@@ -125,9 +130,23 @@ export interface Return {
     id: number;
     return_number: string;
     sale: number;
+    sale_id?: number;
+    sale_details?: {
+        id: number;
+        invoice_number: string;
+        customer_name: string;
+        customer_phone: string;
+        total: string | number;
+        payment_method: string;
+        date: string | null;
+    } | null;
     reason: string;
     status: ReturnStatus;
     refund_amount: number;
+    refund_method?: string;
+    delivery_charge_paid_by_customer?: boolean;
+    return_charge_amount?: number | string;
+    notes?: string;
     processed_date: string | null;
     created_at: string;
     updated_at: string;
@@ -174,4 +193,24 @@ export interface DashboardStats {
         value: number;
         profit: number;
     }>;
-} 
+}
+
+export interface SalesSummary {
+    total_transactions: number;
+    gross_revenue: number;
+    total_paid: number;
+    total_due: number;
+    total_profit: number;
+    avg_ticket: number;
+    in_store_count: number;
+    preorder_count: number;
+    due_count: number;
+    pill_counts: {
+        all: number;
+        completed: number;
+        due: number;
+        in_store: number;
+        preorders: number;
+        refunded: number;
+    };
+}

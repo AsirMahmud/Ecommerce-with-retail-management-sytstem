@@ -427,6 +427,25 @@ export function SideNav() {
             <LogOut className="h-4 w-4" />
           </Button>
         </div>
+
+        {/* Powered by torongoX */}
+        <div className="mt-2.5 flex items-center justify-center">
+          <a
+            href="https://site.torongox.com"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-2 text-xs text-slate-400 dark:text-slate-500 hover:text-slate-700 dark:hover:text-slate-200 transition-colors group"
+          >
+            <span className="text-[11px] font-medium">Powered by</span>
+            <span className="inline-flex items-center bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 px-2.5 py-1 rounded-lg shadow-2xs transition-transform group-hover:scale-105">
+              <img
+                src="/images/torongox-logo-transparent.png"
+                alt="torongoX"
+                className="h-5 w-auto object-contain"
+              />
+            </span>
+          </a>
+        </div>
       </div>
     </div>
   );

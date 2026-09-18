@@ -111,14 +111,41 @@ class ReturnItemSerializer(serializers.ModelSerializer):
         source='sale_item',
         write_only=True
     )
+    product_name = serializers.SerializerMethodField()
+    sku = serializers.SerializerMethodField()
+    size = serializers.SerializerMethodField()
+    color = serializers.SerializerMethodField()
+    unit_price = serializers.SerializerMethodField()
 
     class Meta:
         model = ReturnItem
         fields = [
             'id', 'return_order', 'sale_item', 'sale_item_id',
+            'product_name', 'sku', 'size', 'color', 'unit_price',
             'quantity', 'reason', 'created_at'
         ]
         read_only_fields = ['created_at']
+
+    def get_product_name(self, obj):
+        if obj.sale_item and obj.sale_item.product:
+            return obj.sale_item.product.name
+        return ""
+
+    def get_sku(self, obj):
+        if obj.sale_item and obj.sale_item.product:
+            return obj.sale_item.product.sku
+        return ""
+
+    def get_size(self, obj):
+        return obj.sale_item.size if obj.sale_item else ""
+
+    def get_color(self, obj):
+        return obj.sale_item.color if obj.sale_item else ""
+
+    def get_unit_price(self, obj):
+        if obj.sale_item and obj.sale_item.unit_price is not None:
+            return str(obj.sale_item.unit_price)
+        return "0.00"
 
 class ReturnSerializer(serializers.ModelSerializer):
     items = ReturnItemSerializer(many=True, read_only=True)
@@ -127,14 +154,35 @@ class ReturnSerializer(serializers.ModelSerializer):
         source='sale',
         write_only=True
     )
+    sale_details = serializers.SerializerMethodField()
 
     class Meta:
         model = Return
         fields = [
-            'id', 'sale', 'sale_id', 'return_number', 'reason', 'status',
-            'refund_amount', 'processed_date', 'items', 'created_at', 'updated_at'
+            'id', 'sale', 'sale_id', 'sale_details', 'return_number', 'reason', 'status',
+            'refund_amount', 'refund_method', 'delivery_charge_paid_by_customer',
+            'return_charge_amount', 'notes', 'processed_date', 'items', 'created_at', 'updated_at'
         ]
-        read_only_fields = ['return_number', 'created_at', 'updated_at']
+        read_only_fields = ['return_number', 'created_at', 'updated_at', 'sale_details']
+
+    def get_sale_details(self, obj):
+        if not obj.sale:
+            return None
+        sale = obj.sale
+        customer_name = "Walk-in Customer"
+        customer_phone = ""
+        if sale.customer:
+            customer_name = f"{sale.customer.first_name} {sale.customer.last_name}".strip() or "Walk-in Customer"
+            customer_phone = sale.customer.phone or ""
+        return {
+            'id': sale.id,
+            'invoice_number': sale.invoice_number,
+            'customer_name': customer_name,
+            'customer_phone': customer_phone,
+            'total': str(sale.total),
+            'payment_method': sale.payment_method,
+            'date': sale.created_at.isoformat() if sale.created_at else None,
+        }
 
     def create(self, validated_data):
         items_data = validated_data.pop('items', []) or self.context.get('items', [])

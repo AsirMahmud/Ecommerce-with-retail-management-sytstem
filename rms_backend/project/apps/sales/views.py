@@ -38,13 +38,22 @@ class SaleViewSet(viewsets.ModelViewSet):
         end_date = self.request.query_params.get('end_date')
         if start_date and end_date:
             queryset = queryset.filter(
-                date__range=[start_date, end_date]
+                date__date__range=[start_date, end_date]
             )
+        elif start_date:
+            queryset = queryset.filter(date__date__gte=start_date)
+        elif end_date:
+            queryset = queryset.filter(date__date__lte=end_date)
         
         # Filter by status
         status = self.request.query_params.get('status')
         if status:
             queryset = queryset.filter(status=status)
+
+        # Filter by sale type (channel)
+        sale_type = self.request.query_params.get('sale_type')
+        if sale_type:
+            queryset = queryset.filter(sale_type=sale_type)
         
         # Filter by payment method
         payment_method = self.request.query_params.get('payment_method')
@@ -63,10 +72,90 @@ class SaleViewSet(viewsets.ModelViewSet):
                 queryset = queryset.filter(amount_paid__gte=F('total'))
             elif payment_status == 'partially_paid':
                 queryset = queryset.filter(amount_paid__gt=0, amount_paid__lt=F('total'))
-            elif payment_status == 'unpaid':
-                queryset = queryset.filter(amount_paid=0)
+            elif payment_status in ['unpaid', 'due', 'with_due']:
+                queryset = queryset.filter(amount_due__gt=0)
         
         return queryset
+
+    @action(detail=False, methods=['get'])
+    def summary(self, request):
+        """Return accurate aggregate summary and counts for Sales History ledger"""
+        # Filtered queryset based on active query params (status, sale_type, date, etc.)
+        queryset = self.filter_queryset(self.get_queryset())
+        
+        aggregates = queryset.aggregate(
+            total_transactions=Count('id'),
+            gross_revenue=Sum('total'),
+            total_paid=Sum('amount_paid'),
+            total_due=Sum('amount_due'),
+            total_profit=Sum('total_profit'),
+            avg_ticket=Avg('total')
+        )
+        
+        filtered_channel_counts = dict(queryset.order_by().values('sale_type').annotate(c=Count('id')).values_list('sale_type', 'c'))
+        filtered_due_count = queryset.filter(amount_due__gt=0).count()
+        in_store_count = filtered_channel_counts.get('shop', 0)
+        preorder_count = (
+            filtered_channel_counts.get('online_preorder', 0) +
+            filtered_channel_counts.get('offline_preorder', 0)
+        )
+
+        # Base counts with only date & search applied, for the quick-filter pill counters
+        base_qs = Sale.objects.all()
+        start_date = request.query_params.get('start_date')
+        end_date = request.query_params.get('end_date')
+        if start_date and end_date:
+            base_qs = base_qs.filter(date__date__range=[start_date, end_date])
+        elif start_date:
+            base_qs = base_qs.filter(date__date__gte=start_date)
+        elif end_date:
+            base_qs = base_qs.filter(date__date__lte=end_date)
+            
+        search = request.query_params.get('search')
+        if search:
+            search_filter = (
+                Q(invoice_number__icontains=search) |
+                Q(customer__first_name__icontains=search) |
+                Q(customer__last_name__icontains=search) |
+                Q(customer_phone__icontains=search)
+            )
+            base_qs = base_qs.filter(search_filter)
+
+        base_status_counts = dict(base_qs.order_by().values('status').annotate(c=Count('id')).values_list('status', 'c'))
+        base_channel_counts = dict(base_qs.order_by().values('sale_type').annotate(c=Count('id')).values_list('sale_type', 'c'))
+        base_due_count = base_qs.filter(amount_due__gt=0).count()
+        base_total_count = base_qs.count()
+
+        base_in_store = base_channel_counts.get('shop', 0)
+        base_preorders = (
+            base_channel_counts.get('online_preorder', 0) +
+            base_channel_counts.get('offline_preorder', 0)
+        )
+
+        gross = aggregates['gross_revenue'] or Decimal('0.00')
+        paid = aggregates['total_paid'] or Decimal('0.00')
+        due = aggregates['total_due'] or Decimal('0.00')
+        avg = aggregates['avg_ticket'] or Decimal('0.00')
+
+        return Response({
+            'total_transactions': aggregates['total_transactions'] or 0,
+            'gross_revenue': float(gross),
+            'total_paid': float(paid),
+            'total_due': float(due),
+            'total_profit': float(aggregates['total_profit'] or Decimal('0.00')),
+            'avg_ticket': float(avg),
+            'in_store_count': in_store_count,
+            'preorder_count': preorder_count,
+            'due_count': filtered_due_count,
+            'pill_counts': {
+                'all': base_total_count,
+                'completed': base_status_counts.get('completed', 0),
+                'due': base_due_count,
+                'in_store': base_in_store,
+                'preorders': base_preorders,
+                'refunded': base_status_counts.get('refunded', 0),
+            }
+        })
 
     @transaction.atomic
     def create(self, request, *args, **kwargs):
@@ -584,12 +673,19 @@ class ReturnViewSet(viewsets.ModelViewSet):
     queryset = Return.objects.all()
     serializer_class = ReturnSerializer
     filter_backends = [filters.SearchFilter, filters.OrderingFilter]
-    search_fields = ['return_number', 'sale__invoice_number']
+    search_fields = [
+        'return_number',
+        'sale__invoice_number',
+        'sale__customer__phone',
+        'sale__customer__first_name',
+        'sale__customer__last_name',
+        'items__sale_item__product__name'
+    ]
     ordering_fields = ['created_at', 'status', 'refund_amount']
     ordering = ['-created_at']
 
     def get_queryset(self):
-        queryset = super().get_queryset()
+        queryset = super().get_queryset().select_related('sale', 'sale__customer').prefetch_related('items__sale_item__product').distinct()
         
         # Filter by date range
         start_date = self.request.query_params.get('start_date')
@@ -670,14 +766,46 @@ class ReturnViewSet(viewsets.ModelViewSet):
         else:
             refund_amount = calculated_refund
 
+        refund_method = payload.get('refund_method', 'cash') or 'cash'
+        delivery_charge_paid_by_customer = payload.get('delivery_charge_paid_by_customer', True)
+        if isinstance(delivery_charge_paid_by_customer, str):
+            delivery_charge_paid_by_customer = delivery_charge_paid_by_customer.lower() in ['true', '1', 'yes']
+        return_charge_amount = Decimal(str(payload.get('return_charge_amount', 0) or 0))
+        notes = payload.get('notes', '').strip()
+
         # Create Return record
         return_order = Return.objects.create(
             sale=sale,
             reason=payload.get('reason', 'Customer Return'),
             refund_amount=refund_amount,
+            refund_method=refund_method,
+            delivery_charge_paid_by_customer=delivery_charge_paid_by_customer,
+            return_charge_amount=return_charge_amount,
+            notes=notes,
             status='completed',
             processed_date=timezone.now()
         )
+
+        # If delivery_charge_paid_by_customer is False and return_charge_amount > 0: automatically create Expense
+        if not delivery_charge_paid_by_customer and return_charge_amount > Decimal("0.00"):
+            from apps.expenses.models import Expense, ExpenseCategory
+            category, _ = ExpenseCategory.objects.get_or_create(
+                name="Courier Return Charges",
+                defaults={
+                    "color": "#EF4444",
+                    "description": "Courier return charges borne by store for returned orders"
+                }
+            )
+            Expense.objects.create(
+                description=f"Return Courier Charge for Return #{return_order.return_number} (Invoice {sale.invoice_number})",
+                amount=return_charge_amount,
+                date=timezone.now().date(),
+                category=category,
+                payment_method="OTHER",
+                status="PAID",
+                reference_number=f"RET-{return_order.return_number}",
+                notes=f"Store return #{return_order.return_number} for sale #{sale.invoice_number} returned without customer paying return delivery fee. Notes: {notes}"
+            )
 
         # Create ReturnItems and restore stock
         for v_item in validated_items:

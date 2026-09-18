@@ -24,6 +24,7 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { useAuth } from "@/contexts/auth-context";
 import { CommandPalette } from "@/components/command-palette";
 import { NotificationsCenter } from "@/components/notifications-center";
+import { PwaInstallButton } from "@/components/pwa-install-button";
 import { KeyboardShortcutsDialog } from "@/components/keyboard-shortcuts-dialog";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { LanguageToggle } from "@/components/language-toggle";
@@ -103,6 +104,9 @@ export function UpperNav() {
 
         {/* Theme Mode Toggle */}
         <ThemeToggle />
+
+        {/* PWA Install Button */}
+        <PwaInstallButton />
 
         {/* Notifications */}
         <NotificationsCenter />

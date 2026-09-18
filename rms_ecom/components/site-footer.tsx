@@ -196,6 +196,11 @@ export function SiteFooter() {
                   Map preview will appear here when you add a Google Map embed URL in Home Page Settings.
                 </div>
               )}
+              ) : (
+                <div className="flex h-full w-full items-center justify-center text-sm text-white/60">
+                  Map preview will appear here when you add a Google Map embed URL in Home Page Settings.
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -204,10 +209,21 @@ export function SiteFooter() {
           <p>
             © {currentYear} {settings.logo_text || "Retail Shop"}. All rights reserved.
           </p>
-          <p className="flex gap-2">
-            <span>Powered by</span>
-            <span className="font-medium text-white">RMS Ecommerce</span>
-          </p>
+          <a
+            href="https://site.torongox.com"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-2.5 group hover:text-white transition-colors"
+          >
+            <span className="text-white/70 text-xs sm:text-sm font-medium">Powered by</span>
+            <span className="inline-flex items-center bg-white hover:bg-slate-100 px-3 py-1 rounded-xl shadow-xs transition-transform group-hover:scale-105">
+              <img
+                src="/images/torongox-logo-transparent.png"
+                alt="torongoX"
+                className="h-7 sm:h-8 w-auto object-contain"
+              />
+            </span>
+          </a>
         </div>
       </div>
     </footer>

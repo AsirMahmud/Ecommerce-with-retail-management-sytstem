@@ -6,7 +6,8 @@ import type {
     Return,
     ReturnItem,
     CustomerLookupResponse,
-    DashboardStats
+    DashboardStats,
+    SalesSummary
 } from '@/types/sales';
 
 export interface PaginatedResponse<T> {
@@ -31,6 +32,21 @@ export const getSales = async (params?: {
     page_size?: number;
 }) => {
     const response = await axios.get<PaginatedResponse<Sale>>('/sales/sales/', { params });
+    return response.data;
+};
+
+// Sales Ledger Summary & Accurate Aggregates API
+export const getSalesSummary = async (params?: {
+    start_date?: string;
+    end_date?: string;
+    status?: string;
+    sale_type?: string;
+    payment_method?: string;
+    payment_status?: string;
+    customer_phone?: string;
+    search?: string;
+}) => {
+    const response = await axios.get<SalesSummary>('/sales/sales/summary/', { params });
     return response.data;
 };
 

@@ -7,7 +7,8 @@ export interface PrintableSaleItem {
   size?: string;
   color?: string;
   quantity: number;
-  price: number;
+  price?: number;
+  unit_price?: number | string;
   total?: number;
 }
 
@@ -57,7 +58,7 @@ export function printThermalReceipt(sale: PrintableSale) {
       const name = item.product?.name || item.name || "Item";
       const variant = [item.size, item.color].filter(Boolean).join(" / ");
       const qty = item.quantity;
-      const unitPrice = item.price;
+      const unitPrice = Number(item.price ?? item.unit_price ?? 0);
       const itemTotal = item.total !== undefined ? item.total : qty * unitPrice;
       return `
         <div style="margin-bottom: 6px; font-size: 13px;">
@@ -236,7 +237,7 @@ export function printA4Invoice(sale: PrintableSale) {
       const sku = item.product?.sku || "-";
       const variant = [item.size, item.color].filter(Boolean).join(" / ");
       const qty = item.quantity;
-      const unitPrice = item.price;
+      const unitPrice = Number(item.price ?? item.unit_price ?? 0);
       const itemTotal = item.total !== undefined ? item.total : qty * unitPrice;
       return `
         <tr style="border-bottom: 1px solid #e2e8f0;">
