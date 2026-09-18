@@ -85,9 +85,57 @@ class OnlinePreorderViewSet(
                 qs = qs.filter(status=status_filter)
 
         # Filter by courier partner
-        courier_filter = self.request.query_params.get('courier_partner')
+        courier_filter = self.request.query_params.get('courier_partner') or self.request.query_params.get('courier')
         if courier_filter and courier_filter != 'all':
-            qs = qs.filter(courier_partner__iexact=courier_filter)
+            if courier_filter.upper() == 'STEADFAST':
+                qs = qs.filter(
+                    models.Q(courier_partner__iexact='STEADFAST') |
+                    (models.Q(courier_partner__isnull=True) & models.Q(steadfast_consignment_id__isnull=False) & ~models.Q(steadfast_consignment_id=""))
+                )
+            else:
+                qs = qs.filter(courier_partner__iexact=courier_filter)
+
+        # Filter by delivery status (courier shipment lifecycle status)
+        delivery_status = self.request.query_params.get('delivery_status') or self.request.query_params.get('courier_status')
+        if delivery_status and delivery_status.lower() != 'all':
+            deliv_lower = delivery_status.lower().strip()
+            if deliv_lower in ['not_dispatched', 'unassigned', 'pending_dispatch']:
+                qs = qs.filter(
+                    (models.Q(courier_consignment_id__isnull=True) | models.Q(courier_consignment_id="")) &
+                    (models.Q(steadfast_consignment_id__isnull=True) | models.Q(steadfast_consignment_id=""))
+                )
+            elif deliv_lower in ['in_review', 'review', 'booked']:
+                review_kws = ['in_review', 'review', 'pending', 'pickup_requested', 'accepted', 'created', 'ready_for_pickup', 'order_placed']
+                q_rev = models.Q()
+                for kw in review_kws:
+                    q_rev |= models.Q(courier_status__icontains=kw) | models.Q(steadfast_status__icontains=kw)
+                qs = qs.filter(q_rev)
+            elif deliv_lower in ['in_transit', 'transit', 'on_the_road']:
+                transit_kws = ['in_transit', 'transit', 'picked', 'picked_up', 'pickup_in_progress', 'in_process', 'waiting for pickup', 'dispatch', 'dispatched', 'assigned_for_delivery', 'out_for_delivery', 'in_sorting_hub']
+                q_tr = models.Q()
+                for kw in transit_kws:
+                    q_tr |= models.Q(courier_status__icontains=kw) | models.Q(steadfast_status__icontains=kw)
+                qs = qs.filter(q_tr)
+            elif deliv_lower in ['delivered', 'completed', 'delivered_completed']:
+                deliv_kws = ['delivered', 'completed', 'delivered_approval_pending']
+                q_del = models.Q()
+                for kw in deliv_kws:
+                    q_del |= models.Q(courier_status__icontains=kw) | models.Q(steadfast_status__icontains=kw)
+                qs = qs.filter(q_del)
+            elif deliv_lower in ['cancelled_returned', 'cancelled', 'returned', 'cancel', 'return', 'failed']:
+                ret_kws = ['cancel', 'cancelled', 'return', 'returned', 'return_pending', 'failed', 'delivery_failed', 'returned_to_merchant', 'pickup cancel', 'paid return', 'partial_delivered', 'hold']
+                q_ret = models.Q()
+                for kw in ret_kws:
+                    q_ret |= models.Q(courier_status__icontains=kw) | models.Q(steadfast_status__icontains=kw)
+                qs = qs.filter(q_ret)
+            else:
+                # Direct / exact match for courier-specific raw status (e.g. 'delivered_approval_pending', 'partial_delivered', 'Pickup_Requested')
+                qs = qs.filter(
+                    models.Q(courier_status__iexact=delivery_status) |
+                    models.Q(steadfast_status__iexact=delivery_status) |
+                    models.Q(courier_status__icontains=delivery_status) |
+                    models.Q(steadfast_status__icontains=delivery_status)
+                )
 
         # Filter by date range
         date_from = self.request.query_params.get('date_from')
@@ -183,6 +231,37 @@ class OnlinePreorderViewSet(
         return_rate = round(((returned_count / dispatched_or_closed) * 100), 1) if dispatched_or_closed > 0 else 0.0
         cancellation_rate = round(((cancelled_count / total_orders) * 100), 1) if total_orders > 0 else 0.0
 
+        # Delivery status metrics breakdown
+        not_dispatched_q = (
+            (models.Q(courier_consignment_id__isnull=True) | models.Q(courier_consignment_id="")) &
+            (models.Q(steadfast_consignment_id__isnull=True) | models.Q(steadfast_consignment_id=""))
+        )
+        not_dispatched_count = qs.filter(not_dispatched_q).exclude(status__in=['CANCELLED', 'RETURNED']).count()
+
+        transit_kws = ['in_transit', 'transit', 'picked', 'picked_up', 'pickup_in_progress', 'in_process', 'waiting for pickup', 'dispatch', 'dispatched', 'assigned_for_delivery', 'out_for_delivery', 'in_sorting_hub']
+        q_tr = models.Q()
+        for kw in transit_kws:
+            q_tr |= models.Q(courier_status__icontains=kw) | models.Q(steadfast_status__icontains=kw)
+        in_transit_count = qs.filter(q_tr).count()
+
+        deliv_kws = ['delivered', 'completed', 'delivered_approval_pending']
+        q_del = models.Q()
+        for kw in deliv_kws:
+            q_del |= models.Q(courier_status__icontains=kw) | models.Q(steadfast_status__icontains=kw)
+        delivered_courier_count = qs.filter(q_del).count()
+
+        ret_kws = ['cancel', 'cancelled', 'return', 'returned', 'return_pending', 'failed', 'delivery_failed', 'returned_to_merchant', 'pickup cancel', 'paid return', 'partial_delivered']
+        q_ret = models.Q()
+        for kw in ret_kws:
+            q_ret |= models.Q(courier_status__icontains=kw) | models.Q(steadfast_status__icontains=kw)
+        cancelled_returned_count = qs.filter(q_ret).count()
+
+        review_kws = ['in_review', 'review', 'pending', 'pickup_requested', 'accepted', 'created', 'ready_for_pickup', 'order_placed']
+        q_rev = models.Q()
+        for kw in review_kws:
+            q_rev |= models.Q(courier_status__icontains=kw) | models.Q(steadfast_status__icontains=kw)
+        in_review_count = qs.filter(q_rev).count()
+
         today_start = timezone.now().replace(hour=0, minute=0, second=0, microsecond=0)
         today_orders = qs.filter(created_at__gte=today_start).count()
 
@@ -197,6 +276,14 @@ class OnlinePreorderViewSet(
                 'COMPLETED': status_aggregates['completed'] or 0,
                 'RETURNED': status_aggregates['returned'] or 0,
                 'CANCELLED': status_aggregates['cancelled'] or 0,
+            },
+            'delivery_breakdown': {
+                'all': total_orders,
+                'not_dispatched': not_dispatched_count,
+                'in_review': in_review_count,
+                'in_transit': in_transit_count,
+                'delivered': delivered_courier_count,
+                'cancelled_returned': cancelled_returned_count,
             },
             'financials': {
                 'total_revenue': float(total_rev),
@@ -875,24 +962,66 @@ class OnlinePreorderViewSet(
         List all orders dispatched to courier partners with statistics.
         Filtered by courier_partner, status, search, date range.
         """
-        qs = OnlinePreorder.objects.filter(
+        base_qs = OnlinePreorder.objects.filter(
             models.Q(courier_consignment_id__isnull=False) & ~models.Q(courier_consignment_id="") |
             models.Q(steadfast_consignment_id__isnull=False) & ~models.Q(steadfast_consignment_id="")
         )
 
-        partner = request.query_params.get("courier_partner")
+        # Calculate provider-level counts across all booked parcels
+        steadfast_q = models.Q(courier_partner__iexact='STEADFAST') | (
+            models.Q(courier_partner__isnull=True) & models.Q(steadfast_consignment_id__isnull=False) & ~models.Q(steadfast_consignment_id="")
+        )
+        provider_counts = {
+            "ALL": base_qs.count(),
+            "STEADFAST": base_qs.filter(steadfast_q).count(),
+            "PATHAO": base_qs.filter(courier_partner__iexact='PATHAO').count(),
+            "REDX": base_qs.filter(courier_partner__iexact='REDX').count(),
+            "CARRYBEE": base_qs.filter(courier_partner__iexact='CARRYBEE').count(),
+        }
+
+        qs = base_qs
+
+        partner = request.query_params.get("courier") or request.query_params.get("courier_partner")
         if partner and partner.upper() != "ALL":
             if partner.upper() == 'STEADFAST':
-                qs = qs.filter(models.Q(courier_partner='STEADFAST') | models.Q(steadfast_consignment_id__isnull=False))
+                qs = qs.filter(steadfast_q)
             else:
-                qs = qs.filter(courier_partner=partner.upper())
+                qs = qs.filter(courier_partner__iexact=partner.upper())
 
         status_param = request.query_params.get("status")
         if status_param and status_param != "all":
-            qs = qs.filter(models.Q(courier_status__iexact=status_param) | models.Q(steadfast_status__iexact=status_param))
+            status_lower = status_param.lower()
+            if status_lower in ['in_transit', 'transit']:
+                transit_keywords = ['in_transit', 'transit', 'picked', 'in_process', 'waiting for pickup', 'dispatch', 'pending', 'created', 'in_review']
+                q_status = models.Q()
+                for kw in transit_keywords:
+                    q_status |= models.Q(courier_status__icontains=kw) | models.Q(steadfast_status__icontains=kw)
+                qs = qs.filter(q_status)
+            elif status_lower in ['delivered', 'completed']:
+                deliv_keywords = ['delivered', 'completed', 'delivered_approval_pending']
+                q_status = models.Q()
+                for kw in deliv_keywords:
+                    q_status |= models.Q(courier_status__icontains=kw) | models.Q(steadfast_status__icontains=kw) | models.Q(status__icontains=kw)
+                qs = qs.filter(q_status)
+            elif status_lower in ['cancelled', 'returned', 'cancel', 'return', 'failed']:
+                cancel_keywords = ['cancel', 'return', 'failed', 'pickup cancel', 'paid return']
+                q_status = models.Q()
+                for kw in cancel_keywords:
+                    q_status |= models.Q(courier_status__icontains=kw) | models.Q(steadfast_status__icontains=kw) | models.Q(status__icontains=kw)
+                qs = qs.filter(q_status)
+            elif status_lower in ['in_review', 'review']:
+                q_status = models.Q(courier_status__icontains='review') | models.Q(steadfast_status__icontains='review') | models.Q(courier_status__icontains='pending')
+                qs = qs.filter(q_status)
+            else:
+                qs = qs.filter(
+                    models.Q(courier_status__icontains=status_param) |
+                    models.Q(steadfast_status__icontains=status_param) |
+                    models.Q(status__icontains=status_param)
+                )
 
         search = request.query_params.get("search")
         if search:
+            search = search.strip()
             qs = qs.filter(
                 models.Q(customer_name__icontains=search) |
                 models.Q(customer_phone__icontains=search) |
@@ -905,9 +1034,9 @@ class OnlinePreorderViewSet(
 
         all_courier_orders = list(qs.order_by('-created_at'))
         total_booked = len(all_courier_orders)
-        in_transit = sum(1 for o in all_courier_orders if str(o.courier_status or o.steadfast_status).lower() in ['in_review', 'pending', 'created', 'in_transit', 'picked', 'in_process'])
-        delivered = sum(1 for o in all_courier_orders if str(o.courier_status or o.steadfast_status or o.status).lower() in ['delivered', 'completed'])
-        cancelled = sum(1 for o in all_courier_orders if str(o.courier_status or o.steadfast_status or o.status).lower() in ['cancelled', 'returned', 'failed'])
+        in_transit = sum(1 for o in all_courier_orders if str(o.courier_status or o.steadfast_status).lower() in ['in_review', 'pending', 'created', 'in_transit', 'picked', 'in_process', 'waiting for pickup'])
+        delivered = sum(1 for o in all_courier_orders if str(o.courier_status or o.steadfast_status or o.status).lower() in ['delivered', 'completed', 'delivered_approval_pending'])
+        cancelled = sum(1 for o in all_courier_orders if str(o.courier_status or o.steadfast_status or o.status).lower() in ['cancelled', 'returned', 'failed', 'pickup cancel', 'paid return'])
         total_cod = sum(float(o.total_amount or 0) for o in all_courier_orders)
 
         serialized = OnlinePreorderSerializer(all_courier_orders, many=True, context={'request': request}).data
@@ -920,6 +1049,7 @@ class OnlinePreorderViewSet(
                 "cancelled": cancelled,
                 "total_cod_amount": total_cod,
             },
+            "provider_counts": provider_counts,
             "results": serialized
         })
 

@@ -38,6 +38,7 @@ export interface CourierParcelSummary {
 
 export interface CourierParcelsResponse {
   summary: CourierParcelSummary;
+  provider_counts?: Record<string, number>;
   results: OnlinePreorder[];
 }
 
@@ -125,7 +126,7 @@ export const courierApi = {
       order_ids: orderIds,
     }),
 
-  getCourierParcels: (params?: { courier?: string; status?: string; search?: string }) =>
+  getCourierParcels: (params?: { courier?: string; courier_partner?: string; status?: string; search?: string }) =>
     axios.get<CourierParcelsResponse>('/online-preorder/orders/courier-parcels/', {
       params,
     }),

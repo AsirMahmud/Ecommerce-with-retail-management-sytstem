@@ -34,6 +34,7 @@ export const useOnlinePreorders = (
         page,
         pageSize,
         status: params.status || 'all',
+        deliveryStatus: params.deliveryStatus || 'all',
         search: params.search || '',
         courierPartner: params.courierPartner || 'all',
         dateFrom: params.dateFrom || '',

@@ -44,7 +44,13 @@ import {
   SlidersHorizontal,
   X,
 } from "lucide-react";
-import { onlinePreordersApi, type OnlinePreorder, type SteadfastFraudResult } from "@/lib/api/onlinePreorder";
+import {
+  onlinePreordersApi,
+  type OnlinePreorder,
+  type SteadfastFraudResult,
+  COURIER_SPECIFIC_STATUSES,
+  UNIFIED_DELIVERY_STATUSES,
+} from "@/lib/api/onlinePreorder";
 import { courierApi, type ActiveCourier, type CourierProvider, type CourierFraudResult } from "@/lib/api/courier";
 import { OrderDetailsSheet } from "@/components/online-preorders/order-details-sheet";
 import { OnlinePreorderVerificationModal } from "@/components/online-preorders/verification-modal";
@@ -105,6 +111,7 @@ export default function OnlinePreordersPage() {
   const [page, setPage] = useState<number>(1);
   const [pageSize, setPageSize] = useState<number>(15);
   const [courierFilter, setCourierFilter] = useState<string>("all");
+  const [deliveryStatus, setDeliveryStatus] = useState<string>("all");
   const [ordering, setOrdering] = useState<string>("-created_at");
   const [showKpis, setShowKpis] = useState<boolean>(true);
 
@@ -118,8 +125,23 @@ export default function OnlinePreordersPage() {
     setPage(1);
   };
 
+  const handleDeliveryStatusChange = (newDeliveryStatus: string) => {
+    setDeliveryStatus(newDeliveryStatus);
+    setPage(1);
+  };
+
   const handleCourierFilterChange = (newCourier: string) => {
     setCourierFilter(newCourier);
+    setDeliveryStatus("all");
+    setPage(1);
+  };
+
+  const applyPreset = (orderSt: string, delivSt: string, courierSt?: string) => {
+    setStatus(orderSt);
+    setDeliveryStatus(delivSt);
+    if (courierSt) {
+      setCourierFilter(courierSt);
+    }
     setPage(1);
   };
 
@@ -134,6 +156,7 @@ export default function OnlinePreordersPage() {
     page,
     pageSize,
     status,
+    deliveryStatus,
     search: debouncedSearch,
     courierPartner: courierFilter,
     ordering,
@@ -518,12 +541,40 @@ export default function OnlinePreordersPage() {
   const clearFilters = () => {
     setSearch("");
     setStatus("all");
+    setDeliveryStatus("all");
     setCourierFilter("all");
     setOrdering("-created_at");
     setPage(1);
   };
 
-  const isFiltered = status !== "all" || search !== "" || courierFilter !== "all" || ordering !== "-created_at";
+  const isFiltered =
+    status !== "all" ||
+    deliveryStatus !== "all" ||
+    search !== "" ||
+    courierFilter !== "all" ||
+    ordering !== "-created_at";
+
+  // Dynamic delivery status options based on selected courier partner
+  const deliveryStatusOptions = useMemo(() => {
+    if (courierFilter !== "all" && COURIER_SPECIFIC_STATUSES[courierFilter]) {
+      return [
+        { value: "all", label: `All ${courierFilter} Deliveries`, count: undefined },
+        ...COURIER_SPECIFIC_STATUSES[courierFilter].map((s) => ({
+          value: s.value,
+          label: s.label,
+          count: undefined,
+        })),
+      ];
+    }
+    return [
+      { value: "all", label: "All Deliveries", count: metrics?.delivery_breakdown?.all ?? totalCount },
+      { value: "not_dispatched", label: "Not Dispatched", count: metrics?.delivery_breakdown?.not_dispatched ?? 0 },
+      { value: "in_transit", label: "In Transit", count: metrics?.delivery_breakdown?.in_transit ?? 0 },
+      { value: "in_review", label: "In Review", count: metrics?.delivery_breakdown?.in_review ?? 0 },
+      { value: "delivered", label: "Delivered / Completed", count: metrics?.delivery_breakdown?.delivered ?? 0 },
+      { value: "cancelled_returned", label: "Returned / Cancelled", count: metrics?.delivery_breakdown?.cancelled_returned ?? 0 },
+    ];
+  }, [courierFilter, metrics, totalCount]);
 
   // Pagination calculation
   const fromRecord = totalCount === 0 ? 0 : (page - 1) * pageSize + 1;
@@ -538,153 +589,164 @@ export default function OnlinePreordersPage() {
   };
 
   return (
-    <div className="min-h-screen space-y-3 sm:space-y-4 animate-in fade-in duration-300">
-      {/* 1. Sleek Compact Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white px-4 py-3 rounded-xl border border-slate-200/90 shadow-2xs">
-        <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-lg bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-600 shrink-0">
-            <ShoppingBag className="w-4 h-4" />
+    <div className="min-h-screen space-y-4 sm:space-y-6 animate-in fade-in duration-300">
+      {/* 1. Sleek Compact Header — matches Dashboard header */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white/80 dark:bg-slate-900/80 backdrop-blur-md p-4 sm:p-6 rounded-2xl border border-slate-200/80 dark:border-slate-800 shadow-xs">
+        <div className="flex items-center space-x-3.5">
+          <div className="w-11 h-11 bg-gradient-to-tr from-indigo-600 via-blue-600 to-sky-500 rounded-xl flex items-center justify-center shadow-md shadow-indigo-500/20 shrink-0 text-white">
+            <ShoppingBag className="h-6 w-6" />
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <h1 className="text-xl sm:text-2xl font-black tracking-tight text-slate-900">
+              <h1 className="text-xl sm:text-2xl md:text-3xl font-extrabold text-slate-900 dark:text-slate-100 tracking-tight">
                 Online Preorders
               </h1>
-              <Badge className="bg-indigo-50 text-indigo-700 border-indigo-200 text-xs font-bold px-2 py-0.5">
+              <span className="hidden sm:inline-flex items-center gap-1 text-[11px] font-semibold bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-400 px-2.5 py-0.5 rounded-full border border-indigo-200/60 dark:border-indigo-800">
+                <Sparkles className="w-3 h-3 text-indigo-500" />
                 {metrics?.total_orders ?? totalCount} Orders
-              </Badge>
+              </span>
               {(metrics?.today_orders || 0) > 0 && (
                 <span className="text-[11px] text-emerald-600 font-semibold hidden sm:inline">
                   +{metrics?.today_orders} today
                 </span>
               )}
             </div>
-            <p className="text-slate-400 text-xs font-medium">
+            <p className="text-slate-500 dark:text-slate-400 mt-0.5 text-xs sm:text-sm font-medium">
               Consignment dispatching, live courier syncing &amp; inventory fulfillment
             </p>
           </div>
         </div>
 
-        <div className="flex items-center gap-2 shrink-0">
+        <div className="flex items-center gap-2.5 self-start sm:self-auto flex-wrap">
           <Button
             variant="outline"
             size="sm"
             onClick={() => setShowKpis((prev) => !prev)}
-            className="h-8 px-2.5 text-xs text-slate-600 border-slate-200 bg-white hover:bg-slate-50 font-medium"
+            className="gap-2 bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800 border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-200 text-xs sm:text-sm font-medium h-9 rounded-xl shadow-2xs"
             title="Toggle KPI Summary Ribbon"
           >
-            <BarChart3 className="w-3.5 h-3.5 mr-1 text-slate-500" />
+            <BarChart3 className="h-3.5 w-3.5" />
             {showKpis ? "Hide Stats" : "Show Stats"}
           </Button>
           <Button
             variant="outline"
             size="sm"
-            className="h-8 px-2.5 bg-white border-amber-300 text-amber-900 hover:bg-amber-50 text-xs flex items-center gap-1.5 font-semibold"
+            className="gap-2 bg-white dark:bg-slate-900 hover:bg-amber-50 dark:hover:bg-amber-950/30 border-amber-300 dark:border-amber-800 text-amber-900 dark:text-amber-300 text-xs sm:text-sm font-medium h-9 rounded-xl shadow-2xs"
             onClick={handleSyncAllCouriers}
             disabled={isSyncingCouriers}
             title="Sync live status from Steadfast, Pathao & all couriers"
           >
-            <Truck className="w-3 h-3 text-amber-600" />
-            <RefreshCw className={`w-3 h-3 ${isSyncingCouriers ? "animate-spin text-amber-600" : ""}`} />
-            {isSyncingCouriers ? "Syncing..." : "Sync Live Status"}
+            <Truck className="h-3.5 w-3.5" />
+            <RefreshCw className={`h-3.5 w-3.5 ${isSyncingCouriers ? "animate-spin text-amber-600" : ""}`} />
+            <span>{isSyncingCouriers ? "Syncing..." : "Sync Live Status"}</span>
           </Button>
           <Button
             variant="outline"
             size="sm"
-            className="h-8 px-2.5 bg-white border-slate-200 text-slate-700 text-xs hover:bg-slate-50"
+            className="gap-2 bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800 border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-200 text-xs sm:text-sm font-medium h-9 rounded-xl shadow-2xs"
             onClick={loadData}
           >
-            <RefreshCw className={`w-3 h-3 mr-1 ${isFetching ? "animate-spin text-indigo-600" : ""}`} />
-            Refresh
+            <RefreshCw className={`h-3.5 w-3.5 ${isFetching ? "animate-spin text-indigo-600" : ""}`} />
+            <span>Refresh</span>
           </Button>
           <Button
             size="sm"
-            className="h-8 px-3 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs shadow-xs"
+            className="gap-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs sm:text-sm h-9 rounded-xl shadow-md shadow-indigo-500/20"
             onClick={() => {
               setEditingOrder(null);
               setActiveTab("manual");
             }}
           >
-            <Plus className="w-3.5 h-3.5 mr-1" />
-            New Order
+            <Plus className="h-3.5 w-3.5" />
+            <span>New Order</span>
           </Button>
         </div>
       </div>
 
       {/* 2. Compact Horizontal Executive Ribbon (Only ~50px tall, collapsible) */}
       {showKpis && (
-        <div className="bg-white border border-slate-200/90 rounded-xl px-4 py-2.5 shadow-2xs grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4 divide-y sm:divide-y-0 sm:divide-x divide-slate-100 animate-in fade-in duration-200">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5 sm:gap-5 animate-in fade-in duration-200">
           {/* Metric 1: Total Orders */}
-          <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center shrink-0">
-              <ShoppingBag className="h-4 w-4" />
-            </div>
-            <div>
-              <div className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Preorders</div>
-              <div className="flex items-baseline gap-1.5">
-                <span className="text-lg font-black text-slate-900">
-                  {isMetricsLoading ? "..." : (metrics?.total_orders ?? totalCount)}
-                </span>
-                <span className="text-[10px] text-emerald-600 font-bold bg-emerald-50 px-1 rounded">
-                  +{metrics?.today_orders || 0} today
-                </span>
+          <Card className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800 shadow-xs hover:shadow-lg hover:border-indigo-300/80 dark:hover:border-indigo-800 transition-all duration-300 p-5 group relative overflow-hidden">
+            <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-indigo-500 to-violet-500" />
+            <div className="flex items-center justify-between pb-3">
+              <span className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                Preorders
+              </span>
+              <div className="w-9 h-9 rounded-xl bg-indigo-50 dark:bg-indigo-950/60 border border-indigo-100 dark:border-indigo-800 flex items-center justify-center text-indigo-600 dark:text-indigo-400 group-hover:scale-110 group-hover:bg-indigo-600 group-hover:text-white transition-all duration-300">
+                <ShoppingBag className="h-4.5 w-4.5" />
               </div>
             </div>
-          </div>
+            <div className="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-slate-100 tracking-tight">
+              {isMetricsLoading ? "..." : (metrics?.total_orders ?? totalCount)}
+            </div>
+            <div className="flex items-center gap-1 text-xs font-semibold text-emerald-700 dark:text-emerald-400 bg-emerald-50/80 dark:bg-emerald-950/50 border border-emerald-200/60 dark:border-emerald-800 px-2 py-0.5 rounded-full w-fit mt-2.5">
+              <TrendingUp className="h-3.5 w-3.5" />
+              <span>+{metrics?.today_orders || 0} today</span>
+            </div>
+          </Card>
 
           {/* Metric 2: Completed Revenue */}
-          <div className="flex items-center gap-3 sm:pl-4 pt-2 sm:pt-0">
-            <div className="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
-              <DollarSign className="h-4 w-4" />
-            </div>
-            <div>
-              <div className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Completed COD</div>
-              <div className="flex items-baseline gap-1.5">
-                <span className="text-lg font-black text-slate-900">
-                  {isMetricsLoading ? "..." : formatCurrency(metrics?.financials?.completed_revenue ?? 0)}
-                </span>
-                <span className="text-[10px] text-slate-500 font-medium">
-                  ({metrics?.status_breakdown?.COMPLETED ?? 0} del.)
-                </span>
+          <Card className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800 shadow-xs hover:shadow-lg hover:border-emerald-300/80 dark:hover:border-emerald-800 transition-all duration-300 p-5 group relative overflow-hidden">
+            <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-emerald-500 to-teal-500" />
+            <div className="flex items-center justify-between pb-3">
+              <span className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                Completed COD
+              </span>
+              <div className="w-9 h-9 rounded-xl bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-100 dark:border-emerald-800 flex items-center justify-center text-emerald-600 dark:text-emerald-400 group-hover:scale-110 group-hover:bg-emerald-600 group-hover:text-white transition-all duration-300">
+                <DollarSign className="h-4.5 w-4.5" />
               </div>
             </div>
-          </div>
+            <div className="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-slate-100 tracking-tight">
+              {isMetricsLoading ? "..." : formatCurrency(metrics?.financials?.completed_revenue ?? 0)}
+              {" "}<span className="text-xs font-normal text-slate-400">({metrics?.status_breakdown?.COMPLETED ?? 0} del.)</span>
+            </div>
+            <div className="flex items-center gap-1 text-xs font-semibold text-emerald-700 dark:text-emerald-400 bg-emerald-50/80 dark:bg-emerald-950/50 border border-emerald-200/60 dark:border-emerald-800 px-2 py-0.5 rounded-full w-fit mt-2.5">
+              <DollarSign className="h-3.5 w-3.5" />
+              <span>Total revenue</span>
+            </div>
+          </Card>
 
           {/* Metric 3: Fulfillment Rate */}
-          <div className="flex items-center gap-3 sm:pl-4 pt-2 sm:pt-0">
-            <div className="w-8 h-8 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
-              <Truck className="h-4 w-4" />
-            </div>
-            <div>
-              <div className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Delivery Rate</div>
-              <div className="flex items-baseline gap-1.5">
-                <span className="text-lg font-black text-slate-900">
-                  {isMetricsLoading ? "..." : `${metrics?.rates?.fulfillment_rate ?? 0}%`}
-                </span>
-                <span className="text-[10px] text-purple-600 font-medium bg-purple-50 px-1 rounded">
-                  {metrics?.rates?.return_rate ?? 0}% ret.
-                </span>
+          <Card className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800 shadow-xs hover:shadow-lg hover:border-blue-300/80 dark:hover:border-blue-800 transition-all duration-300 p-5 group relative overflow-hidden">
+            <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-blue-500 to-indigo-500" />
+            <div className="flex items-center justify-between pb-3">
+              <span className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                Delivery Rate
+              </span>
+              <div className="w-9 h-9 rounded-xl bg-blue-50 dark:bg-blue-950/60 border border-blue-100 dark:border-blue-800 flex items-center justify-center text-blue-600 dark:text-blue-400 group-hover:scale-110 group-hover:bg-blue-600 group-hover:text-white transition-all duration-300">
+                <Truck className="h-4.5 w-4.5" />
               </div>
             </div>
-          </div>
+            <div className="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-slate-100 tracking-tight">
+              {isMetricsLoading ? "..." : `${metrics?.rates?.fulfillment_rate ?? 0}%`}
+            </div>
+            <div className="flex items-center gap-1 text-xs font-semibold text-purple-700 dark:text-purple-400 bg-purple-50/80 dark:bg-purple-950/50 border border-purple-200/60 dark:border-purple-800 px-2 py-0.5 rounded-full w-fit mt-2.5">
+              <Truck className="h-3.5 w-3.5" />
+              <span>{metrics?.rates?.return_rate ?? 0}% ret.</span>
+            </div>
+          </Card>
 
           {/* Metric 4: Avg Order Value */}
-          <div className="flex items-center gap-3 sm:pl-4 pt-2 sm:pt-0">
-            <div className="w-8 h-8 rounded-lg bg-purple-50 text-purple-600 flex items-center justify-center shrink-0">
-              <TrendingUp className="h-4 w-4" />
-            </div>
-            <div>
-              <div className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Avg Order Value</div>
-              <div className="flex items-baseline gap-1.5">
-                <span className="text-lg font-black text-slate-900">
-                  {isMetricsLoading ? "..." : formatCurrency(metrics?.financials?.average_order_value ?? 0)}
-                </span>
-                <span className="text-[10px] text-slate-400">
-                  / {formatCurrency(metrics?.financials?.total_revenue ?? 0)}
-                </span>
+          <Card className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800 shadow-xs hover:shadow-lg hover:border-pink-300/80 dark:hover:border-pink-800 transition-all duration-300 p-5 group relative overflow-hidden">
+            <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-pink-500 to-purple-500" />
+            <div className="flex items-center justify-between pb-3">
+              <span className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                Avg Order Value
+              </span>
+              <div className="w-9 h-9 rounded-xl bg-pink-50 dark:bg-pink-950/60 border border-pink-100 dark:border-pink-800 flex items-center justify-center text-pink-600 dark:text-pink-400 group-hover:scale-110 group-hover:bg-pink-600 group-hover:text-white transition-all duration-300">
+                <TrendingUp className="h-4.5 w-4.5" />
               </div>
             </div>
-          </div>
+            <div className="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-slate-100 tracking-tight">
+              {isMetricsLoading ? "..." : formatCurrency(metrics?.financials?.average_order_value ?? 0)}
+              {" "}<span className="text-xs font-normal text-slate-400">/ {formatCurrency(metrics?.financials?.total_revenue ?? 0)}</span>
+            </div>
+            <div className="flex items-center gap-1 text-xs font-semibold text-pink-700 dark:text-pink-400 bg-pink-50/80 dark:bg-pink-950/50 border border-pink-200/60 dark:border-pink-800 px-2 py-0.5 rounded-full w-fit mt-2.5">
+              <TrendingUp className="h-3.5 w-3.5" />
+              <span>Per order avg</span>
+            </div>
+          </Card>
         </div>
       )}
 
@@ -697,7 +759,7 @@ export default function OnlinePreordersPage() {
         }}
         className="w-full space-y-3"
       >
-        <TabsList className="bg-white border border-slate-200/90 p-1 h-10 shadow-2xs rounded-xl inline-flex">
+        <TabsList className="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 p-1 h-10 shadow-xs rounded-2xl inline-flex">
           <TabsTrigger
             value="orders"
             className="rounded-lg data-[state=active]:bg-indigo-600 data-[state=active]:text-white px-4 py-1 text-xs font-bold transition-all flex items-center gap-1.5"
@@ -743,55 +805,229 @@ export default function OnlinePreordersPage() {
 
         {/* Master Orders Tab Content */}
         <TabsContent value="orders" className="space-y-3 mt-0">
-          <Card className="border border-slate-200/90 shadow-sm bg-white overflow-hidden rounded-xl">
+          <Card className="border border-slate-200/80 dark:border-slate-800 shadow-xs hover:shadow-md transition-all duration-300 bg-white dark:bg-slate-900 overflow-hidden rounded-2xl">
             {/* Unified Filter & Toolbar Header */}
-            <CardHeader className="border-b bg-slate-50/70 p-3 sm:p-4 space-y-2.5">
-              {/* Row 1: Status Pills Strip */}
-              <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar pb-0.5">
-                {[
-                  { key: "all", label: "All", count: metrics?.total_orders ?? totalCount },
-                  { key: "PENDING", label: "Pending", count: metrics?.status_breakdown?.PENDING ?? 0 },
-                  { key: "CONFIRMED", label: "Confirmed", count: metrics?.status_breakdown?.CONFIRMED ?? 0 },
-                  { key: "HOLD", label: "Hold", count: metrics?.status_breakdown?.HOLD ?? 0 },
-                  { key: "DELIVERED", label: "Delivered", count: metrics?.status_breakdown?.DELIVERED ?? 0 },
-                  { key: "COMPLETED", label: "Completed", count: metrics?.status_breakdown?.COMPLETED ?? 0 },
-                  { key: "RETURNED", label: "Returned", count: metrics?.status_breakdown?.RETURNED ?? 0 },
-                  { key: "CANCELLED", label: "Cancelled", count: metrics?.status_breakdown?.CANCELLED ?? 0 },
-                ].map((item) => {
-                  const isActive = status === item.key;
-                  return (
+            <CardHeader className="border-b border-slate-100 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-800/50 p-4 sm:p-5 space-y-3">
+              {/* Row 1: Order Status Pills Strip */}
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                  <div className="flex items-center gap-1.5">
+                    <ShoppingBag className="w-3.5 h-3.5 text-indigo-500" />
+                    <span>Order Status</span>
+                  </div>
+                  {status !== "all" && (
                     <button
-                      key={item.key}
                       type="button"
-                      onClick={() => handleStatusChange(item.key)}
-                      className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all shrink-0 flex items-center gap-1.5 ${
-                        isActive
-                          ? "bg-indigo-600 text-white shadow-xs"
-                          : "bg-white hover:bg-slate-100 text-slate-700 border border-slate-200"
-                      }`}
+                      onClick={() => handleStatusChange("all")}
+                      className="text-indigo-600 hover:text-indigo-700 text-[10px] font-semibold lowercase"
                     >
-                      <span>{item.label}</span>
-                      <span
-                        className={`text-[10px] px-1.5 py-0.2 rounded-full font-mono font-bold ${
-                          isActive ? "bg-white/20 text-white" : "bg-slate-100 text-slate-600"
+                      reset order status
+                    </button>
+                  )}
+                </div>
+                <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar pb-0.5">
+                  {[
+                    { key: "all", label: "All Orders", count: metrics?.total_orders ?? totalCount },
+                    { key: "PENDING", label: "Pending", count: metrics?.status_breakdown?.PENDING ?? 0 },
+                    { key: "CONFIRMED", label: "Confirmed", count: metrics?.status_breakdown?.CONFIRMED ?? 0 },
+                    { key: "HOLD", label: "Hold", count: metrics?.status_breakdown?.HOLD ?? 0 },
+                    { key: "DELIVERED", label: "Delivered", count: metrics?.status_breakdown?.DELIVERED ?? 0 },
+                    { key: "COMPLETED", label: "Completed", count: metrics?.status_breakdown?.COMPLETED ?? 0 },
+                    { key: "RETURNED", label: "Returned", count: metrics?.status_breakdown?.RETURNED ?? 0 },
+                    { key: "CANCELLED", label: "Cancelled", count: metrics?.status_breakdown?.CANCELLED ?? 0 },
+                  ].map((item) => {
+                    const isActive = status === item.key;
+                    return (
+                      <button
+                        key={item.key}
+                        type="button"
+                        onClick={() => handleStatusChange(item.key)}
+                        className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all shrink-0 flex items-center gap-1.5 ${
+                          isActive
+                            ? "bg-indigo-600 text-white shadow-xs"
+                            : "bg-white dark:bg-slate-900 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700"
                         }`}
                       >
-                        {item.count}
-                      </span>
-                    </button>
-                  );
-                })}
+                        <span>{item.label}</span>
+                        <span
+                          className={`text-[10px] px-1.5 py-0.2 rounded-full font-mono font-bold ${
+                            isActive ? "bg-white/20 text-white" : "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400"
+                          }`}
+                        >
+                          {item.count}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
 
-              {/* Row 2: Search Input & Dropdowns */}
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 pt-1 border-t border-slate-200/60">
+              {/* Row 2: Delivery Order Status Pills Strip */}
+              <div className="space-y-1.5 pt-1.5 border-t border-slate-200/50 dark:border-slate-800/60">
+                <div className="flex items-center justify-between text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                  <div className="flex items-center gap-1.5">
+                    <Truck className="w-3.5 h-3.5 text-blue-500" />
+                    <span>
+                      Delivery Status
+                      {courierFilter !== "all" && (
+                        <span className="ml-1.5 text-[10px] px-1.5 py-0.2 rounded font-semibold bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-300">
+                          {courierFilter}
+                        </span>
+                      )}
+                    </span>
+                  </div>
+                  {deliveryStatus !== "all" && (
+                    <button
+                      type="button"
+                      onClick={() => handleDeliveryStatusChange("all")}
+                      className="text-blue-600 hover:text-blue-700 text-[10px] font-semibold lowercase"
+                    >
+                      reset delivery status
+                    </button>
+                  )}
+                </div>
+                <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar pb-0.5">
+                  {deliveryStatusOptions.map((item) => {
+                    const isActive = deliveryStatus === item.value;
+                    return (
+                      <button
+                        key={item.value}
+                        type="button"
+                        onClick={() => handleDeliveryStatusChange(item.value)}
+                        className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all shrink-0 flex items-center gap-1.5 ${
+                          isActive
+                            ? "bg-blue-600 text-white shadow-xs"
+                            : "bg-white dark:bg-slate-900 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700"
+                        }`}
+                      >
+                        <span>{item.label}</span>
+                        {item.count !== undefined && (
+                          <span
+                            className={`text-[10px] px-1.5 py-0.2 rounded-full font-mono font-bold ${
+                              isActive ? "bg-white/20 text-white" : "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400"
+                            }`}
+                          >
+                            {item.count}
+                          </span>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Row 3: Active Filters & Smart Quick Presets */}
+              <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-slate-200/60 dark:border-slate-800">
+                {/* Active Filter Tags */}
+                <div className="flex flex-wrap items-center gap-1.5">
+                  <span className="text-[11px] font-semibold text-slate-400 dark:text-slate-500 mr-1">
+                    Active:
+                  </span>
+                  {status !== "all" ? (
+                    <Badge variant="secondary" className="bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800 text-[11px] font-medium gap-1 pl-2 pr-1 py-0.5">
+                      <span>Order: <strong>{status}</strong></span>
+                      <button
+                        type="button"
+                        onClick={() => handleStatusChange("all")}
+                        className="hover:bg-indigo-200/60 rounded p-0.5"
+                      >
+                        <X className="w-3 h-3" />
+                      </button>
+                    </Badge>
+                  ) : (
+                    <span className="text-[11px] text-slate-400">All Orders</span>
+                  )}
+
+                  <span className="text-slate-300 dark:text-slate-700 text-xs">•</span>
+
+                  {deliveryStatus !== "all" ? (
+                    <Badge variant="secondary" className="bg-blue-50 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800 text-[11px] font-medium gap-1 pl-2 pr-1 py-0.5">
+                      <span>Delivery: <strong>{deliveryStatus.replace(/_/g, " ")}</strong></span>
+                      <button
+                        type="button"
+                        onClick={() => handleDeliveryStatusChange("all")}
+                        className="hover:bg-blue-200/60 rounded p-0.5"
+                      >
+                        <X className="w-3 h-3" />
+                      </button>
+                    </Badge>
+                  ) : (
+                    <span className="text-[11px] text-slate-400">All Deliveries</span>
+                  )}
+
+                  {courierFilter !== "all" && (
+                    <>
+                      <span className="text-slate-300 dark:text-slate-700 text-xs">•</span>
+                      <Badge variant="secondary" className="bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 text-[11px] font-medium gap-1 pl-2 pr-1 py-0.5">
+                        <span>Courier: <strong>{courierFilter}</strong></span>
+                        <button
+                          type="button"
+                          onClick={() => handleCourierFilterChange("all")}
+                          className="hover:bg-emerald-200/60 rounded p-0.5"
+                        >
+                          <X className="w-3 h-3" />
+                        </button>
+                      </Badge>
+                    </>
+                  )}
+
+                  {(status !== "all" && deliveryStatus !== "all") && (
+                    <Badge className="bg-gradient-to-r from-indigo-600 to-blue-600 text-white text-[10px] font-bold uppercase tracking-wider ml-1 shadow-2xs">
+                      Filtered by Both
+                    </Badge>
+                  )}
+                </div>
+
+                {/* 1-Click Quick Presets */}
+                <div className="flex items-center gap-1.5 ml-auto">
+                  <span className="text-[10px] uppercase tracking-wider font-bold text-slate-400 hidden sm:inline">
+                    Presets:
+                  </span>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    onClick={() => applyPreset("CONFIRMED", "not_dispatched")}
+                    className="h-7 px-2 text-[11px] font-semibold border-amber-300 bg-amber-50/60 hover:bg-amber-100 text-amber-900 flex items-center gap-1 shadow-2xs"
+                    title="Filter: Order Confirmed + Not Dispatched"
+                  >
+                    <Zap className="w-3 h-3 text-amber-600" />
+                    <span>Ready to Dispatch</span>
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    onClick={() => applyPreset("CONFIRMED", "in_transit")}
+                    className="h-7 px-2 text-[11px] font-semibold border-blue-300 bg-blue-50/60 hover:bg-blue-100 text-blue-900 flex items-center gap-1 shadow-2xs"
+                    title="Filter: Confirmed & In Transit"
+                  >
+                    <Truck className="w-3 h-3 text-blue-600" />
+                    <span>In Transit</span>
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    onClick={() => applyPreset("DELIVERED", "completed")}
+                    className="h-7 px-2 text-[11px] font-semibold border-emerald-300 bg-emerald-50/60 hover:bg-emerald-100 text-emerald-900 flex items-center gap-1 shadow-2xs"
+                    title="Filter: Delivered & Completed"
+                  >
+                    <Check className="w-3 h-3 text-emerald-600" />
+                    <span>Delivered & Completed</span>
+                  </Button>
+                </div>
+              </div>
+
+              {/* Row 4: Search Input & Dropdowns */}
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 pt-2 border-t border-slate-200/60 dark:border-slate-800">
                 <div className="relative flex-1 max-w-md">
                   <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
                   <Input
                     placeholder="Search by ID (#123), customer, phone, tracking..."
                     value={search}
                     onChange={(e) => setSearch(e.target.value)}
-                    className="pl-9 pr-8 h-9 bg-white border-slate-200 rounded-lg text-xs"
+                    className="pl-9 pr-8 h-9 bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 rounded-lg text-xs"
                   />
                   {search && (
                     <button
@@ -805,8 +1041,9 @@ export default function OnlinePreordersPage() {
                 </div>
 
                 <div className="flex flex-wrap items-center gap-2">
+                  {/* Delivery Partner Select */}
                   <Select value={courierFilter} onValueChange={handleCourierFilterChange}>
-                    <SelectTrigger className="w-[145px] h-9 bg-white border-slate-200 rounded-lg text-xs font-semibold">
+                    <SelectTrigger className="w-[140px] h-9 bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 rounded-lg text-xs font-semibold">
                       <Truck className="w-3.5 h-3.5 mr-1.5 text-slate-400" />
                       <SelectValue placeholder="Delivery Partner" />
                     </SelectTrigger>
@@ -819,8 +1056,24 @@ export default function OnlinePreordersPage() {
                     </SelectContent>
                   </Select>
 
+                  {/* Delivery Status Dropdown Select */}
+                  <Select value={deliveryStatus} onValueChange={handleDeliveryStatusChange}>
+                    <SelectTrigger className="w-[155px] h-9 bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 rounded-lg text-xs font-semibold">
+                      <Package className="w-3.5 h-3.5 mr-1.5 text-slate-400" />
+                      <SelectValue placeholder="Delivery Status" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {deliveryStatusOptions.map((opt) => (
+                        <SelectItem key={opt.value} value={opt.value}>
+                          {opt.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+
+                  {/* Sort Order Select */}
                   <Select value={ordering} onValueChange={(val) => { setOrdering(val); setPage(1); }}>
-                    <SelectTrigger className="w-[140px] h-9 bg-white border-slate-200 rounded-lg text-xs font-semibold">
+                    <SelectTrigger className="w-[135px] h-9 bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 rounded-lg text-xs font-semibold">
                       <ArrowUpDown className="w-3.5 h-3.5 mr-1.5 text-slate-400" />
                       <SelectValue placeholder="Sort Order" />
                     </SelectTrigger>
@@ -836,7 +1089,7 @@ export default function OnlinePreordersPage() {
                     variant="outline"
                     size="sm"
                     onClick={() => setActiveTab("analytics")}
-                    className="h-9 px-2.5 rounded-lg text-xs font-semibold border-slate-200 bg-white hover:bg-slate-50 text-indigo-600 flex items-center gap-1.5"
+                    className="h-9 px-2.5 rounded-lg text-xs font-semibold border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800 text-indigo-600 dark:text-indigo-400 flex items-center gap-1.5"
                   >
                     <BarChart3 className="w-3.5 h-3.5" />
                     View Charts
@@ -847,9 +1100,9 @@ export default function OnlinePreordersPage() {
                       variant="ghost"
                       size="sm"
                       onClick={clearFilters}
-                      className="h-9 px-2 text-xs text-rose-600 hover:text-rose-700 hover:bg-rose-50"
+                      className="h-9 px-2 text-xs text-rose-600 hover:text-rose-700 hover:bg-rose-50 dark:hover:bg-rose-950/40"
                     >
-                      Clear
+                      Clear All
                     </Button>
                   )}
                 </div>
@@ -1344,7 +1597,7 @@ export default function OnlinePreordersPage() {
               )}
 
               {/* Backend Pagination Footer Controls */}
-              <div className="p-4 border-t border-slate-100 bg-slate-50/50 flex flex-col sm:flex-row items-center justify-between gap-4">
+              <div className="p-4 sm:p-5 border-t border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/30 flex flex-col sm:flex-row items-center justify-between gap-4">
                 <div className="text-xs text-slate-500 font-medium">
                   Showing <span className="font-bold text-slate-900">{fromRecord}</span> to{" "}
                   <span className="font-bold text-slate-900">{toRecord}</span> of{" "}

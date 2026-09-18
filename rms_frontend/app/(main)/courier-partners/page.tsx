@@ -51,6 +51,7 @@ import {
   Copy,
   Check,
   AlertCircle,
+  X,
 } from "lucide-react";
 import { format } from "date-fns";
 
@@ -90,6 +91,13 @@ export default function CourierPartnersPage() {
   const [copiedCode, setCopiedCode] = useState<string | null>(null);
 
   const [parcels, setParcels] = useState<OnlinePreorder[]>([]);
+  const [providerCounts, setProviderCounts] = useState<Record<string, number>>({
+    ALL: 0,
+    STEADFAST: 0,
+    PATHAO: 0,
+    REDX: 0,
+    CARRYBEE: 0,
+  });
   const [summary, setSummary] = useState<CourierParcelSummary>({
     total_booked: 0,
     in_transit: 0,
@@ -101,14 +109,20 @@ export default function CourierPartnersPage() {
   const fetchData = async () => {
     try {
       setLoading(true);
-      const params: { courier?: string; status?: string; search?: string } = {};
-      if (selectedCourier !== "ALL") params.courier = selectedCourier;
+      const params: { courier?: string; courier_partner?: string; status?: string; search?: string } = {};
+      if (selectedCourier !== "ALL") {
+        params.courier = selectedCourier;
+        params.courier_partner = selectedCourier;
+      }
       if (statusFilter !== "all") params.status = statusFilter;
       if (searchQuery.trim()) params.search = searchQuery.trim();
 
       const res = await courierApi.getCourierParcels(params);
       setSummary(res.data.summary);
       setParcels(res.data.results);
+      if (res.data.provider_counts) {
+        setProviderCounts(res.data.provider_counts);
+      }
     } catch (err: any) {
       toast({
         title: "Failed to load courier parcels",
@@ -318,20 +332,41 @@ export default function CourierPartnersPage() {
           >
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <TabsList className="bg-slate-100 dark:bg-slate-900 p-1 h-auto flex-wrap">
-                <TabsTrigger value="ALL" className="text-xs py-1.5 px-3">
+                <TabsTrigger value="ALL" className="text-xs py-1.5 px-3 gap-1.5 data-[state=active]:bg-white dark:data-[state=active]:bg-slate-800 data-[state=active]:shadow-xs">
                   All Couriers
+                  {providerCounts.ALL > 0 && (
+                    <span className="ml-1 px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300">
+                      {providerCounts.ALL}
+                    </span>
+                  )}
                 </TabsTrigger>
-                <TabsTrigger value="STEADFAST" className="text-xs py-1.5 px-3">
+                <TabsTrigger value="STEADFAST" className="text-xs py-1.5 px-3 gap-1.5 data-[state=active]:bg-white dark:data-[state=active]:bg-slate-800 data-[state=active]:shadow-xs">
                   Steadfast
+                  {providerCounts.STEADFAST > 0 && (
+                    <span className="ml-1 px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300">
+                      {providerCounts.STEADFAST}
+                    </span>
+                  )}
                 </TabsTrigger>
-                <TabsTrigger value="PATHAO" className="text-xs py-1.5 px-3">
+                <TabsTrigger value="PATHAO" className="text-xs py-1.5 px-3 gap-1.5 data-[state=active]:bg-white dark:data-[state=active]:bg-slate-800 data-[state=active]:shadow-xs">
                   Pathao
+                  {providerCounts.PATHAO > 0 && (
+                    <span className="ml-1 px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-red-100 dark:bg-red-950 text-red-700 dark:text-red-300">
+                      {providerCounts.PATHAO}
+                    </span>
+                  )}
                 </TabsTrigger>
-                <TabsTrigger value="REDX" className="text-xs py-1.5 px-3">
+                <TabsTrigger value="REDX" className="text-xs py-1.5 px-3 gap-1.5 data-[state=active]:bg-white dark:data-[state=active]:bg-slate-800 data-[state=active]:shadow-xs">
                   RedX
+                  <span className="ml-1 px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-slate-200/70 text-slate-500">
+                    {providerCounts.REDX || 0}
+                  </span>
                 </TabsTrigger>
-                <TabsTrigger value="CARRYBEE" className="text-xs py-1.5 px-3">
+                <TabsTrigger value="CARRYBEE" className="text-xs py-1.5 px-3 gap-1.5 data-[state=active]:bg-white dark:data-[state=active]:bg-slate-800 data-[state=active]:shadow-xs">
                   Carrybee
+                  <span className="ml-1 px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-slate-200/70 text-slate-500">
+                    {providerCounts.CARRYBEE || 0}
+                  </span>
                 </TabsTrigger>
               </TabsList>
 
@@ -344,8 +379,30 @@ export default function CourierPartnersPage() {
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     onKeyDown={handleSearchKeyDown}
-                    className="pl-8 h-8 text-xs"
+                    className="pl-8 pr-7 h-8 text-xs"
                   />
+                  {searchQuery && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSearchQuery("");
+                        const params: { courier?: string; courier_partner?: string; status?: string } = {};
+                        if (selectedCourier !== "ALL") {
+                          params.courier = selectedCourier;
+                          params.courier_partner = selectedCourier;
+                        }
+                        if (statusFilter !== "all") params.status = statusFilter;
+                        courierApi.getCourierParcels(params).then((res) => {
+                          setSummary(res.data.summary);
+                          setParcels(res.data.results);
+                          if (res.data.provider_counts) setProviderCounts(res.data.provider_counts);
+                        }).catch(() => {});
+                      }}
+                      className="absolute right-2 top-2 text-slate-400 hover:text-slate-600"
+                    >
+                      <X className="h-3.5 w-3.5" />
+                    </button>
+                  )}
                 </div>
 
                 <Select value={statusFilter} onValueChange={setStatusFilter}>
@@ -398,9 +455,15 @@ export default function CourierPartnersPage() {
                         <div className="p-3 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-400">
                           <Package className="h-6 w-6" />
                         </div>
-                        <h4 className="text-sm font-semibold">No Parcels Dispatched Yet</h4>
+                        <h4 className="text-sm font-semibold">
+                          {selectedCourier === "ALL"
+                            ? "No Parcels Dispatched Yet"
+                            : `No Parcels Dispatched via ${PROVIDER_INFO[selectedCourier]?.label || selectedCourier}`}
+                        </h4>
                         <p className="text-xs text-muted-foreground">
-                          When you dispatch orders from the Online Preorders screen using Steadfast, Pathao, RedX, or Carrybee, they will automatically appear here.
+                          {selectedCourier === "ALL"
+                            ? "When you dispatch orders from the Online Preorders screen using Steadfast, Pathao, RedX, or Carrybee, they will automatically appear here."
+                            : `No booked consignments currently exist for ${PROVIDER_INFO[selectedCourier]?.label || selectedCourier}.`}
                         </p>
                         <Button asChild size="sm" variant="outline" className="mt-2 text-xs">
                           <Link href="/online-preorders">Go to Online Preorders</Link>

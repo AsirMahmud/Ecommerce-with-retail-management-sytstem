@@ -158,10 +158,58 @@ export interface OnlinePreorderScanResult {
   verification: OnlinePreorderVerification;
 }
 
+export const COURIER_SPECIFIC_STATUSES: Record<string, { value: string; label: string }[]> = {
+  STEADFAST: [
+    { value: "completed", label: "Completed" },
+    { value: "delivered", label: "Delivered" },
+    { value: "delivered_approval_pending", label: "Approval Pending" },
+    { value: "in_transit", label: "In Transit" },
+    { value: "in_review", label: "In Review" },
+    { value: "partial_delivered", label: "Partial Delivered" },
+    { value: "cancelled", label: "Cancelled" },
+    { value: "hold", label: "Hold" },
+  ],
+  PATHAO: [
+    { value: "Delivered", label: "Delivered" },
+    { value: "In_Transit", label: "In Transit" },
+    { value: "Assigned_For_Delivery", label: "Out For Delivery" },
+    { value: "Picked", label: "Picked" },
+    { value: "Pickup_Requested", label: "Pickup Requested" },
+    { value: "Returned", label: "Returned" },
+    { value: "Cancelled", label: "Cancelled" },
+  ],
+  REDX: [
+    { value: "delivered", label: "Delivered" },
+    { value: "in_transit", label: "In Transit" },
+    { value: "picked_up", label: "Picked Up" },
+    { value: "ready_for_pickup", label: "Ready For Pickup" },
+    { value: "returned_to_merchant", label: "Returned" },
+    { value: "cancelled", label: "Cancelled" },
+  ],
+  CARRYBEE: [
+    { value: "delivered", label: "Delivered" },
+    { value: "in_transit", label: "In Transit" },
+    { value: "picked_up", label: "Picked Up" },
+    { value: "in_review", label: "In Review" },
+    { value: "returned", label: "Returned" },
+    { value: "cancelled", label: "Cancelled" },
+  ],
+};
+
+export const UNIFIED_DELIVERY_STATUSES = [
+  { value: "all", label: "All Deliveries" },
+  { value: "not_dispatched", label: "Not Dispatched" },
+  { value: "in_review", label: "In Review / Booked" },
+  { value: "in_transit", label: "In Transit" },
+  { value: "delivered", label: "Delivered / Completed" },
+  { value: "cancelled_returned", label: "Cancelled / Returned" },
+];
+
 export interface OnlinePreordersQueryParams {
   page?: number;
   pageSize?: number;
   status?: string;
+  deliveryStatus?: string;
   search?: string;
   courierPartner?: string;
   dateFrom?: string;
@@ -189,6 +237,14 @@ export interface OnlinePreorderMetrics {
     RETURNED: number;
     CANCELLED: number;
   };
+  delivery_breakdown?: {
+    all: number;
+    not_dispatched: number;
+    in_review: number;
+    in_transit: number;
+    delivered: number;
+    cancelled_returned: number;
+  };
   financials: {
     total_revenue: number;
     completed_revenue: number;
@@ -213,10 +269,11 @@ export const onlinePreordersApi = {
       if (paramsOrStatus && paramsOrStatus !== 'all') query.append('status', paramsOrStatus);
       if (legacySearch) query.append('search', legacySearch);
     } else if (paramsOrStatus && typeof paramsOrStatus === 'object') {
-      const { page, pageSize, status, search, courierPartner, dateFrom, dateTo, ordering, noPagination } = paramsOrStatus;
+      const { page, pageSize, status, deliveryStatus, search, courierPartner, dateFrom, dateTo, ordering, noPagination } = paramsOrStatus;
       if (page) query.append('page', String(page));
       if (pageSize) query.append('page_size', String(pageSize));
       if (status && status !== 'all') query.append('status', status);
+      if (deliveryStatus && deliveryStatus !== 'all') query.append('delivery_status', deliveryStatus);
       if (search) query.append('search', search);
       if (courierPartner && courierPartner !== 'all') query.append('courier_partner', courierPartner);
       if (dateFrom) query.append('date_from', dateFrom);
