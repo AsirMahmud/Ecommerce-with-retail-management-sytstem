@@ -195,6 +195,46 @@ export function SalesReport({
         </Card>
       </div>
 
+      {/* Retail Sales Accounting Waterfall Strip */}
+      <Card className="rounded-2xl border border-slate-200/90 shadow-2xs bg-white p-4">
+        <div className="flex flex-wrap items-center justify-between gap-3 text-xs">
+          <div className="flex items-center gap-1.5">
+            <span className="text-slate-400 font-bold uppercase">Gross Sales:</span>
+            <span className="font-extrabold text-slate-800">
+              ${parseFloat(salesData.gross_sales || salesData.total_sales || "0").toFixed(2)}
+            </span>
+          </div>
+          <span className="text-slate-300 font-bold">−</span>
+          <div className="flex items-center gap-1.5">
+            <span className="text-rose-500 font-bold uppercase">Discounts:</span>
+            <span className="font-extrabold text-rose-600">
+              ${parseFloat(salesData.total_discounts || "0").toFixed(2)}
+            </span>
+          </div>
+          <span className="text-slate-300 font-bold">+</span>
+          <div className="flex items-center gap-1.5">
+            <span className="text-blue-500 font-bold uppercase">Taxes:</span>
+            <span className="font-extrabold text-blue-600">
+              ${parseFloat(salesData.total_tax || "0").toFixed(2)}
+            </span>
+          </div>
+          <span className="text-slate-300 font-bold">−</span>
+          <div className="flex items-center gap-1.5">
+            <span className="text-amber-500 font-bold uppercase">Refunds:</span>
+            <span className="font-extrabold text-amber-600">
+              ${parseFloat(salesData.total_refunds || "0").toFixed(2)}
+            </span>
+          </div>
+          <span className="text-slate-300 font-bold">=</span>
+          <div className="flex items-center gap-1.5 bg-emerald-50 px-2.5 py-1 rounded-lg border border-emerald-100">
+            <span className="text-emerald-700 font-extrabold uppercase">Net Realized Revenue:</span>
+            <span className="font-black text-emerald-800 text-sm">
+              ${parseFloat(salesData.net_sales || salesData.total_sales || "0").toFixed(2)}
+            </span>
+          </div>
+        </div>
+      </Card>
+
       {/* Main Analysis Tabs */}
       <Tabs defaultValue="products" className="space-y-4">
         <div className="overflow-x-auto no-scrollbar pb-1">
@@ -204,6 +244,12 @@ export function SalesReport({
               className="rounded-lg px-3 py-1.5 font-semibold data-[state=active]:bg-white data-[state=active]:text-indigo-600 data-[state=active]:shadow-xs"
             >
               Top Products Leaderboard
+            </TabsTrigger>
+            <TabsTrigger
+              value="channels"
+              className="rounded-lg px-3 py-1.5 font-semibold data-[state=active]:bg-white data-[state=active]:text-indigo-600 data-[state=active]:shadow-xs"
+            >
+              Sales Channels
             </TabsTrigger>
             <TabsTrigger
               value="trend"
@@ -367,7 +413,59 @@ export function SalesReport({
           </Card>
         </TabsContent>
 
-        {/* 2. Sales Trend Timeline */}
+        {/* 2. Sales by Channel (POS vs Online vs Offline Preorder) */}
+        <TabsContent value="channels">
+          <Card className="border border-slate-200/90 shadow-xs bg-white rounded-2xl overflow-hidden">
+            <CardHeader className="p-5 border-b border-slate-100 flex flex-row items-center justify-between bg-slate-50/50">
+              <div>
+                <CardTitle className="text-base font-bold text-slate-900 flex items-center gap-2">
+                  <Layers className="w-4 h-4 text-indigo-600" />
+                  Sales by Channel Matrix
+                </CardTitle>
+                <p className="text-xs text-slate-400 mt-0.5">
+                  Comparison between in-store POS register and online/offline preorders
+                </p>
+              </div>
+            </CardHeader>
+            <CardContent className="p-0">
+              <Table>
+                <TableHeader className="bg-slate-50/70">
+                  <TableRow>
+                    <TableHead className="font-bold text-slate-700">Channel</TableHead>
+                    <TableHead className="text-right font-bold text-slate-700">Gross Sales</TableHead>
+                    <TableHead className="text-right font-bold text-slate-700">Orders</TableHead>
+                    <TableHead className="text-right font-bold text-slate-700">Items Sold</TableHead>
+                    <TableHead className="text-right font-bold text-slate-700">AOV</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {(salesData.sales_by_channel || []).map((ch, idx) => {
+                    const totalVal = parseFloat(ch.total) || 0;
+                    const aov = ch.orders > 0 ? totalVal / ch.orders : 0;
+                    return (
+                      <TableRow key={idx} className="hover:bg-slate-50/80">
+                        <TableCell className="font-bold text-slate-900 flex items-center gap-2">
+                          <span className="w-2.5 h-2.5 rounded-full bg-indigo-500 inline-block" />
+                          {ch.channel}
+                        </TableCell>
+                        <TableCell className="text-right font-bold text-slate-900">
+                          ${totalVal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        </TableCell>
+                        <TableCell className="text-right font-medium text-slate-700">{ch.orders}</TableCell>
+                        <TableCell className="text-right font-medium text-slate-700">{ch.items}</TableCell>
+                        <TableCell className="text-right font-bold text-indigo-600">
+                          ${aov.toFixed(2)}
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* 3. Sales Trend Timeline */}
         <TabsContent value="trend">
           <Card className="border border-slate-200/90 shadow-xs bg-white rounded-2xl overflow-hidden">
             <CardHeader className="p-5 border-b border-slate-100 flex flex-row items-center justify-between bg-slate-50/50">

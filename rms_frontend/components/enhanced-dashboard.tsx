@@ -19,7 +19,7 @@ import { RecentSales } from "@/components/recent-sales";
 import { RecentActivity } from "@/components/recent-activity";
 import { LowStockAlert } from "@/components/low-stock-alert";
 import { UpcomingTasks } from "@/components/upcoming-tasks";
-import { NotificationsCenter } from "@/components/notifications-center";
+import { Notifications } from "@/components/notifications";
 import { QuickActions } from "@/components/quick-actions";
 import {
   Area,
@@ -316,14 +316,9 @@ export default function EnhancedDashboard() {
             <LowStockAlert />
           </CardContent>
         </Card>
-        <Card className="col-span-1">
-          <CardHeader>
-            <CardTitle>Notifications</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <NotificationsCenter />
-          </CardContent>
-        </Card>
+        <div className="col-span-1">
+          <Notifications />
+        </div>
       </div>
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-7">

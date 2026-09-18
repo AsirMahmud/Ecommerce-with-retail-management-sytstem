@@ -2,13 +2,15 @@ import axiosInstance from './axios-config';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 export interface Notification {
-    id: number;
-    type: 'low_stock' | 'new_order' | 'payment' | 'system' | 'info' | 'success' | 'warning' | 'error';
+    id: string | number;
+    type: 'low_stock' | 'new_order' | 'payment' | 'system' | 'info' | 'success' | 'warning' | 'error' | 'return';
     title: string;
     message: string;
     is_read: boolean;
     created_at: string;
     link?: string;
+    priority?: 'urgent' | 'high' | 'medium' | 'low';
+    category?: 'inventory' | 'orders' | 'finance' | 'system';
     metadata?: Record<string, any>;
 }
 
@@ -18,88 +20,222 @@ export interface NotificationSummary {
     notifications: Notification[];
 }
 
-// ─── Fallback: Generate notifications from existing data ─────────────────────
-// Since the backend may not have a dedicated notifications endpoint yet,
-// we aggregate alerts from existing sources (low stock, recent orders, etc.)
+// ─── Local Storage Keys & Helpers ────────────────────────────────────────────
+const STORAGE_KEYS = {
+    READ: 'rms_read_notifications_v2',
+    DISMISSED: 'rms_dismissed_notifications_v2',
+    SOUND: 'rms_notification_sound_enabled',
+};
 
+export function getStoredReadIds(): Set<string> {
+    if (typeof window === 'undefined') return new Set();
+    try {
+        const stored = localStorage.getItem(STORAGE_KEYS.READ);
+        return stored ? new Set(JSON.parse(stored)) : new Set();
+    } catch {
+        return new Set();
+    }
+}
+
+export function saveStoredReadId(id: string | number) {
+    if (typeof window === 'undefined') return;
+    try {
+        const set = getStoredReadIds();
+        set.add(String(id));
+        localStorage.setItem(STORAGE_KEYS.READ, JSON.stringify(Array.from(set)));
+    } catch {
+        // Ignore storage errors
+    }
+}
+
+export function saveAllStoredReadIds(ids: (string | number)[]) {
+    if (typeof window === 'undefined') return;
+    try {
+        const set = getStoredReadIds();
+        ids.forEach((id) => set.add(String(id)));
+        localStorage.setItem(STORAGE_KEYS.READ, JSON.stringify(Array.from(set)));
+    } catch {
+        // Ignore storage errors
+    }
+}
+
+export function getStoredDismissedIds(): Set<string> {
+    if (typeof window === 'undefined') return new Set();
+    try {
+        const stored = localStorage.getItem(STORAGE_KEYS.DISMISSED);
+        return stored ? new Set(JSON.parse(stored)) : new Set();
+    } catch {
+        return new Set();
+    }
+}
+
+export function saveStoredDismissedId(id: string | number) {
+    if (typeof window === 'undefined') return;
+    try {
+        const set = getStoredDismissedIds();
+        set.add(String(id));
+        localStorage.setItem(STORAGE_KEYS.DISMISSED, JSON.stringify(Array.from(set)));
+    } catch {
+        // Ignore storage errors
+    }
+}
+
+export function isSoundEnabled(): boolean {
+    if (typeof window === 'undefined') return true;
+    try {
+        const val = localStorage.getItem(STORAGE_KEYS.SOUND);
+        return val !== null ? JSON.parse(val) : true;
+    } catch {
+        return true;
+    }
+}
+
+export function setSoundEnabled(enabled: boolean): void {
+    if (typeof window === 'undefined') return;
+    try {
+        localStorage.setItem(STORAGE_KEYS.SOUND, JSON.stringify(enabled));
+    } catch {
+        // Ignore storage errors
+    }
+}
+
+// ─── Smart Aggregation Engine ────────────────────────────────────────────────
 async function generateSmartNotifications(): Promise<NotificationSummary> {
     const notifications: Notification[] = [];
+    const readIds = getStoredReadIds();
+    const dismissedIds = getStoredDismissedIds();
 
+    // 1. Online Preorders (high operational relevance)
     try {
-        // 1. Low stock alerts from inventory
-        const stockRes = await axiosInstance.get('/inventory/products/', {
-            params: { stock_status: 'low_stock', page_size: 5 },
+        const preorderRes = await axiosInstance.get('/online-preorder/orders/', {
+            params: { page_size: 6, ordering: '-created_at' },
         });
-        const lowStockProducts = stockRes.data.results || [];
-        lowStockProducts.forEach((p: any, i: number) => {
+        const recentOrders = preorderRes.data.results || [];
+        recentOrders.forEach((o: any) => {
+            const notifId = `preorder-${o.id}`;
+            if (dismissedIds.has(notifId)) return;
+
+            const isPending = o.status === 'pending';
+            const formattedTotal = Number(o.total_amount || 0).toLocaleString();
             notifications.push({
-                id: 1000 + i,
-                type: 'low_stock',
-                title: 'Low Stock Alert',
-                message: `${p.name} has only ${p.total_stock ?? 0} units left`,
-                is_read: false,
-                created_at: new Date().toISOString(),
-                link: `/inventory/edit-product/${p.id}`,
-                metadata: { product_id: p.id, stock: p.total_stock },
+                id: notifId,
+                type: 'new_order',
+                category: 'orders',
+                priority: isPending ? 'high' : 'medium',
+                title: `Preorder #${o.id} • ${o.customer_name || 'Customer'}`,
+                message: `Order for ৳${formattedTotal} (${(o.status || 'Pending').toUpperCase()}) • Phone: ${o.customer_phone || 'N/A'}`,
+                is_read: readIds.has(notifId),
+                created_at: o.created_at || new Date().toISOString(),
+                link: '/online-preorders',
+                metadata: { order_id: o.id, amount: o.total_amount, status: o.status },
             });
         });
     } catch {
-        // Inventory endpoint may fail — that's OK
+        // Gracefully ignore if offline
     }
 
+    // 2. Low Stock Alerts (deduplicated by product ID with real timestamps)
     try {
-        // 2. Recent online preorders
-        const preorderRes = await axiosInstance.get('/online-preorder/orders/', {
-            params: { page_size: 3, ordering: '-created_at' },
+        const stockRes = await axiosInstance.get('/inventory/products/', {
+            params: { stock_status: 'low_stock', page_size: 8 },
         });
-        const recentOrders = preorderRes.data.results || [];
-        recentOrders.forEach((o: any, i: number) => {
-            if (o.status === 'pending' || o.status === 'confirmed') {
+        const lowStockProducts = stockRes.data.results || [];
+        const seenProductIds = new Set<number>();
+
+        lowStockProducts.forEach((p: any) => {
+            if (seenProductIds.has(p.id)) return;
+            seenProductIds.add(p.id);
+
+            const notifId = `stock-${p.id}`;
+            if (dismissedIds.has(notifId)) return;
+
+            const stock = Number(p.total_stock ?? p.stock_quantity ?? 0);
+            const minStock = Number(p.minimum_stock ?? 10);
+            const isCritical = stock <= 0;
+
+            notifications.push({
+                id: notifId,
+                type: 'low_stock',
+                category: 'inventory',
+                priority: isCritical ? 'urgent' : 'high',
+                title: isCritical ? `Out of Stock: ${p.name}` : `Low Stock: ${p.name}`,
+                message: `${p.name}${p.sku ? ` (${p.sku})` : ''} has ${stock} units remaining (Threshold: ${minStock})`,
+                is_read: readIds.has(notifId),
+                created_at: p.updated_at || p.created_at || new Date(Date.now() - 3600000).toISOString(),
+                link: `/inventory/edit-product/${p.id}`,
+                metadata: { product_id: p.id, stock, min_stock: minStock },
+            });
+        });
+    } catch {
+        // Gracefully ignore
+    }
+
+    // 3. Due Sales (finance notifications)
+    try {
+        const dueRes = await axiosInstance.get('/sales/sales/due_sales/', {
+            params: { page_size: 4 },
+        });
+        const dueSales = dueRes.data.results || [];
+        dueSales.forEach((s: any) => {
+            const notifId = `due-sale-${s.id}`;
+            if (dismissedIds.has(notifId)) return;
+
+            const dueAmount = Number(s.amount_due ?? s.due_amount ?? s.total ?? 0).toLocaleString();
+            const custName = s.customer ? `${s.customer.first_name || ''} ${s.customer.last_name || ''}`.trim() : (s.customer_phone || 'Walk-in');
+
+            notifications.push({
+                id: notifId,
+                type: 'payment',
+                category: 'finance',
+                priority: 'medium',
+                title: `Pending Due: ${s.invoice_number || `Sale #${s.id}`}`,
+                message: `Due balance of ৳${dueAmount} pending collection from ${custName}`,
+                is_read: readIds.has(notifId),
+                created_at: s.date || s.created_at || new Date(Date.now() - 7200000).toISOString(),
+                link: '/sales/due',
+                metadata: { sale_id: s.id, invoice: s.invoice_number, due: dueAmount },
+            });
+        });
+    } catch {
+        // Gracefully ignore
+    }
+
+    // 4. Critical Activity Log Items (returns, expenses, system events)
+    try {
+        const actRes = await axiosInstance.get('/dashboard/activity-log/', {
+            params: { limit: 8 },
+        });
+        const activities = actRes.data.activities || [];
+        activities.forEach((act: any) => {
+            if (act.action?.toLowerCase().includes('return')) {
+                const notifId = `return-${act.id}`;
+                if (dismissedIds.has(notifId)) return;
                 notifications.push({
-                    id: 2000 + i,
-                    type: 'new_order',
-                    title: 'New Online Order',
-                    message: `Order #${o.id} from ${o.customer_name || 'Customer'} — ৳${o.total_amount || 0}`,
-                    is_read: false,
-                    created_at: o.created_at || new Date().toISOString(),
-                    link: `/online-preorders`,
-                    metadata: { order_id: o.id },
+                    id: notifId,
+                    type: 'return',
+                    category: 'finance',
+                    priority: 'medium',
+                    title: `Sale Return Processed`,
+                    message: act.description || `Return processed: ${act.target}`,
+                    is_read: readIds.has(notifId),
+                    created_at: act.timestamp || new Date().toISOString(),
+                    link: '/sales',
+                    metadata: { target: act.target },
                 });
             }
         });
     } catch {
-        // Online preorder endpoint may fail — that's OK
+        // Gracefully ignore
     }
 
-    try {
-        // 3. Due payments
-        const dueRes = await axiosInstance.get('/sales/sales/due_sales/', {
-            params: { page_size: 3 },
-        });
-        const dueSales = dueRes.data.results || [];
-        if (dueSales.length > 0) {
-            notifications.push({
-                id: 3000,
-                type: 'payment',
-                title: 'Pending Due Payments',
-                message: `You have ${dueRes.data.count || dueSales.length} sales with pending payments`,
-                is_read: true,
-                created_at: new Date().toISOString(),
-                link: '/sales/due',
-            });
-        }
-    } catch {
-        // Due sales endpoint may fail — that's OK
-    }
+    // Sort by timestamp descending
+    notifications.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
 
-    // Sort by created_at descending
-    notifications.sort(
-        (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
-    );
+    const unreadCount = notifications.filter((n) => !n.is_read).length;
 
     return {
         total: notifications.length,
-        unread: notifications.filter((n) => !n.is_read).length,
+        unread: unreadCount,
         notifications,
     };
 }
@@ -107,16 +243,31 @@ async function generateSmartNotifications(): Promise<NotificationSummary> {
 // ─── API Functions ───────────────────────────────────────────────────────────
 export const notificationsApi = {
     /**
-     * Get notifications — tries the dedicated endpoint first,
-     * falls back to smart aggregation from existing data.
+     * Get all notifications with persistent read states
      */
     getAll: async (): Promise<NotificationSummary> => {
         try {
-            // Try dedicated notifications endpoint first
+            // If backend has dedicated endpoint, try it
             const { data } = await axiosInstance.get('/notifications/');
+            const readIds = getStoredReadIds();
+            const dismissedIds = getStoredDismissedIds();
+
+            if (data?.notifications && Array.isArray(data.notifications)) {
+                const filtered = data.notifications
+                    .filter((n: Notification) => !dismissedIds.has(String(n.id)))
+                    .map((n: Notification) => ({
+                        ...n,
+                        is_read: n.is_read || readIds.has(String(n.id)),
+                    }));
+                return {
+                    total: filtered.length,
+                    unread: filtered.filter((n: Notification) => !n.is_read).length,
+                    notifications: filtered,
+                };
+            }
             return data;
         } catch {
-            // Fallback: generate from existing data sources
+            // Fallback: smart aggregation engine
             return generateSmartNotifications();
         }
     },
@@ -124,22 +275,45 @@ export const notificationsApi = {
     /**
      * Mark a single notification as read
      */
-    markAsRead: async (id: number): Promise<void> => {
+    markAsRead: async (id: string | number): Promise<void> => {
+        saveStoredReadId(id);
         try {
             await axiosInstance.patch(`/notifications/${id}/`, { is_read: true });
         } catch {
-            // Backend may not support this yet — silently succeed
+            // Silently succeed via local storage
         }
     },
 
     /**
      * Mark all notifications as read
      */
-    markAllAsRead: async (): Promise<void> => {
+    markAllAsRead: async (ids?: (string | number)[]): Promise<void> => {
+        if (ids && ids.length > 0) {
+            saveAllStoredReadIds(ids);
+        }
         try {
             await axiosInstance.post('/notifications/mark-all-read/');
         } catch {
-            // Backend may not support this yet — silently succeed
+            // Silently succeed via local storage
         }
+    },
+
+    /**
+     * Dismiss / hide a notification permanently
+     */
+    dismissNotification: async (id: string | number): Promise<void> => {
+        saveStoredDismissedId(id);
+        try {
+            await axiosInstance.delete(`/notifications/${id}/`);
+        } catch {
+            // Silently succeed via local storage
+        }
+    },
+
+    /**
+     * Clear all read notifications
+     */
+    clearAllRead: async (readIds: (string | number)[]): Promise<void> => {
+        readIds.forEach((id) => saveStoredDismissedId(id));
     },
 };

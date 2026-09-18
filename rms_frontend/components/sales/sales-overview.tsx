@@ -1,5 +1,6 @@
 "use client";
 import { useState, useMemo } from "react";
+import { format } from "date-fns";
 import {
   Card,
   CardContent,
@@ -91,10 +92,10 @@ export default function SalesOverview() {
     payment_method: paymentMethod || undefined,
     customer_phone: customerPhone || undefined,
     start_date: dateRange.from
-      ? dateRange.from.toISOString().slice(0, 10)
+      ? format(dateRange.from, "yyyy-MM-dd")
       : undefined,
     end_date: dateRange.to
-      ? dateRange.to.toISOString().slice(0, 10)
+      ? format(dateRange.to, "yyyy-MM-dd")
       : undefined,
   });
 

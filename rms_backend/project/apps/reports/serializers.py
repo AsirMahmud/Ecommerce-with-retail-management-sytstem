@@ -68,7 +68,14 @@ class ExpenseReportSerializer(serializers.Serializer):
 
 class InventoryReportSerializer(serializers.Serializer):
     total_products = serializers.IntegerField()
-    total_stock_value = serializers.DecimalField(max_digits=10, decimal_places=2)
+    total_stock_value = serializers.DecimalField(max_digits=15, decimal_places=2)
+    total_cost_value = serializers.DecimalField(max_digits=15, decimal_places=2, required=False)
+    total_retail_value = serializers.DecimalField(max_digits=15, decimal_places=2, required=False)
+    potential_profit = serializers.DecimalField(max_digits=15, decimal_places=2, required=False)
+    unrealized_margin = serializers.DecimalField(max_digits=10, decimal_places=2, required=False)
+    out_of_stock_count = serializers.IntegerField(required=False, default=0)
+    dead_stock_count = serializers.IntegerField(required=False, default=0)
+    dead_stock_value = serializers.DecimalField(max_digits=15, decimal_places=2, required=False, default=Decimal('0.00'))
     low_stock_items = serializers.ListField(child=serializers.DictField())
     stock_by_category = serializers.ListField(child=serializers.DictField())
     stock_movements = serializers.ListField(child=serializers.DictField())
@@ -83,16 +90,22 @@ class PaymentMethodSerializer(serializers.Serializer):
     payment_method = serializers.CharField()
     total = serializers.DecimalField(max_digits=10, decimal_places=2)
     orders_count = serializers.IntegerField()
-    items_count = serializers.IntegerField()
+    items_count = serializers.IntegerField(required=False, default=0)
 
 class SalesReportSerializer(serializers.Serializer):
-    total_sales = serializers.DecimalField(max_digits=10, decimal_places=2)
+    total_sales = serializers.DecimalField(max_digits=15, decimal_places=2)
+    gross_sales = serializers.DecimalField(max_digits=15, decimal_places=2, required=False)
+    total_discounts = serializers.DecimalField(max_digits=15, decimal_places=2, required=False)
+    total_tax = serializers.DecimalField(max_digits=15, decimal_places=2, required=False)
+    total_refunds = serializers.DecimalField(max_digits=15, decimal_places=2, required=False)
+    net_sales = serializers.DecimalField(max_digits=15, decimal_places=2, required=False)
     total_orders = serializers.IntegerField()
     total_items_sold = serializers.IntegerField()
     average_order_value = serializers.DecimalField(max_digits=15, decimal_places=2)
     average_item_price = serializers.DecimalField(max_digits=15, decimal_places=2)
     sales_by_date = serializers.ListField(child=serializers.DictField())
     sales_by_category = serializers.ListField(child=serializers.DictField())
+    sales_by_channel = serializers.ListField(child=serializers.DictField(), required=False)
     top_products = TopProductsSerializer(many=True)
     payment_methods = PaymentMethodSerializer(many=True)
 
@@ -162,19 +175,63 @@ class RevenueByDateSerializer(serializers.Serializer):
 
 class ProfitByCategorySerializer(serializers.Serializer):
     category_name = serializers.CharField()
-    revenue = serializers.DecimalField(max_digits=10, decimal_places=2)
-    cost = serializers.DecimalField(max_digits=10, decimal_places=2)
-    profit = serializers.DecimalField(max_digits=10, decimal_places=2)
+    revenue = serializers.DecimalField(max_digits=15, decimal_places=2)
+    cost = serializers.DecimalField(max_digits=15, decimal_places=2)
+    profit = serializers.DecimalField(max_digits=15, decimal_places=2)
     items_sold = serializers.IntegerField()
 
 class ProfitLossReportSerializer(serializers.Serializer):
-    total_revenue = serializers.DecimalField(max_digits=10, decimal_places=2)
-    total_expenses = serializers.DecimalField(max_digits=10, decimal_places=2)
-    net_profit = serializers.DecimalField(max_digits=10, decimal_places=2)
+    total_revenue = serializers.DecimalField(max_digits=15, decimal_places=2)
+    gross_revenue = serializers.DecimalField(max_digits=15, decimal_places=2, required=False)
+    total_discounts = serializers.DecimalField(max_digits=15, decimal_places=2, required=False)
+    total_refunds = serializers.DecimalField(max_digits=15, decimal_places=2, required=False)
+    net_revenue = serializers.DecimalField(max_digits=15, decimal_places=2, required=False)
+    cogs = serializers.DecimalField(max_digits=15, decimal_places=2, required=False)
+    gross_profit = serializers.DecimalField(max_digits=15, decimal_places=2, required=False)
+    gross_margin = serializers.DecimalField(max_digits=10, decimal_places=2, required=False)
+    total_expenses = serializers.DecimalField(max_digits=15, decimal_places=2)
+    net_profit = serializers.DecimalField(max_digits=15, decimal_places=2)
     profit_margin = serializers.DecimalField(max_digits=10, decimal_places=2)
     revenue_by_date = RevenueByDateSerializer(many=True)
     expenses_by_date = ExpenseByDateSerializer(many=True)
     profit_by_category = ProfitByCategorySerializer(many=True)
+    revenue_vs_expense_by_date = serializers.ListField(child=serializers.DictField(), required=False)
+    preorder_total_orders = serializers.IntegerField(required=False, default=0)
+    preorder_total_revenue = serializers.DecimalField(max_digits=15, decimal_places=2, required=False, default=Decimal('0.00'))
+    preorder_profit = serializers.DecimalField(max_digits=15, decimal_places=2, required=False, default=Decimal('0.00'))
+    preorder_status_breakdown = serializers.DictField(required=False, default=dict)
+
+class TaxReportSerializer(serializers.Serializer):
+    taxable_sales = serializers.DecimalField(max_digits=15, decimal_places=2)
+    total_tax_collected = serializers.DecimalField(max_digits=15, decimal_places=2)
+    tax_refunded = serializers.DecimalField(max_digits=15, decimal_places=2)
+    net_tax_payable = serializers.DecimalField(max_digits=15, decimal_places=2)
+    tax_by_date = serializers.ListField(child=serializers.DictField())
+
+class ReturnsReportSerializer(serializers.Serializer):
+    total_returns_count = serializers.IntegerField()
+    total_items_returned = serializers.IntegerField()
+    total_refund_amount = serializers.DecimalField(max_digits=15, decimal_places=2)
+    return_rate_percentage = serializers.DecimalField(max_digits=5, decimal_places=2)
+    top_returned_products = serializers.ListField(child=serializers.DictField())
+    reasons_breakdown = serializers.ListField(child=serializers.DictField())
+    returns_by_date = serializers.ListField(child=serializers.DictField())
+
+class DuesAgingReportSerializer(serializers.Serializer):
+    total_receivable = serializers.DecimalField(max_digits=15, decimal_places=2)
+    current_due = serializers.DecimalField(max_digits=15, decimal_places=2)
+    due_1_to_30_days = serializers.DecimalField(max_digits=15, decimal_places=2)
+    due_31_to_60_days = serializers.DecimalField(max_digits=15, decimal_places=2)
+    due_60_plus_days = serializers.DecimalField(max_digits=15, decimal_places=2)
+    aging_customers = serializers.ListField(child=serializers.DictField())
+
+class CashReconciliationReportSerializer(serializers.Serializer):
+    cash_sales = serializers.DecimalField(max_digits=15, decimal_places=2)
+    cash_refunds = serializers.DecimalField(max_digits=15, decimal_places=2)
+    cash_expenses = serializers.DecimalField(max_digits=15, decimal_places=2)
+    due_payments_collected = serializers.DecimalField(max_digits=15, decimal_places=2)
+    net_cash_in_drawer = serializers.DecimalField(max_digits=15, decimal_places=2)
+    non_cash_totals = serializers.DictField()
 
 class ProductPerformanceSerializer(serializers.Serializer):
     product_id = serializers.IntegerField()

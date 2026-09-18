@@ -73,87 +73,117 @@ export function InventoryReport() {
   }
 
   const lowStockCount = inventoryData.low_stock_items?.length || 0;
+  const costVal = parseFloat(inventoryData.total_cost_value || "0");
+  const retailVal = parseFloat(inventoryData.total_retail_value || inventoryData.total_stock_value || "0");
+  const potentialProfit = parseFloat(inventoryData.potential_profit || "0");
+  const unrealizedMargin = parseFloat(String(inventoryData.unrealized_margin || "0"));
+  const deadStockCount = inventoryData.dead_stock_count || 0;
+  const deadStockVal = parseFloat(inventoryData.dead_stock_value || "0");
+  const outOfStockCount = inventoryData.out_of_stock_count || 0;
 
   return (
     <div className="space-y-6">
-      {/* Executive Metric Cards */}
-      <div className="grid gap-4 grid-cols-1 sm:grid-cols-3">
-        {/* Total Products */}
-        <Card className="relative overflow-hidden bg-white border border-slate-200/80 shadow-xs hover:shadow-md transition-all rounded-2xl">
-          <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-indigo-500 to-blue-500" />
-          <CardHeader className="flex flex-row items-center justify-between pb-2 pt-4 px-5">
+      {/* 4 Balanced Executive Valuation Cards */}
+      <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
+        {/* Active Catalog SKUs */}
+        <Card className="relative overflow-hidden bg-white border border-slate-200/80 shadow-xs hover:shadow-md transition-all rounded-2xl p-5">
+          <div className="flex items-center justify-between pb-2">
             <span className="text-xs font-bold uppercase tracking-wider text-slate-500">
               Active Catalog SKUs
             </span>
             <div className="w-8 h-8 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center shadow-xs">
               <Package className="w-4 h-4" />
             </div>
-          </CardHeader>
-          <CardContent className="px-5 pb-4">
-            <div className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">
-              {inventoryData.total_products || 0}
-            </div>
-            <div className="flex items-center gap-1.5 text-xs text-indigo-600 font-semibold mt-1.5">
-              <Layers className="w-3.5 h-3.5" />
-              <span>{inventoryData.stock_by_category?.length || 0} product categories</span>
-            </div>
-          </CardContent>
+          </div>
+          <div className="text-2xl font-black text-slate-900 tracking-tight">
+            {inventoryData.total_products || 0}
+          </div>
+          <div className="flex items-center gap-1.5 text-xs text-slate-500 font-medium mt-1.5">
+            {outOfStockCount > 0 ? (
+              <Badge variant="outline" className="bg-red-50 text-red-600 border-red-200 text-[10px] font-bold">
+                {outOfStockCount} Out of Stock
+              </Badge>
+            ) : (
+              <span>In stock across all SKUs</span>
+            )}
+          </div>
         </Card>
 
-        {/* Total Stock Value */}
-        <Card className="relative overflow-hidden bg-white border border-slate-200/80 shadow-xs hover:shadow-md transition-all rounded-2xl">
-          <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-emerald-500 to-teal-500" />
-          <CardHeader className="flex flex-row items-center justify-between pb-2 pt-4 px-5">
+        {/* Cost Valuation */}
+        <Card className="relative overflow-hidden bg-white border border-slate-200/80 shadow-xs hover:shadow-md transition-all rounded-2xl p-5">
+          <div className="flex items-center justify-between pb-2">
             <span className="text-xs font-bold uppercase tracking-wider text-slate-500">
-              Total Stock Valuation
+              Asset Value (Cost)
             </span>
-            <div className="w-8 h-8 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center shadow-xs">
+            <div className="w-8 h-8 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center shadow-xs">
               <DollarSign className="w-4 h-4" />
             </div>
-          </CardHeader>
-          <CardContent className="px-5 pb-4">
-            <div className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">
-              ${totalValue.toLocaleString(undefined, {
-                minimumFractionDigits: 2,
-                maximumFractionDigits: 2,
-              })}
-            </div>
-            <div className="flex items-center gap-1.5 text-xs text-emerald-600 font-semibold mt-1.5">
-              <TrendingUp className="w-3.5 h-3.5" />
-              <span>Asset value of current on-hand items</span>
-            </div>
-          </CardContent>
+          </div>
+          <div className="text-2xl font-black text-blue-700 tracking-tight">
+            ${costVal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+          </div>
+          <div className="text-xs text-blue-600 font-medium mt-1.5">
+            Capital tied up in stock
+          </div>
         </Card>
 
-        {/* Low Stock Alerts */}
-        <Card className="relative overflow-hidden bg-white border border-slate-200/80 shadow-xs hover:shadow-md transition-all rounded-2xl">
-          <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-amber-500 to-rose-500" />
-          <CardHeader className="flex flex-row items-center justify-between pb-2 pt-4 px-5">
+        {/* Retail Valuation */}
+        <Card className="relative overflow-hidden bg-white border border-slate-200/80 shadow-xs hover:shadow-md transition-all rounded-2xl p-5">
+          <div className="flex items-center justify-between pb-2">
             <span className="text-xs font-bold uppercase tracking-wider text-slate-500">
-              Low Stock Alerts
+              Retail Valuation
             </span>
-            <div className="w-8 h-8 rounded-xl bg-rose-50 text-rose-600 flex items-center justify-center shadow-xs">
-              <AlertTriangle className="w-4 h-4" />
+            <div className="w-8 h-8 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center shadow-xs">
+              <TrendingUp className="w-4 h-4" />
             </div>
-          </CardHeader>
-          <CardContent className="px-5 pb-4">
-            <div className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">
-              {lowStockCount}
+          </div>
+          <div className="text-2xl font-black text-emerald-700 tracking-tight">
+            ${retailVal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+          </div>
+          <div className="text-xs text-emerald-600 font-medium mt-1.5">
+            Potential gross sales value
+          </div>
+        </Card>
+
+        {/* Potential Gross Margin */}
+        <Card className="relative overflow-hidden bg-white border border-slate-200/80 shadow-xs hover:shadow-md transition-all rounded-2xl p-5">
+          <div className="flex items-center justify-between pb-2">
+            <span className="text-xs font-bold uppercase tracking-wider text-slate-500">
+              Unrealized Profit
+            </span>
+            <div className="w-8 h-8 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center shadow-xs">
+              <Boxes className="w-4 h-4" />
             </div>
-            <div className="flex items-center gap-1.5 text-xs font-semibold mt-1.5">
-              {lowStockCount > 0 ? (
-                <Badge variant="outline" className="bg-rose-50 text-rose-700 border-rose-200 text-[10px] font-bold">
-                  Requires Reordering
-                </Badge>
-              ) : (
-                <Badge variant="outline" className="bg-emerald-50 text-emerald-700 border-emerald-200 text-[10px] font-bold">
-                  All Items Stocked
-                </Badge>
-              )}
-            </div>
-          </CardContent>
+          </div>
+          <div className="text-2xl font-black text-indigo-700 tracking-tight">
+            ${potentialProfit.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+          </div>
+          <div className="text-xs text-indigo-600 font-bold mt-1.5">
+            {unrealizedMargin.toFixed(1)}% Potential Margin
+          </div>
         </Card>
       </div>
+
+      {/* Dead Stock Warning Banner */}
+      {deadStockCount > 0 && (
+        <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-xl bg-amber-100 text-amber-800 flex items-center justify-center shrink-0">
+              <AlertTriangle className="w-5 h-5" />
+            </div>
+            <div>
+              <h4 className="text-sm font-bold text-amber-900">Slow Moving / Dead Stock Alert</h4>
+              <p className="text-xs text-amber-700 mt-0.5">
+                <span className="font-bold">{deadStockCount} products</span> have had zero sales in the last 60 days, tying up{" "}
+                <span className="font-bold">${deadStockVal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span> in capital.
+              </p>
+            </div>
+          </div>
+          <Badge variant="outline" className="bg-amber-100 text-amber-800 border-amber-300 text-xs font-bold px-3 py-1">
+            Action Recommended: Clearance Sale
+          </Badge>
+        </div>
+      )}
 
       {/* Low Stock Urgency Table */}
       <Card className="border border-slate-200/90 shadow-xs bg-white rounded-2xl overflow-hidden">

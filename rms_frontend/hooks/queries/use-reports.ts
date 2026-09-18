@@ -82,4 +82,38 @@ export function useOnlinePreorderAnalytics(dateRange: DateRange | undefined) {
         queryFn: () => reportsApi.getOnlinePreorderAnalytics(formattedDateRange!),
         enabled: !!formattedDateRange,
     });
+}
+
+export function useTaxReport(dateRange: DateRange | undefined) {
+    const formattedDateRange = formatDateRange(dateRange);
+    return useQuery({
+        queryKey: ['tax-report', formattedDateRange],
+        queryFn: () => reportsApi.getTaxReport(formattedDateRange!),
+        enabled: !!formattedDateRange,
+    });
+}
+
+export function useReturnsReport(dateRange: DateRange | undefined) {
+    const formattedDateRange = formatDateRange(dateRange);
+    return useQuery({
+        queryKey: ['returns-report', formattedDateRange],
+        queryFn: () => reportsApi.getReturnsReport(formattedDateRange!),
+        enabled: !!formattedDateRange,
+    });
+}
+
+export function useDuesAgingReport() {
+    return useQuery({
+        queryKey: ['dues-aging-report'],
+        queryFn: () => reportsApi.getDuesAgingReport(),
+    });
+}
+
+export function useReconciliationReport(dateRange: DateRange | undefined) {
+    const formattedDateRange = formatDateRange(dateRange);
+    return useQuery({
+        queryKey: ['reconciliation-report', formattedDateRange],
+        queryFn: () => reportsApi.getReconciliationReport(formattedDateRange!),
+        enabled: !!formattedDateRange,
+    });
 } 

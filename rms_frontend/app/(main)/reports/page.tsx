@@ -32,6 +32,19 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { PreorderReport } from "@/components/reports/preorder-report";
 import { OnlinePreorderAnalytics } from "@/components/reports/online-preorder-analytics";
+import { TaxReport } from "@/components/reports/tax-report";
+import { ReturnsReport } from "@/components/reports/returns-report";
+import { DuesAgingReport } from "@/components/reports/dues-aging-report";
+import { CashReconciliationReport } from "@/components/reports/cash-reconciliation-report";
+import { reportsApi, formatDateRange } from "@/lib/api/reports";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import {
   Calendar,
   Filter,
@@ -49,6 +62,12 @@ import {
   Sparkles,
   ArrowUpRight,
   ArrowDownRight,
+  Download,
+  Receipt,
+  RotateCcw,
+  Wallet,
+  FileSpreadsheet,
+  ChevronDown,
 } from "lucide-react";
 
 // Preset filter options
@@ -284,21 +303,72 @@ export default function ReportsPage() {
               </div>
             </div>
 
-            {/* Date Range Badge & Custom Trigger */}
-            <div className="flex items-center gap-2 self-start md:self-auto bg-slate-50 px-3 py-1.5 rounded-xl border border-slate-200 text-xs text-slate-600 font-medium">
-              <Calendar className="h-4 w-4 text-indigo-600 shrink-0" />
-              <span>{formatDateRangeDisplay(dateRange)}</span>
-              <Button
-                variant={selectedFilter === "custom" || showCustomPicker ? "secondary" : "ghost"}
-                size="sm"
-                onClick={() => {
-                  setShowCustomPicker(!showCustomPicker);
-                  if (!showCustomPicker) setSelectedFilter("custom");
-                }}
-                className="h-7 px-2 text-xs font-semibold text-indigo-700 hover:text-indigo-800"
-              >
-                {showCustomPicker ? "Hide Picker" : "Custom Date"}
-              </Button>
+            {/* Action Bar: Export & Date Picker */}
+            <div className="flex flex-wrap items-center gap-2 self-start md:self-auto">
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-8 sm:h-9 px-3 text-xs font-semibold bg-white border-slate-200 text-slate-700 hover:bg-slate-50 shadow-xs flex items-center gap-1.5"
+                  >
+                    <Download className="h-3.5 w-3.5 text-indigo-600" />
+                    <span>Export CSV</span>
+                    <ChevronDown className="h-3 w-3 text-slate-400" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-56">
+                  <DropdownMenuLabel className="text-xs font-bold text-slate-500">
+                    Export Financials & Data
+                  </DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem
+                    onClick={() => reportsApi.exportReport("sales", formatDateRange(dateRange))}
+                    className="text-xs font-medium cursor-pointer"
+                  >
+                    <FileSpreadsheet className="h-3.5 w-3.5 mr-2 text-indigo-600" />
+                    Sales Transactions CSV
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    onClick={() => reportsApi.exportReport("inventory")}
+                    className="text-xs font-medium cursor-pointer"
+                  >
+                    <Package className="h-3.5 w-3.5 mr-2 text-emerald-600" />
+                    Inventory Valuation CSV
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    onClick={() => reportsApi.exportReport("expenses", formatDateRange(dateRange))}
+                    className="text-xs font-medium cursor-pointer"
+                  >
+                    <DollarSign className="h-3.5 w-3.5 mr-2 text-rose-600" />
+                    Expense Audit CSV
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    onClick={() => reportsApi.exportReport("profit_loss", formatDateRange(dateRange))}
+                    className="text-xs font-medium cursor-pointer"
+                  >
+                    <TrendingUp className="h-3.5 w-3.5 mr-2 text-amber-600" />
+                    Profit & Loss Statement CSV
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+
+              {/* Date Range Badge & Custom Trigger */}
+              <div className="flex items-center gap-2 bg-slate-50 px-3 py-1.5 rounded-xl border border-slate-200 text-xs text-slate-600 font-medium">
+                <Calendar className="h-4 w-4 text-indigo-600 shrink-0" />
+                <span>{formatDateRangeDisplay(dateRange)}</span>
+                <Button
+                  variant={selectedFilter === "custom" || showCustomPicker ? "secondary" : "ghost"}
+                  size="sm"
+                  onClick={() => {
+                    setShowCustomPicker(!showCustomPicker);
+                    if (!showCustomPicker) setSelectedFilter("custom");
+                  }}
+                  className="h-7 px-2 text-xs font-semibold text-indigo-700 hover:text-indigo-800"
+                >
+                  {showCustomPicker ? "Hide Picker" : "Custom Date"}
+                </Button>
+              </div>
             </div>
           </div>
 
@@ -348,52 +418,76 @@ export default function ReportsPage() {
         {/* Unified Tab Navigation */}
         <Tabs defaultValue="overview" className="space-y-6">
           <div className="overflow-x-auto no-scrollbar pb-1">
-            <TabsList className="bg-slate-200/60 p-1 rounded-2xl border border-slate-200/80 flex w-max min-w-full sm:w-full sm:grid sm:grid-cols-8 gap-1 shadow-inner">
+            <TabsList className="bg-slate-200/60 p-1.5 rounded-2xl border border-slate-200/80 flex w-max min-w-full gap-1 shadow-inner">
               <TabsTrigger
                 value="overview"
-                className="rounded-xl px-3 py-2 text-xs sm:text-sm font-semibold transition-all data-[state=active]:bg-white data-[state=active]:text-indigo-600 data-[state=active]:shadow-sm"
+                className="rounded-xl px-3.5 py-2 text-xs sm:text-sm font-semibold transition-all data-[state=active]:bg-white data-[state=active]:text-indigo-600 data-[state=active]:shadow-sm"
               >
                 Overview
               </TabsTrigger>
               <TabsTrigger
                 value="sales"
-                className="rounded-xl px-3 py-2 text-xs sm:text-sm font-semibold transition-all data-[state=active]:bg-white data-[state=active]:text-indigo-600 data-[state=active]:shadow-sm"
+                className="rounded-xl px-3.5 py-2 text-xs sm:text-sm font-semibold transition-all data-[state=active]:bg-white data-[state=active]:text-indigo-600 data-[state=active]:shadow-sm"
               >
                 Sales
               </TabsTrigger>
               <TabsTrigger
+                value="profit-loss"
+                className="rounded-xl px-3.5 py-2 text-xs sm:text-sm font-semibold transition-all data-[state=active]:bg-white data-[state=active]:text-indigo-600 data-[state=active]:shadow-sm"
+              >
+                Profit & Loss
+              </TabsTrigger>
+              <TabsTrigger
+                value="tax"
+                className="rounded-xl px-3.5 py-2 text-xs sm:text-sm font-semibold transition-all data-[state=active]:bg-white data-[state=active]:text-indigo-600 data-[state=active]:shadow-sm"
+              >
+                Tax & VAT
+              </TabsTrigger>
+              <TabsTrigger
+                value="returns"
+                className="rounded-xl px-3.5 py-2 text-xs sm:text-sm font-semibold transition-all data-[state=active]:bg-white data-[state=active]:text-indigo-600 data-[state=active]:shadow-sm"
+              >
+                Returns & Refunds
+              </TabsTrigger>
+              <TabsTrigger
+                value="dues-aging"
+                className="rounded-xl px-3.5 py-2 text-xs sm:text-sm font-semibold transition-all data-[state=active]:bg-white data-[state=active]:text-indigo-600 data-[state=active]:shadow-sm"
+              >
+                Dues Aging
+              </TabsTrigger>
+              <TabsTrigger
+                value="reconciliation"
+                className="rounded-xl px-3.5 py-2 text-xs sm:text-sm font-semibold transition-all data-[state=active]:bg-white data-[state=active]:text-indigo-600 data-[state=active]:shadow-sm"
+              >
+                Cash Drawer
+              </TabsTrigger>
+              <TabsTrigger
                 value="expenses"
-                className="rounded-xl px-3 py-2 text-xs sm:text-sm font-semibold transition-all data-[state=active]:bg-white data-[state=active]:text-indigo-600 data-[state=active]:shadow-sm"
+                className="rounded-xl px-3.5 py-2 text-xs sm:text-sm font-semibold transition-all data-[state=active]:bg-white data-[state=active]:text-indigo-600 data-[state=active]:shadow-sm"
               >
                 Expenses
               </TabsTrigger>
               <TabsTrigger
                 value="inventory"
-                className="rounded-xl px-3 py-2 text-xs sm:text-sm font-semibold transition-all data-[state=active]:bg-white data-[state=active]:text-indigo-600 data-[state=active]:shadow-sm"
+                className="rounded-xl px-3.5 py-2 text-xs sm:text-sm font-semibold transition-all data-[state=active]:bg-white data-[state=active]:text-indigo-600 data-[state=active]:shadow-sm"
               >
                 Inventory
               </TabsTrigger>
               <TabsTrigger
                 value="customers"
-                className="rounded-xl px-3 py-2 text-xs sm:text-sm font-semibold transition-all data-[state=active]:bg-white data-[state=active]:text-indigo-600 data-[state=active]:shadow-sm"
+                className="rounded-xl px-3.5 py-2 text-xs sm:text-sm font-semibold transition-all data-[state=active]:bg-white data-[state=active]:text-indigo-600 data-[state=active]:shadow-sm"
               >
                 Customers
               </TabsTrigger>
               <TabsTrigger
-                value="profit-loss"
-                className="rounded-xl px-3 py-2 text-xs sm:text-sm font-semibold transition-all data-[state=active]:bg-white data-[state=active]:text-indigo-600 data-[state=active]:shadow-sm"
-              >
-                Profit & Loss
-              </TabsTrigger>
-              <TabsTrigger
                 value="product-performance"
-                className="rounded-xl px-3 py-2 text-xs sm:text-sm font-semibold transition-all data-[state=active]:bg-white data-[state=active]:text-indigo-600 data-[state=active]:shadow-sm"
+                className="rounded-xl px-3.5 py-2 text-xs sm:text-sm font-semibold transition-all data-[state=active]:bg-white data-[state=active]:text-indigo-600 data-[state=active]:shadow-sm"
               >
                 Products
               </TabsTrigger>
               <TabsTrigger
                 value="online-preorder"
-                className="rounded-xl px-3 py-2 text-xs sm:text-sm font-semibold transition-all data-[state=active]:bg-white data-[state=active]:text-indigo-600 data-[state=active]:shadow-sm"
+                className="rounded-xl px-3.5 py-2 text-xs sm:text-sm font-semibold transition-all data-[state=active]:bg-white data-[state=active]:text-indigo-600 data-[state=active]:shadow-sm"
               >
                 Online Preorders
               </TabsTrigger>
@@ -491,7 +585,7 @@ export default function ReportsPage() {
                   </CardHeader>
                   <CardContent className="px-5 pb-4">
                     <div className="text-2xl font-black text-slate-900 tracking-tight">
-                      {parseFloat(overviewData.profit_margin || "0").toFixed(1)}%
+                      {parseFloat(String(overviewData.profit_margin || "0")).toFixed(1)}%
                     </div>
                     <div className="flex items-center gap-1.5 text-xs text-amber-600 font-semibold mt-1.5">
                       <Sparkles className="w-3.5 h-3.5" />
@@ -645,6 +739,21 @@ export default function ReportsPage() {
           <TabsContent value="sales">
             <SalesReport dateRange={formattedDateRange} />
           </TabsContent>
+          <TabsContent value="profit-loss">
+            <ProfitLossReport dateRange={formattedDateRange} />
+          </TabsContent>
+          <TabsContent value="tax">
+            <TaxReport dateRange={formattedDateRange} />
+          </TabsContent>
+          <TabsContent value="returns">
+            <ReturnsReport dateRange={formattedDateRange} />
+          </TabsContent>
+          <TabsContent value="dues-aging">
+            <DuesAgingReport />
+          </TabsContent>
+          <TabsContent value="reconciliation">
+            <CashReconciliationReport dateRange={formattedDateRange} />
+          </TabsContent>
           <TabsContent value="expenses">
             <ExpenseReport dateRange={formattedDateRange} />
           </TabsContent>
@@ -653,9 +762,6 @@ export default function ReportsPage() {
           </TabsContent>
           <TabsContent value="customers">
             <CustomerReport dateRange={formattedDateRange} />
-          </TabsContent>
-          <TabsContent value="profit-loss">
-            <ProfitLossReport dateRange={formattedDateRange} />
           </TabsContent>
           <TabsContent value="product-performance">
             <ProductPerformanceReport dateRange={formattedDateRange} />

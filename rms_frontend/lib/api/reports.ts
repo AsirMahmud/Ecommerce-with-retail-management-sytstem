@@ -1,5 +1,6 @@
 import axios from './axios-config';
 import { DateRange } from 'react-day-picker';
+import { format } from 'date-fns';
 
 export interface ReportDateRange {
     date_from: string;
@@ -8,6 +9,11 @@ export interface ReportDateRange {
 
 export interface SalesReport {
     total_sales: string;
+    gross_sales?: string;
+    total_discounts?: string;
+    total_tax?: string;
+    total_refunds?: string;
+    net_sales?: string;
     total_orders: number;
     total_items_sold: number;
     average_order_value: string;
@@ -23,6 +29,13 @@ export interface SalesReport {
         items_count: number;
         quantity_sold: number;
     }>;
+    sales_by_channel?: Array<{
+        channel: string;
+        raw_type: string;
+        total: string;
+        orders: number;
+        items: number;
+    }>;
     top_products: Array<{
         product_name: string;
         category_name: string;
@@ -35,7 +48,7 @@ export interface SalesReport {
         payment_method: string;
         total: string;
         orders_count: number;
-        items_count: number;
+        items_count?: number;
     }>;
 }
 
@@ -56,6 +69,13 @@ export interface ExpenseReport {
 export interface InventoryReport {
     total_products: number;
     total_stock_value: string;
+    total_cost_value?: string;
+    total_retail_value?: string;
+    potential_profit?: string;
+    unrealized_margin?: string | number;
+    out_of_stock_count?: number;
+    dead_stock_count?: number;
+    dead_stock_value?: string;
     low_stock_items: Array<{
         name: string;
         stock: number;
@@ -130,6 +150,13 @@ export interface CategoryReport {
 
 export interface ProfitLossReport {
     total_revenue: string;
+    gross_revenue?: string;
+    total_discounts?: string;
+    total_refunds?: string;
+    net_revenue?: string;
+    cogs?: string;
+    gross_profit?: string;
+    gross_margin?: string | number;
     total_expenses: string;
     net_profit: string;
     profit_margin: string;
@@ -213,10 +240,17 @@ export interface ProductPerformanceReport {
 
 export interface OverviewReport {
     total_sales: string;
+    gross_sales?: string;
+    total_discounts?: string;
+    total_tax?: string;
+    total_refunds?: string;
+    net_sales?: string;
+    cogs?: string;
+    gross_profit?: string;
     total_orders: number;
     total_expenses: string;
     net_profit: string;
-    profit_margin: string;
+    profit_margin: string | number;
     sales_by_date: Array<{
         date: string;
         total: string;
@@ -225,6 +259,10 @@ export interface OverviewReport {
         date: string;
         total: string;
     }>;
+    preorder_total_orders?: number;
+    preorder_total_revenue?: string;
+    preorder_profit?: string;
+    preorder_status_breakdown?: Record<string, number>;
 }
 
 export interface OnlinePreorderAnalytics {
@@ -283,11 +321,76 @@ export interface OnlinePreorderAnalytics {
     };
 }
 
+export interface TaxReport {
+    taxable_sales: string;
+    total_tax_collected: string;
+    tax_refunded: string;
+    net_tax_payable: string;
+    tax_by_date: Array<{
+        date: string;
+        taxable_amount: string;
+        tax_collected: string;
+    }>;
+}
+
+export interface ReturnsReport {
+    total_returns_count: number;
+    total_items_returned: number;
+    total_refund_amount: string;
+    return_rate_percentage: string | number;
+    top_returned_products: Array<{
+        product_id: number;
+        product_name: string;
+        category_name: string;
+        returned_quantity: number;
+        returns_count: number;
+    }>;
+    reasons_breakdown: Array<{
+        reason: string;
+        count: number;
+        total_refund: string;
+    }>;
+    returns_by_date: Array<{
+        date: string;
+        count: number;
+        refund_amount: string;
+    }>;
+}
+
+export interface DuesAgingReport {
+    total_receivable: string;
+    current_due: string;
+    due_1_to_30_days: string;
+    due_31_to_60_days: string;
+    due_60_plus_days: string;
+    aging_customers: Array<{
+        customer_id: number;
+        customer_name: string;
+        customer_phone: string;
+        total_due: string | number;
+        current: string | number;
+        days_1_30: string | number;
+        days_31_60: string | number;
+        days_60_plus: string | number;
+        invoices_count: number;
+    }>;
+}
+
+export interface CashReconciliationReport {
+    cash_sales: string;
+    cash_refunds: string;
+    cash_expenses: string;
+    due_payments_collected: string;
+    net_cash_in_drawer: string;
+    non_cash_totals: Record<string, string>;
+}
+
 export const formatDateRange = (dateRange: DateRange | undefined): ReportDateRange | null => {
-    if (!dateRange?.from) return null;
+    if (!dateRange?.from || isNaN(dateRange.from.getTime())) return null;
+    const toDate = dateRange.to && !isNaN(dateRange.to.getTime()) ? dateRange.to : dateRange.from;
     return {
-        date_from: dateRange.from.toISOString().split('T')[0],
-        date_to: (dateRange.to || dateRange.from).toISOString().split('T')[0],
+        date_from: format(dateRange.from, 'yyyy-MM-dd'),
+        date_to: format(toDate, 'yyyy-MM-dd'),
     };
 };
 
@@ -336,4 +439,35 @@ export const reportsApi = {
         const response = await axios.get('/reports/online-preorder-analytics/', { params: dateRange });
         return response.data;
     },
+
+    getTaxReport: async (dateRange: ReportDateRange): Promise<TaxReport> => {
+        const response = await axios.get('/reports/tax/', { params: dateRange });
+        return response.data;
+    },
+
+    getReturnsReport: async (dateRange: ReportDateRange): Promise<ReturnsReport> => {
+        const response = await axios.get('/reports/returns/', { params: dateRange });
+        return response.data;
+    },
+
+    getDuesAgingReport: async (): Promise<DuesAgingReport> => {
+        const response = await axios.get('/reports/dues-aging/');
+        return response.data;
+    },
+
+    getReconciliationReport: async (dateRange: ReportDateRange): Promise<CashReconciliationReport> => {
+        const response = await axios.get('/reports/reconciliation/', { params: dateRange });
+        return response.data;
+    },
+
+    exportReport: (type: string, dateRange?: ReportDateRange | null) => {
+        const params = new URLSearchParams();
+        params.append('type', type);
+        if (dateRange) {
+            params.append('date_from', dateRange.date_from);
+            params.append('date_to', dateRange.date_to);
+        }
+        const baseURL = axios.defaults.baseURL || '/api';
+        window.open(`${baseURL}/reports/export/?${params.toString()}`, '_blank');
+    }
 }; 

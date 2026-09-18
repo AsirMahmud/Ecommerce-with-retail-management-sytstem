@@ -369,6 +369,73 @@ export function ProfitLossReport({
         </Card>
       </div>
 
+      {/* Retail Accounting Income Statement Waterfall Card */}
+      <Card className="rounded-2xl border border-slate-200/90 shadow-2xs bg-white p-5">
+        <CardHeader className="p-0 pb-4">
+          <CardTitle className="text-base font-bold text-slate-900 flex items-center gap-2">
+            <Layers className="w-4 h-4 text-indigo-600" />
+            Income Statement & Profit Waterfall (GAAP Standard)
+          </CardTitle>
+        </CardHeader>
+        <div className="grid gap-3 grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 text-xs">
+          <div className="bg-slate-50 p-3 rounded-xl border border-slate-100">
+            <span className="text-slate-500 font-bold uppercase text-[10px] block">Gross Sales</span>
+            <span className="text-sm font-black text-slate-900 mt-1 block">
+              ${parseFloat(profitLossData.gross_revenue || profitLossData.total_revenue || "0").toFixed(2)}
+            </span>
+          </div>
+
+          <div className="bg-rose-50/50 p-3 rounded-xl border border-rose-100">
+            <span className="text-rose-600 font-bold uppercase text-[10px] block">(-) Discounts</span>
+            <span className="text-sm font-black text-rose-700 mt-1 block">
+              ${parseFloat(profitLossData.total_discounts || "0").toFixed(2)}
+            </span>
+          </div>
+
+          <div className="bg-amber-50/50 p-3 rounded-xl border border-amber-100">
+            <span className="text-amber-600 font-bold uppercase text-[10px] block">(-) Refunds</span>
+            <span className="text-sm font-black text-amber-700 mt-1 block">
+              ${parseFloat(profitLossData.total_refunds || "0").toFixed(2)}
+            </span>
+          </div>
+
+          <div className="bg-blue-50/50 p-3 rounded-xl border border-blue-100">
+            <span className="text-blue-700 font-bold uppercase text-[10px] block">(=) Net Revenue</span>
+            <span className="text-sm font-black text-blue-800 mt-1 block">
+              ${parseFloat(profitLossData.net_revenue || profitLossData.total_revenue || "0").toFixed(2)}
+            </span>
+          </div>
+
+          <div className="bg-orange-50/50 p-3 rounded-xl border border-orange-100">
+            <span className="text-orange-700 font-bold uppercase text-[10px] block">(-) COGS</span>
+            <span className="text-sm font-black text-orange-800 mt-1 block">
+              ${parseFloat(profitLossData.cogs || "0").toFixed(2)}
+            </span>
+          </div>
+
+          <div className="bg-emerald-50/50 p-3 rounded-xl border border-emerald-100">
+            <span className="text-emerald-700 font-bold uppercase text-[10px] block">(=) Gross Profit</span>
+            <span className="text-sm font-black text-emerald-800 mt-1 block">
+              ${parseFloat(profitLossData.gross_profit || "0").toFixed(2)}
+            </span>
+          </div>
+
+          <div className="bg-red-50/50 p-3 rounded-xl border border-red-100">
+            <span className="text-red-600 font-bold uppercase text-[10px] block">(-) Expenses</span>
+            <span className="text-sm font-black text-red-700 mt-1 block">
+              ${parseFloat(profitLossData.total_expenses || "0").toFixed(2)}
+            </span>
+          </div>
+
+          <div className="bg-indigo-900 p-3 rounded-xl border border-indigo-800 text-white">
+            <span className="text-indigo-200 font-extrabold uppercase text-[10px] block">(=) Net Profit</span>
+            <span className="text-sm font-black text-white mt-1 block">
+              ${parseFloat(profitLossData.net_profit || "0").toFixed(2)}
+            </span>
+          </div>
+        </div>
+      </Card>
+
       {/* Revenue vs Expenses Comparative Performance */}
       <Card className="border border-slate-200/90 shadow-xs bg-white rounded-2xl overflow-hidden">
         <CardHeader className="p-5 border-b border-slate-100 bg-slate-50/40 flex flex-col md:flex-row md:items-center justify-between gap-4">

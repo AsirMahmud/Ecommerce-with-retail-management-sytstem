@@ -36,6 +36,7 @@ import { useAuth } from "@/contexts/auth-context";
 import { useLanguage } from "@/contexts/language-context";
 import { homePageSettingsApi, HomePageSettings } from "@/lib/api/ecommerce";
 import { BrandLogos } from "./brand-logos";
+import { NotificationsCenter } from "@/components/notifications-center";
 
 const mainNavItems = [
   {
@@ -460,6 +461,7 @@ export function SideNav() {
         </div>
 
         <div className="flex items-center gap-1.5 shrink-0">
+          <NotificationsCenter />
           <Link
             href="/pos"
             className="text-xs font-semibold bg-indigo-600 hover:bg-indigo-700 text-white px-2.5 py-1.5 rounded-lg flex items-center gap-1.5 shadow-2xs"

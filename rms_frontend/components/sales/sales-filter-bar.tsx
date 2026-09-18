@@ -12,7 +12,7 @@ import {
 } from "@/components/ui/select";
 import { Search, Filter, Download } from "lucide-react";
 import { DatePickerWithRange } from "@/components/ui/date-range-picker";
-import { addDays } from "date-fns";
+import { addDays, format } from "date-fns";
 
 interface SalesFilterBarProps {
   onFilterChange?: (filters: {
@@ -48,8 +48,8 @@ export function SalesFilterBar({ onFilterChange }: SalesFilterBarProps) {
     if (range && range.from) {
       setFilters((prev) => ({
         ...prev,
-        start_date: range.from ? range.from.toISOString() : "",
-        end_date: range.to ? range.to.toISOString() : "",
+        start_date: range.from ? format(range.from, "yyyy-MM-dd") : "",
+        end_date: range.to ? format(range.to, "yyyy-MM-dd") : "",
       }));
     } else {
       setFilters((prev) => ({

@@ -14,6 +14,10 @@ import {
   RotateCcw,
   Check,
   Calendar,
+  Clock,
+  Warehouse,
+  Users2,
+  GitFork,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
@@ -39,6 +43,11 @@ import { Badge } from "@/components/ui/badge";
 export interface DashboardWidgetConfig {
   kpiCards: boolean;
   quickStats: boolean;
+  omniChannel: boolean;
+  hourlyHeatmap: boolean;
+  inventoryValuation: boolean;
+  courierPerformance: boolean;
+  customerInsights: boolean;
   preorderOps: boolean;
   revenueTrends: boolean;
   expenseDonut: boolean;
@@ -50,6 +59,11 @@ export interface DashboardWidgetConfig {
 export const DEFAULT_WIDGET_CONFIG: DashboardWidgetConfig = {
   kpiCards: true,
   quickStats: true,
+  omniChannel: true,
+  hourlyHeatmap: true,
+  inventoryValuation: true,
+  courierPerformance: true,
+  customerInsights: true,
   preorderOps: true,
   revenueTrends: true,
   expenseDonut: true,
@@ -85,7 +99,7 @@ export function DashboardCustomizer({
     }));
   };
 
-  const applyPreset = (preset: "all" | "executive" | "operations" | "minimal") => {
+  const applyPreset = (preset: "all" | "executive" | "operations" | "ecommerce" | "minimal") => {
     switch (preset) {
       case "all":
         setTempConfig(DEFAULT_WIDGET_CONFIG);
@@ -94,6 +108,11 @@ export function DashboardCustomizer({
         setTempConfig({
           kpiCards: true,
           quickStats: false,
+          omniChannel: true,
+          hourlyHeatmap: false,
+          inventoryValuation: true,
+          courierPerformance: false,
+          customerInsights: true,
           preorderOps: false,
           revenueTrends: true,
           expenseDonut: true,
@@ -106,6 +125,11 @@ export function DashboardCustomizer({
         setTempConfig({
           kpiCards: true,
           quickStats: true,
+          omniChannel: false,
+          hourlyHeatmap: true,
+          inventoryValuation: true,
+          courierPerformance: true,
+          customerInsights: false,
           preorderOps: true,
           revenueTrends: false,
           expenseDonut: false,
@@ -114,10 +138,32 @@ export function DashboardCustomizer({
           recentSuppliers: true,
         });
         break;
+      case "ecommerce":
+        setTempConfig({
+          kpiCards: true,
+          quickStats: true,
+          omniChannel: true,
+          hourlyHeatmap: true,
+          inventoryValuation: false,
+          courierPerformance: true,
+          customerInsights: true,
+          preorderOps: true,
+          revenueTrends: true,
+          expenseDonut: false,
+          lowStock: false,
+          topProducts: true,
+          recentSuppliers: false,
+        });
+        break;
       case "minimal":
         setTempConfig({
           kpiCards: true,
           quickStats: true,
+          omniChannel: false,
+          hourlyHeatmap: false,
+          inventoryValuation: false,
+          courierPerformance: false,
+          customerInsights: false,
           preorderOps: false,
           revenueTrends: false,
           expenseDonut: false,
@@ -132,7 +178,7 @@ export function DashboardCustomizer({
   const handleSave = () => {
     onChange(tempConfig);
     try {
-      localStorage.setItem("rms_dashboard_widgets", JSON.stringify(tempConfig));
+      localStorage.setItem("rms_dashboard_widgets_v2", JSON.stringify(tempConfig));
     } catch {
       // ignore
     }
@@ -143,7 +189,7 @@ export function DashboardCustomizer({
     setTempConfig(DEFAULT_WIDGET_CONFIG);
     onChange(DEFAULT_WIDGET_CONFIG);
     try {
-      localStorage.setItem("rms_dashboard_widgets", JSON.stringify(DEFAULT_WIDGET_CONFIG));
+      localStorage.setItem("rms_dashboard_widgets_v2", JSON.stringify(DEFAULT_WIDGET_CONFIG));
     } catch {
       // ignore
     }
@@ -151,6 +197,7 @@ export function DashboardCustomizer({
   };
 
   const activeWidgetCount = Object.values(config).filter(Boolean).length;
+  const totalWidgetCount = Object.keys(DEFAULT_WIDGET_CONFIG).length;
 
   const widgetsList: {
     key: keyof DashboardWidgetConfig;
@@ -161,7 +208,7 @@ export function DashboardCustomizer({
     {
       key: "kpiCards",
       label: "Financial KPI Cards",
-      description: "Today's sales, expenses, net profit, and profit margin rate",
+      description: "Period sales, expenses, net profit, and profit margin rate with growth %",
       icon: DollarSign,
     },
     {
@@ -171,15 +218,45 @@ export function DashboardCustomizer({
       icon: LayoutGrid,
     },
     {
+      key: "omniChannel",
+      label: "Omni-Channel & Payments",
+      description: "In-store POS vs online preorders, plus payment method distributions",
+      icon: GitFork,
+    },
+    {
+      key: "hourlyHeatmap",
+      label: "Peak Store Hours Heatmap",
+      description: "Hourly sales and foot-traffic breakdown (00:00 - 23:00) for staffing",
+      icon: Clock,
+    },
+    {
+      key: "inventoryValuation",
+      label: "Inventory Capital & Health",
+      description: "Retail valuation, locked capital, and dead / aging stock detection",
+      icon: Warehouse,
+    },
+    {
+      key: "courierPerformance",
+      label: "Courier & Preorder Fulfillment",
+      description: "Delivery success rate, in-transit items, and courier return rates",
+      icon: Truck,
+    },
+    {
+      key: "customerInsights",
+      label: "Customer Retention & VIPs",
+      description: "New customer acquisition rate and top spending VIP clientele",
+      icon: Users2,
+    },
+    {
       key: "preorderOps",
-      label: "Preorder Operations Pipeline",
+      label: "Preorder Status Funnel",
       description: "Pending, confirmed, and courier fulfillment tracking metrics",
       icon: ShoppingBag,
     },
     {
       key: "revenueTrends",
       label: "Revenue vs Expense Trends",
-      description: "Daily and monthly area chart tracking cashflow performance",
+      description: "Daily chart tracking cashflow performance over selected timeframe",
       icon: TrendingUp,
     },
     {
@@ -212,15 +289,17 @@ export function DashboardCustomizer({
     <div className="flex items-center gap-2 flex-wrap">
       {/* Date Range Selector */}
       <Select value={dateRange} onValueChange={onDateRangeChange}>
-        <SelectTrigger className="h-9 w-[135px] rounded-xl bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-xs font-semibold text-slate-700 dark:text-slate-200 shadow-2xs">
+        <SelectTrigger className="h-9 w-[145px] rounded-xl bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-xs font-semibold text-slate-700 dark:text-slate-200 shadow-2xs">
           <Calendar className="h-3.5 w-3.5 mr-1 text-slate-400" />
           <SelectValue placeholder="Period" />
         </SelectTrigger>
         <SelectContent className="rounded-xl border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 text-xs">
           <SelectItem value="today">Today</SelectItem>
+          <SelectItem value="yesterday">Yesterday</SelectItem>
           <SelectItem value="7d">Last 7 Days</SelectItem>
           <SelectItem value="30d">Last 30 Days</SelectItem>
-          <SelectItem value="ytd">Year to Date</SelectItem>
+          <SelectItem value="this_month">This Month</SelectItem>
+          <SelectItem value="last_month">Last Month</SelectItem>
         </SelectContent>
       </Select>
 
@@ -238,12 +317,12 @@ export function DashboardCustomizer({
               variant="secondary"
               className="ml-1 h-5 px-1.5 text-[10px] font-bold rounded-md bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 border border-indigo-200/60 dark:border-indigo-800"
             >
-              {activeWidgetCount}/8
+              {activeWidgetCount}/{totalWidgetCount}
             </Badge>
           </Button>
         </DialogTrigger>
 
-        <DialogContent className="sm:max-w-[550px] rounded-2xl bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 p-6">
+        <DialogContent className="sm:max-w-[550px] max-h-[85vh] flex flex-col rounded-2xl bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 p-6">
           <DialogHeader>
             <div className="flex items-center justify-between">
               <DialogTitle className="text-base font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
@@ -264,7 +343,7 @@ export function DashboardCustomizer({
             <Label className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
               Layout Presets
             </Label>
-            <div className="grid grid-cols-4 gap-1.5">
+            <div className="grid grid-cols-5 gap-1.5">
               <Button
                 type="button"
                 variant="outline"
@@ -272,7 +351,7 @@ export function DashboardCustomizer({
                 onClick={() => applyPreset("all")}
                 className="text-[11px] h-8 rounded-lg border-slate-200 dark:border-slate-800"
               >
-                All (8)
+                All ({totalWidgetCount})
               </Button>
               <Button
                 type="button"
@@ -296,6 +375,15 @@ export function DashboardCustomizer({
                 type="button"
                 variant="outline"
                 size="sm"
+                onClick={() => applyPreset("ecommerce")}
+                className="text-[11px] h-8 rounded-lg border-slate-200 dark:border-slate-800"
+              >
+                Ecommerce
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
                 onClick={() => applyPreset("minimal")}
                 className="text-[11px] h-8 rounded-lg border-slate-200 dark:border-slate-800"
               >
@@ -305,7 +393,7 @@ export function DashboardCustomizer({
           </div>
 
           {/* Widgets Toggle List */}
-          <div className="space-y-2.5 max-h-[300px] overflow-y-auto pr-1 divide-y divide-slate-100 dark:divide-slate-800">
+          <div className="space-y-2.5 flex-1 overflow-y-auto pr-1 my-3 divide-y divide-slate-100 dark:divide-slate-800">
             {widgetsList.map((widget) => {
               const Icon = widget.icon;
               const isChecked = tempConfig[widget.key];

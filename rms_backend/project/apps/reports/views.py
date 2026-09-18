@@ -1,28 +1,36 @@
+import csv
+import logging
+from datetime import timedelta, datetime, time
+from decimal import Decimal
+from zoneinfo import ZoneInfo
+from django.http import HttpResponse
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from django.db.models import Sum, Count, Avg, F, Q, DecimalField, Max, OuterRef, Subquery, Case, When, Value, CharField, DateField
 from django.db.models.functions import Coalesce, Cast, TruncDate
 from django.utils import timezone
-from datetime import timedelta, datetime, time
-from decimal import Decimal
+
 from .models import Report, ReportMetric, ReportDataPoint, SavedReport
 from .serializers import (
     ReportSerializer, SavedReportSerializer,
     SalesReportSerializer, ExpenseReportSerializer,
     InventoryReportSerializer, CustomerReportSerializer,
     CategoryReportSerializer, ProfitLossReportSerializer,
-    ProductPerformanceReportSerializer
+    ProductPerformanceReportSerializer,
+    TaxReportSerializer, ReturnsReportSerializer,
+    DuesAgingReportSerializer, CashReconciliationReportSerializer
 )
-from apps.sales.models import Sale, SaleItem
+from apps.sales.models import Sale, SaleItem, Return, ReturnItem, SalePayment, DuePayment
 from apps.expenses.models import Expense, ExpenseCategory
 from apps.inventory.models import Product, Category, StockMovement
 from apps.customer.models import Customer
 from apps.preorder.models import Preorder, PreorderProduct
 from apps.online_preorder.models import OnlinePreorder
-import logging
 
 logger = logging.getLogger(__name__)
+
+BUSINESS_TIMEZONE = ZoneInfo('Asia/Dhaka')
 
 class ReportViewSet(viewsets.ModelViewSet):
     queryset = Report.objects.all()
@@ -36,8 +44,10 @@ class ReportViewSet(viewsets.ModelViewSet):
             return None, None, Response({"error": "date_from and date_to parameters are required."}, status=status.HTTP_400_BAD_REQUEST)
         
         try:
-            date_from = timezone.make_aware(datetime.strptime(date_from_str, '%Y-%m-%d'))
-            date_to = timezone.make_aware(datetime.combine(datetime.strptime(date_to_str, '%Y-%m-%d'), time.max))
+            s_date = datetime.strptime(date_from_str, '%Y-%m-%d').date()
+            e_date = datetime.strptime(date_to_str, '%Y-%m-%d').date()
+            date_from = datetime.combine(s_date, time.min).replace(tzinfo=BUSINESS_TIMEZONE)
+            date_to = datetime.combine(e_date, time.max).replace(tzinfo=BUSINESS_TIMEZONE)
         except ValueError:
             return None, None, Response({"error": "Invalid date format. Use YYYY-MM-DD."}, status=status.HTTP_400_BAD_REQUEST)
 
@@ -51,24 +61,44 @@ class ReportViewSet(viewsets.ModelViewSet):
 
         # Sales data
         sales = Sale.objects.filter(date__range=[date_from, date_to], status='completed')
+        gross_sales = sales.aggregate(total=Sum('subtotal'))['total'] or Decimal('0.00')
+        order_discounts = sales.aggregate(total=Sum('discount'))['total'] or Decimal('0.00')
+        item_discounts = SaleItem.objects.filter(sale__in=sales).aggregate(total=Sum('discount'))['total'] or Decimal('0.00')
+        total_discounts = order_discounts + item_discounts
+        total_tax = sales.aggregate(total=Sum('tax'))['total'] or Decimal('0.00')
         total_sales = sales.aggregate(total=Sum('total'))['total'] or Decimal('0.00')
         total_orders = sales.count()
+
+        # Returns & refunds
+        returns_qs = Return.objects.filter(created_at__range=[date_from, date_to], status__in=['completed', 'approved'])
+        total_refunds = returns_qs.aggregate(total=Sum('refund_amount'))['total'] or Decimal('0.00')
+        net_sales = max(Decimal('0.00'), total_sales - total_refunds)
         
-        # Expense data
-        expenses = Expense.objects.filter(date__range=[date_from, date_to], status='APPROVED')
+        # Expense data (Approved + Paid)
+        expenses = Expense.objects.filter(
+            date__range=[date_from.date(), date_to.date()],
+            status__in=['APPROVED', 'PAID']
+        )
         total_expenses = expenses.aggregate(total=Sum('amount'))['total'] or Decimal('0.00')
 
-        # Profit & Loss data
-        total_profit = sales.aggregate(total=Sum('total_profit'))['total'] or Decimal('0.00')
-        net_profit = total_profit # Simplified for overview
-        profit_margin = (net_profit / total_sales * 100) if total_sales > 0 else Decimal('0.00')
+        # COGS & Profit
+        cogs = SaleItem.objects.filter(sale__in=sales).aggregate(
+            total=Sum(F('quantity') * F('product__cost_price'))
+        )['total'] or Decimal('0.00')
+
+        gross_profit = sales.aggregate(total=Sum('total_profit'))['total'] or Decimal('0.00')
+        if total_refunds > 0 and total_sales > 0:
+            refund_ratio = min(Decimal('1.0'), total_refunds / total_sales)
+            gross_profit = max(Decimal('0.00'), gross_profit * (Decimal('1.0') - refund_ratio))
+
+        net_profit = gross_profit - total_expenses
+        profit_margin = (net_profit / net_sales * 100) if net_sales > 0 else Decimal('0.00')
 
         # Preorder analysis
         preorders = Preorder.objects.filter(created_at__range=[date_from, date_to])
         preorder_status_breakdown = {}
         for status_choice in Preorder.STATUS_CHOICES:
             preorder_status_breakdown[status_choice[0]] = preorders.filter(status=status_choice[0]).count()
-        # Only count revenue and profit for COMPLETED preorders
         completed_preorders = preorders.filter(status='COMPLETED')
         preorder_total_orders = completed_preorders.count()
         preorder_total_revenue = completed_preorders.aggregate(total=Sum('total_amount'))['total'] or Decimal('0.00')
@@ -80,10 +110,17 @@ class ReportViewSet(viewsets.ModelViewSet):
 
         data = {
             "total_sales": total_sales,
+            "gross_sales": gross_sales,
+            "total_discounts": total_discounts,
+            "total_tax": total_tax,
+            "total_refunds": total_refunds,
+            "net_sales": net_sales,
+            "cogs": cogs,
+            "gross_profit": gross_profit,
             "total_orders": total_orders,
             "total_expenses": total_expenses,
             "net_profit": net_profit,
-            "profit_margin": profit_margin,
+            "profit_margin": round(profit_margin, 2),
             "sales_by_date": list(sales_by_date),
             "expenses_by_date": list(expenses_by_date),
             # Preorder analytics
@@ -107,6 +144,16 @@ class ReportViewSet(viewsets.ModelViewSet):
         )
 
         total_sales = sales.aggregate(total=Sum('total'))['total'] or Decimal('0.00')
+        gross_sales = sales.aggregate(total=Sum('subtotal'))['total'] or Decimal('0.00')
+        order_discounts = sales.aggregate(total=Sum('discount'))['total'] or Decimal('0.00')
+        item_discounts = SaleItem.objects.filter(sale__in=sales).aggregate(total=Sum('discount'))['total'] or Decimal('0.00')
+        total_discounts = order_discounts + item_discounts
+        total_tax = sales.aggregate(total=Sum('tax'))['total'] or Decimal('0.00')
+
+        returns_qs = Return.objects.filter(created_at__range=[date_from, date_to], status__in=['completed', 'approved'])
+        total_refunds = returns_qs.aggregate(total=Sum('refund_amount'))['total'] or Decimal('0.00')
+        net_sales = max(Decimal('0.00'), total_sales - total_refunds)
+
         total_orders = sales.count()
         total_items_sold = sales.aggregate(total_items=Sum('items__quantity'))['total_items'] or 0
 
@@ -132,6 +179,28 @@ class ReportViewSet(viewsets.ModelViewSet):
             quantity_sold=Sum('quantity')
         ).order_by('-total')
 
+        # Sales by channel (Shop POS vs Online Preorder vs Offline Preorder)
+        channel_names = {
+            'shop': 'Shop POS',
+            'online_preorder': 'Online Preorder',
+            'offline_preorder': 'Offline Preorder'
+        }
+        sales_by_channel_qs = sales.values('sale_type').annotate(
+            total=Sum('total'),
+            orders=Count('id'),
+            items=Sum('items__quantity')
+        ).order_by('-total')
+        sales_by_channel = [
+            {
+                'channel': channel_names.get(ch['sale_type'], ch['sale_type'] or 'Shop POS'),
+                'raw_type': ch['sale_type'],
+                'total': ch['total'] or Decimal('0.00'),
+                'orders': ch['orders'],
+                'items': ch['items'] or 0
+            }
+            for ch in sales_by_channel_qs
+        ]
+
         # Top products
         top_products = SaleItem.objects.filter(
             sale__in=sales
@@ -147,25 +216,63 @@ class ReportViewSet(viewsets.ModelViewSet):
             profit=Sum('profit')
         ).order_by('-total_sales')[:10]
 
-        # Payment methods
-        payment_methods = sales.values(
-            'payment_method'
-        ).annotate(
-            total=Sum('total'),
-            orders_count=Count('id'),
-            items_count=Sum('items__quantity')
+        # Payment methods - Accurate tender breakdown from SalePayment
+        completed_payments = SalePayment.objects.filter(
+            sale__in=sales,
+            status='completed'
+        ).values('payment_method').annotate(
+            total=Sum('amount'),
+            orders_count=Count('sale', distinct=True)
         ).order_by('-total')
+
+        payment_methods_dict = {
+            p['payment_method'].lower(): {
+                'payment_method': p['payment_method'].capitalize(),
+                'total': p['total'],
+                'orders_count': p['orders_count'],
+                'items_count': 0
+            }
+            for p in completed_payments
+        }
+
+        # Fallback for sales without SalePayment records
+        sales_without_payments = sales.filter(sale_payments__isnull=True)
+        if sales_without_payments.exists():
+            legacy_methods = sales_without_payments.values('payment_method').annotate(
+                total=Sum('total'),
+                orders_count=Count('id')
+            )
+            for lm in legacy_methods:
+                pm_key = (lm['payment_method'] or 'cash').lower()
+                if pm_key in payment_methods_dict:
+                    payment_methods_dict[pm_key]['total'] += lm['total'] or Decimal('0.00')
+                    payment_methods_dict[pm_key]['orders_count'] += lm['orders_count']
+                else:
+                    payment_methods_dict[pm_key] = {
+                        'payment_method': pm_key.capitalize(),
+                        'total': lm['total'] or Decimal('0.00'),
+                        'orders_count': lm['orders_count'],
+                        'items_count': 0
+                    }
+
+        payment_methods_list = sorted(list(payment_methods_dict.values()), key=lambda x: x['total'], reverse=True)
 
         data = {
             'total_sales': total_sales,
+            'gross_sales': gross_sales,
+            'total_discounts': total_discounts,
+            'total_tax': total_tax,
+            'total_refunds': total_refunds,
+            'net_sales': net_sales,
             'total_orders': total_orders,
             'total_items_sold': total_items_sold,
             'average_order_value': average_order_value,
             'average_item_price': average_item_price,
             'sales_by_date': list(sales_by_date),
             'sales_by_category': list(sales_by_category),
+            'sales_by_channel': sales_by_channel,
             'top_products': list(top_products),
-            'payment_methods': list(payment_methods)
+            'payment_methods': payment_methods_list
         }
 
         serializer = SalesReportSerializer(data)
@@ -177,10 +284,17 @@ class ReportViewSet(viewsets.ModelViewSet):
         if error:
             return error
 
-        expenses = Expense.objects.filter(
-            date__range=[date_from, date_to],
-            status='APPROVED'
-        )
+        status_param = request.query_params.get('status')
+        if status_param:
+            expenses = Expense.objects.filter(
+                date__range=[date_from.date(), date_to.date()],
+                status=status_param
+            )
+        else:
+            expenses = Expense.objects.filter(
+                date__range=[date_from.date(), date_to.date()],
+                status__in=['APPROVED', 'PAID']
+            )
 
         total_expenses = expenses.aggregate(total=Sum('amount'))['total'] or Decimal('0.00')
 
@@ -218,14 +332,25 @@ class ReportViewSet(viewsets.ModelViewSet):
 
     @action(detail=False, methods=['get'])
     def inventory(self, request):
-        products = Product.objects.all()
+        products = Product.objects.filter(is_active=True)
         total_products = products.count()
-        total_stock_value = products.aggregate(
+        
+        # Retail Valuation & Cost Valuation
+        total_retail_value = products.aggregate(
             total=Sum(F('stock_quantity') * F('selling_price'))
         )['total'] or Decimal('0.00')
 
-        # Low stock items
+        total_cost_value = products.aggregate(
+            total=Sum(F('stock_quantity') * F('cost_price'))
+        )['total'] or Decimal('0.00')
+
+        potential_profit = total_retail_value - total_cost_value
+        unrealized_margin = (potential_profit / total_retail_value * 100) if total_retail_value > 0 else Decimal('0.00')
+
+        # Out of stock and Low stock items
+        out_of_stock_count = products.filter(stock_quantity=0).count()
         low_stock_items = products.filter(
+            stock_quantity__gt=0,
             stock_quantity__lte=F('minimum_stock')
         ).values(
             'name', 'stock_quantity', 'minimum_stock', 'selling_price'
@@ -234,6 +359,22 @@ class ReportViewSet(viewsets.ModelViewSet):
             reorder_level=F('minimum_stock'),
             price=F('selling_price')
         ).order_by('stock_quantity')
+
+        # Dead stock analysis: Products with stock > 0 and no sales in the last 60 days
+        sixty_days_ago = timezone.now() - timedelta(days=60)
+        recent_sold_product_ids = SaleItem.objects.filter(
+            sale__date__gte=sixty_days_ago,
+            sale__status='completed'
+        ).values_list('product_id', flat=True).distinct()
+
+        dead_stock_products = products.filter(
+            stock_quantity__gt=0
+        ).exclude(id__in=recent_sold_product_ids)
+
+        dead_stock_count = dead_stock_products.count()
+        dead_stock_value = dead_stock_products.aggregate(
+            total=Sum(F('stock_quantity') * F('cost_price'))
+        )['total'] or Decimal('0.00')
 
         # Stock by category
         stock_by_category = products.values(
@@ -256,7 +397,14 @@ class ReportViewSet(viewsets.ModelViewSet):
 
         data = {
             'total_products': total_products,
-            'total_stock_value': total_stock_value,
+            'total_stock_value': total_retail_value,
+            'total_cost_value': total_cost_value,
+            'total_retail_value': total_retail_value,
+            'potential_profit': potential_profit,
+            'unrealized_margin': round(unrealized_margin, 2),
+            'out_of_stock_count': out_of_stock_count,
+            'dead_stock_count': dead_stock_count,
+            'dead_stock_value': dead_stock_value,
             'low_stock_items': list(low_stock_items),
             'stock_by_category': list(stock_by_category),
             'stock_movements': list(stock_movements)
@@ -419,18 +567,38 @@ class ReportViewSet(viewsets.ModelViewSet):
             date__range=[date_from, date_to],
             status='completed'
         )
+        gross_revenue = sales.aggregate(total=Sum('subtotal'))['total'] or Decimal('0.00')
+        order_discounts = sales.aggregate(total=Sum('discount'))['total'] or Decimal('0.00')
+        item_discounts = SaleItem.objects.filter(sale__in=sales).aggregate(total=Sum('discount'))['total'] or Decimal('0.00')
+        total_discounts = order_discounts + item_discounts
         total_revenue = sales.aggregate(total=Sum('total'))['total'] or Decimal('0.00')
-        total_profit = sales.aggregate(total=Sum('total_profit'))['total'] or Decimal('0.00')
 
-        # Expenses
+        # Returns & refunds
+        returns_qs = Return.objects.filter(created_at__range=[date_from, date_to], status__in=['completed', 'approved'])
+        total_refunds = returns_qs.aggregate(total=Sum('refund_amount'))['total'] or Decimal('0.00')
+        net_revenue = max(Decimal('0.00'), total_revenue - total_refunds)
+
+        # COGS calculation (Unit Cost * Quantity)
+        cogs = SaleItem.objects.filter(sale__in=sales).aggregate(
+            total=Sum(F('quantity') * F('product__cost_price'))
+        )['total'] or Decimal('0.00')
+
+        gross_profit = sales.aggregate(total=Sum('total_profit'))['total'] or Decimal('0.00')
+        if total_refunds > 0 and total_revenue > 0:
+            refund_ratio = min(Decimal('1.0'), total_refunds / total_revenue)
+            gross_profit = max(Decimal('0.00'), gross_profit * (Decimal('1.0') - refund_ratio))
+
+        gross_margin = (gross_profit / net_revenue * 100) if net_revenue > 0 else Decimal('0.00')
+
+        # Expenses (Approved and Paid)
         expenses = Expense.objects.filter(
-            date__range=[date_from, date_to],
-            status='APPROVED'
+            date__range=[date_from.date(), date_to.date()],
+            status__in=['APPROVED', 'PAID']
         )
         total_expenses = expenses.aggregate(total=Sum('amount'))['total'] or Decimal('0.00')
 
-        net_profit = total_revenue - total_expenses
-        profit_margin = (net_profit / total_revenue * 100) if total_revenue > 0 else Decimal('0.00')
+        net_profit = gross_profit - total_expenses
+        profit_margin = (net_profit / net_revenue * 100) if net_revenue > 0 else Decimal('0.00')
 
         # Preorder analysis
         preorders = Preorder.objects.filter(created_at__range=[date_from, date_to])
@@ -461,13 +629,10 @@ class ReportViewSet(viewsets.ModelViewSet):
 
         # Simplified expenses over time for charting
         expenses_over_time = [
-            {'date': e['expense_date'], 'amount': e['amount']} for e in expenses_by_date
+            {'date': str(e['expense_date']), 'amount': e['amount']} for e in expenses_by_date
         ]
 
-        # --- Combine revenue and expenses by date for charting ---
-        from collections import defaultdict
-        import datetime
-        # Normalize date keys to string for correct matching
+        # Combine revenue and expenses by date for charting
         revenue_map = {str(r['sale_date']): r['revenue'] for r in revenue_by_date}
         expense_map = {str(e['expense_date']): e['amount'] for e in expenses_by_date}
         all_dates = set(revenue_map.keys()) | set(expense_map.keys())
@@ -475,28 +640,33 @@ class ReportViewSet(viewsets.ModelViewSet):
         for d in sorted(all_dates):
             revenue_vs_expense_by_date.append({
                 'date': d,
-                'revenue': revenue_map.get(d, 0),
-                'expense': expense_map.get(d, 0)
+                'revenue': revenue_map.get(d, Decimal('0.00')),
+                'expense': expense_map.get(d, Decimal('0.00'))
             })
-        # ---
 
-        # Profit by category
+        # Profit by category - FIXED: multiply cost_price by quantity
         profit_by_category = SaleItem.objects.filter(
-            sale__date__range=[date_from, date_to],
-            sale__status='completed'
+            sale__in=sales
         ).values('product__category__name').annotate(
             category_name=F('product__category__name'),
             revenue=Sum('total'),
-            cost=Sum('product__cost_price'),
+            cost=Sum(F('quantity') * F('product__cost_price')),
             profit=Sum('profit'),
             items_sold=Sum('quantity')
         ).order_by('-profit')
 
         data = {
             'total_revenue': total_revenue,
+            'gross_revenue': gross_revenue,
+            'total_discounts': total_discounts,
+            'total_refunds': total_refunds,
+            'net_revenue': net_revenue,
+            'cogs': cogs,
+            'gross_profit': gross_profit,
+            'gross_margin': round(gross_margin, 2),
             'total_expenses': total_expenses,
             'net_profit': net_profit,
-            'profit_margin': profit_margin,
+            'profit_margin': round(profit_margin, 2),
             'revenue_by_date': list(revenue_by_date),
             'expenses_by_date': list(expenses_by_date),
             'expenses_over_time': expenses_over_time,
@@ -893,6 +1063,291 @@ class ReportViewSet(viewsets.ModelViewSet):
         }
 
         return Response(data)
+
+    @action(detail=False, methods=['get'])
+    def tax(self, request):
+        date_from, date_to, error = self._get_date_range(request)
+        if error:
+            return error
+
+        sales = Sale.objects.filter(date__range=[date_from, date_to], status='completed')
+        taxable_sales = sales.aggregate(total=Sum('subtotal'))['total'] or Decimal('0.00')
+        total_tax_collected = sales.aggregate(total=Sum('tax'))['total'] or Decimal('0.00')
+
+        # Tax refunded on returns
+        returns_qs = Return.objects.filter(created_at__range=[date_from, date_to], status__in=['completed', 'approved'])
+        tax_refunded = Decimal('0.00')
+        for ret in returns_qs.select_related('sale'):
+            if ret.sale and ret.sale.subtotal and ret.sale.subtotal > 0 and ret.sale.tax > 0:
+                tax_rate = ret.sale.tax / ret.sale.subtotal
+                tax_refunded += ret.refund_amount * tax_rate
+
+        tax_refunded = round(tax_refunded, 2)
+        net_tax_payable = max(Decimal('0.00'), total_tax_collected - tax_refunded)
+
+        tax_by_date = sales.values('date__date').annotate(
+            date=F('date__date'),
+            taxable_amount=Sum('subtotal'),
+            tax_collected=Sum('tax')
+        ).order_by('date__date')
+
+        data = {
+            'taxable_sales': taxable_sales,
+            'total_tax_collected': total_tax_collected,
+            'tax_refunded': tax_refunded,
+            'net_tax_payable': net_tax_payable,
+            'tax_by_date': list(tax_by_date)
+        }
+        serializer = TaxReportSerializer(data)
+        return Response(serializer.data)
+
+    @action(detail=False, methods=['get'])
+    def returns(self, request):
+        date_from, date_to, error = self._get_date_range(request)
+        if error:
+            return error
+
+        returns_qs = Return.objects.filter(created_at__range=[date_from, date_to])
+        approved_returns = returns_qs.filter(status__in=['completed', 'approved'])
+
+        total_returns_count = approved_returns.count()
+        total_refund_amount = approved_returns.aggregate(total=Sum('refund_amount'))['total'] or Decimal('0.00')
+        
+        return_items = ReturnItem.objects.filter(return_order__in=approved_returns)
+        total_items_returned = return_items.aggregate(total=Sum('quantity'))['total'] or 0
+
+        # Return rate %
+        sales = Sale.objects.filter(date__range=[date_from, date_to], status='completed')
+        total_sales_count = sales.count()
+        return_rate_percentage = (Decimal(total_returns_count) / Decimal(total_sales_count) * 100) if total_sales_count > 0 else Decimal('0.00')
+
+        # Top returned products
+        top_returned_products = return_items.values(
+            'sale_item__product__id',
+            'sale_item__product__name',
+            'sale_item__product__category__name'
+        ).annotate(
+            product_id=F('sale_item__product__id'),
+            product_name=F('sale_item__product__name'),
+            category_name=F('sale_item__product__category__name'),
+            returned_quantity=Sum('quantity'),
+            returns_count=Count('id')
+        ).order_by('-returned_quantity')[:10]
+
+        # Reasons breakdown
+        reasons_breakdown = returns_qs.values('reason').annotate(
+            count=Count('id'),
+            total_refund=Sum('refund_amount')
+        ).order_by('-count')[:10]
+
+        # Returns by date
+        returns_by_date = approved_returns.annotate(
+            return_date=Cast('created_at', DateField())
+        ).values('return_date').annotate(
+            date=F('return_date'),
+            count=Count('id'),
+            refund_amount=Sum('refund_amount')
+        ).order_by('return_date')
+
+        data = {
+            'total_returns_count': total_returns_count,
+            'total_items_returned': total_items_returned,
+            'total_refund_amount': total_refund_amount,
+            'return_rate_percentage': round(return_rate_percentage, 2),
+            'top_returned_products': list(top_returned_products),
+            'reasons_breakdown': list(reasons_breakdown),
+            'returns_by_date': list(returns_by_date)
+        }
+        serializer = ReturnsReportSerializer(data)
+        return Response(serializer.data)
+
+    @action(detail=False, methods=['get'], url_path='dues-aging')
+    def dues_aging(self, request):
+        now_local = datetime.now(BUSINESS_TIMEZONE).date()
+        
+        pending_dues = DuePayment.objects.filter(status='pending', amount_due__gt=F('amount_paid')).select_related('sale', 'sale__customer')
+        
+        current_due = Decimal('0.00')
+        due_1_to_30_days = Decimal('0.00')
+        due_31_to_60_days = Decimal('0.00')
+        due_60_plus_days = Decimal('0.00')
+
+        aging_customers_map = {}
+
+        for due in pending_dues:
+            remaining = due.remaining_amount
+            days_overdue = (now_local - due.due_date).days if due.due_date else 0
+
+            if days_overdue <= 0:
+                current_due += remaining
+                bucket = 'Current'
+            elif days_overdue <= 30:
+                due_1_to_30_days += remaining
+                bucket = '1-30 Days'
+            elif days_overdue <= 60:
+                due_31_to_60_days += remaining
+                bucket = '31-60 Days'
+            else:
+                due_60_plus_days += remaining
+                bucket = '60+ Days'
+
+            cust = due.sale.customer if due.sale else None
+            cust_id = cust.id if cust else 0
+            cust_name = f"{cust.first_name} {cust.last_name}".strip() if cust else (due.sale.customer_phone or 'Walk-in Customer')
+            cust_phone = cust.phone if cust else (due.sale.customer_phone or '')
+
+            if cust_id not in aging_customers_map:
+                aging_customers_map[cust_id] = {
+                    'customer_id': cust_id,
+                    'customer_name': cust_name,
+                    'customer_phone': cust_phone,
+                    'total_due': Decimal('0.00'),
+                    'current': Decimal('0.00'),
+                    'days_1_30': Decimal('0.00'),
+                    'days_31_60': Decimal('0.00'),
+                    'days_60_plus': Decimal('0.00'),
+                    'invoices_count': 0
+                }
+
+            aging_customers_map[cust_id]['total_due'] += remaining
+            aging_customers_map[cust_id]['invoices_count'] += 1
+            if bucket == 'Current':
+                aging_customers_map[cust_id]['current'] += remaining
+            elif bucket == '1-30 Days':
+                aging_customers_map[cust_id]['days_1_30'] += remaining
+            elif bucket == '31-60 Days':
+                aging_customers_map[cust_id]['days_31_60'] += remaining
+            else:
+                aging_customers_map[cust_id]['days_60_plus'] += remaining
+
+        # Untracked sales with amount_due > 0
+        untracked_sales = Sale.objects.filter(amount_due__gt=0, due_payments__isnull=True).exclude(status='cancelled')
+        for sale in untracked_sales:
+            current_due += sale.amount_due
+
+        total_receivable = current_due + due_1_to_30_days + due_31_to_60_days + due_60_plus_days
+        aging_customers = sorted(list(aging_customers_map.values()), key=lambda x: x['total_due'], reverse=True)[:50]
+
+        data = {
+            'total_receivable': total_receivable,
+            'current_due': current_due,
+            'due_1_to_30_days': due_1_to_30_days,
+            'due_31_to_60_days': due_31_to_60_days,
+            'due_60_plus_days': due_60_plus_days,
+            'aging_customers': aging_customers
+        }
+        serializer = DuesAgingReportSerializer(data)
+        return Response(serializer.data)
+
+    @action(detail=False, methods=['get'])
+    def reconciliation(self, request):
+        date_from, date_to, error = self._get_date_range(request)
+        if error:
+            return error
+
+        # Cash sales
+        sales = Sale.objects.filter(date__range=[date_from, date_to], status='completed')
+        cash_from_payments = SalePayment.objects.filter(
+            sale__in=sales,
+            payment_method='cash',
+            status='completed'
+        ).aggregate(total=Sum('amount'))['total'] or Decimal('0.00')
+
+        legacy_cash_sales = sales.filter(
+            sale_payments__isnull=True,
+            payment_method='cash'
+        ).aggregate(total=Sum('total'))['total'] or Decimal('0.00')
+
+        cash_sales = cash_from_payments + legacy_cash_sales
+
+        # Non-cash totals
+        non_cash_payments = SalePayment.objects.filter(
+            sale__in=sales,
+            status='completed'
+        ).exclude(payment_method='cash').values('payment_method').annotate(
+            total=Sum('amount')
+        )
+        non_cash_totals = {item['payment_method']: str(item['total']) for item in non_cash_payments}
+
+        # Due payments collected in cash during this period
+        due_payments_collected = SalePayment.objects.filter(
+            payment_date__range=[date_from, date_to],
+            payment_method='cash',
+            status='completed',
+            sale__due_payments__isnull=False
+        ).aggregate(total=Sum('amount'))['total'] or Decimal('0.00')
+
+        # Cash refunds
+        cash_refunds = Return.objects.filter(
+            created_at__range=[date_from, date_to],
+            status__in=['completed', 'approved']
+        ).aggregate(total=Sum('refund_amount'))['total'] or Decimal('0.00')
+
+        # Cash expenses
+        cash_expenses = Expense.objects.filter(
+            date__range=[date_from.date(), date_to.date()],
+            payment_method='CASH',
+            status__in=['APPROVED', 'PAID']
+        ).aggregate(total=Sum('amount'))['total'] or Decimal('0.00')
+
+        net_cash_in_drawer = (cash_sales + due_payments_collected) - (cash_refunds + cash_expenses)
+
+        data = {
+            'cash_sales': cash_sales,
+            'cash_refunds': cash_refunds,
+            'cash_expenses': cash_expenses,
+            'due_payments_collected': due_payments_collected,
+            'net_cash_in_drawer': net_cash_in_drawer,
+            'non_cash_totals': non_cash_totals
+        }
+        serializer = CashReconciliationReportSerializer(data)
+        return Response(serializer.data)
+
+    @action(detail=False, methods=['get'])
+    def export(self, request):
+        report_type = request.query_params.get('type', 'sales')
+        response = HttpResponse(content_type='text/csv; charset=utf-8')
+        response['Content-Disposition'] = f'attachment; filename="report_{report_type}_{timezone.now().strftime("%Y%m%d_%H%M%S")}.csv"'
+        writer = csv.writer(response)
+
+        date_from, date_to, _ = self._get_date_range(request)
+
+        if report_type == 'sales':
+            writer.writerow(['Invoice Number', 'Date', 'Channel', 'Customer', 'Subtotal', 'Discount', 'Tax', 'Total', 'Profit', 'Payment Method', 'Status'])
+            sales = Sale.objects.filter(date__range=[date_from, date_to]).select_related('customer') if date_from and date_to else Sale.objects.all()[:1000]
+            for s in sales:
+                cust_name = f"{s.customer.first_name} {s.customer.last_name}".strip() if s.customer else (s.customer_phone or 'N/A')
+                writer.writerow([s.invoice_number, s.date.strftime('%Y-%m-%d %H:%M'), s.sale_type, cust_name, s.subtotal, s.discount, s.tax, s.total, s.total_profit, s.payment_method, s.status])
+
+        elif report_type == 'inventory':
+            writer.writerow(['Product Name', 'SKU', 'Category', 'Cost Price', 'Selling Price', 'Current Stock', 'Stock Value (Retail)', 'Stock Value (Cost)', 'Min Stock Level', 'Status'])
+            for p in Product.objects.select_related('category').all():
+                cat_name = p.category.name if p.category else 'Uncategorized'
+                status_str = 'Out of Stock' if p.stock_quantity == 0 else ('Low Stock' if p.stock_quantity <= p.minimum_stock else 'In Stock')
+                writer.writerow([p.name, p.sku, cat_name, p.cost_price, p.selling_price, p.stock_quantity, p.stock_quantity * p.selling_price, p.stock_quantity * p.cost_price, p.minimum_stock, status_str])
+
+        elif report_type == 'expenses':
+            writer.writerow(['Description', 'Category', 'Date', 'Amount', 'Payment Method', 'Status', 'Reference'])
+            expenses = Expense.objects.filter(date__range=[date_from.date(), date_to.date()]).select_related('category') if date_from and date_to else Expense.objects.all()[:1000]
+            for e in expenses:
+                writer.writerow([e.description, e.category.name if e.category else '', e.date, e.amount, e.payment_method, e.status, e.reference_number])
+
+        elif report_type == 'profit_loss':
+            writer.writerow(['Metric', 'Amount (BDT)'])
+            pl_resp = self.profit_loss(request)
+            if hasattr(pl_resp, 'data'):
+                d = pl_resp.data
+                writer.writerow(['Gross Revenue', d.get('gross_revenue', '0.00')])
+                writer.writerow(['Total Discounts', d.get('total_discounts', '0.00')])
+                writer.writerow(['Total Refunds', d.get('total_refunds', '0.00')])
+                writer.writerow(['Net Revenue', d.get('net_revenue', '0.00')])
+                writer.writerow(['Cost of Goods Sold (COGS)', d.get('cogs', '0.00')])
+                writer.writerow(['Gross Profit', d.get('gross_profit', '0.00')])
+                writer.writerow(['Operating Expenses', d.get('total_expenses', '0.00')])
+                writer.writerow(['Net Operating Profit', d.get('net_profit', '0.00')])
+                writer.writerow(['Net Profit Margin (%)', f"{d.get('profit_margin', '0.00')}%"])
+
+        return response
 
 class SavedReportViewSet(viewsets.ModelViewSet):
     queryset = SavedReport.objects.all()

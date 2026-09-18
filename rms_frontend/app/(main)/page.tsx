@@ -60,6 +60,11 @@ import {
   DEFAULT_WIDGET_CONFIG,
 } from "@/components/dashboard/dashboard-customizer";
 import { useTranslations } from "next-intl";
+import { OmniChannelWidget } from "@/components/dashboard/omni-channel-widget";
+import { HourlySalesWidget } from "@/components/dashboard/hourly-sales-widget";
+import { InventoryHealthWidget } from "@/components/dashboard/inventory-health-widget";
+import { CourierPerformanceWidget } from "@/components/dashboard/courier-performance-widget";
+import { CustomerInsightsWidget } from "@/components/dashboard/customer-insights-widget";
 
 // Curated luxury palette for Donut Pie Chart
 const DONUT_COLORS = [
@@ -113,19 +118,22 @@ function CustomChartTooltip({ active, payload, label, prefix = "", suffix = "", 
 }
 
 function DashboardContent() {
-  const { data: stats, isLoading, error, refetch, isFetching } = useDashboard();
+  const [dateRange, setDateRange] = useState("today");
+  const { data: stats, isLoading, error, refetch, isFetching } = useDashboard(dateRange);
   const t = useTranslations();
   const [isClient, setIsClient] = useState(false);
   const [widgetConfig, setWidgetConfig] = useState<DashboardWidgetConfig>(DEFAULT_WIDGET_CONFIG);
-  const [dateRange, setDateRange] = useState("today");
 
   // Prevent hydration issues and load widget config
   useEffect(() => {
     setIsClient(true);
     try {
-      const saved = localStorage.getItem("rms_dashboard_widgets");
+      const saved = localStorage.getItem("rms_dashboard_widgets_v2") || localStorage.getItem("rms_dashboard_widgets");
       if (saved) {
-        setWidgetConfig(JSON.parse(saved));
+        setWidgetConfig({
+          ...DEFAULT_WIDGET_CONFIG,
+          ...JSON.parse(saved),
+        });
       }
     } catch {
       // ignore
@@ -187,6 +195,14 @@ function DashboardContent() {
 
   // Safe data access with fallbacks
   const safeStats = {
+    period: stats.period,
+    pop_comparison: stats.pop_comparison,
+    channel_breakdown: stats.channel_breakdown || [],
+    payment_methods: stats.payment_methods || [],
+    hourly_sales: stats.hourly_sales || [],
+    inventory_health: stats.inventory_health,
+    courier_performance: stats.courier_performance,
+    customer_insights: stats.customer_insights,
     today: {
       sales: stats.today?.sales || 0,
       expenses: stats.today?.expenses || 0,
@@ -311,110 +327,154 @@ function DashboardContent() {
           </div>
         </motion.div>
 
-        {/* Key Metrics - Today's & Monthly Overview (Modern Cohesive Cards) */}
+        {/* Key Metrics - Dynamic Period Overview with PoP Comparison */}
         {widgetConfig.kpiCards && (
           <motion.div
             className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-3.5 sm:gap-5"
             variants={item}
           >
-            {/* Today's Sales */}
+            {/* Sales Card */}
             <Card className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800 shadow-xs hover:shadow-lg hover:border-blue-300/80 dark:hover:border-blue-800 transition-all duration-300 p-5 group relative overflow-hidden">
               <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-blue-500 to-indigo-500" />
               <div className="flex items-center justify-between pb-3">
                 <span className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                  {t("dashboard.today_sales")}
+                  {safeStats.period?.label ? `${safeStats.period.label} Sales` : t("dashboard.today_sales")}
                 </span>
                 <div className="w-9 h-9 rounded-xl bg-blue-50 dark:bg-blue-950/60 border border-blue-100 dark:border-blue-800 flex items-center justify-center text-blue-600 dark:text-blue-400 group-hover:scale-110 group-hover:bg-blue-600 group-hover:text-white transition-all duration-300">
                   <DollarSign className="h-4.5 w-4.5" />
                 </div>
               </div>
               <div className="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-slate-100 tracking-tight">
-                {formatCurrency(safeStats.today.sales)}
+                {formatCurrency(safeStats.pop_comparison ? safeStats.pop_comparison.current_sales : safeStats.today.sales)}
               </div>
-              <div className="flex items-center gap-1 text-xs font-semibold text-blue-700 dark:text-blue-400 bg-blue-50/80 dark:bg-blue-950/50 border border-blue-200/60 dark:border-blue-800 px-2 py-0.5 rounded-full w-fit mt-2.5">
-                <ArrowUpRight className="h-3.5 w-3.5" />
-                <span>{t("dashboard.today_revenue")}</span>
-              </div>
+              {safeStats.pop_comparison ? (
+                <div className={`flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-full w-fit mt-2.5 ${
+                  safeStats.pop_comparison.sales_growth >= 0
+                    ? "text-emerald-700 dark:text-emerald-400 bg-emerald-50/80 dark:bg-emerald-950/50 border border-emerald-200/60 dark:border-emerald-800"
+                    : "text-rose-700 dark:text-rose-400 bg-rose-50/80 dark:bg-rose-950/50 border border-rose-200/60 dark:border-rose-800"
+                }`}>
+                  {safeStats.pop_comparison.sales_growth >= 0 ? <ArrowUpRight className="h-3.5 w-3.5" /> : <ArrowDownRight className="h-3.5 w-3.5" />}
+                  <span>{safeStats.pop_comparison.sales_growth >= 0 ? `+${safeStats.pop_comparison.sales_growth}%` : `${safeStats.pop_comparison.sales_growth}%`} vs prior</span>
+                </div>
+              ) : (
+                <div className="flex items-center gap-1 text-xs font-semibold text-blue-700 dark:text-blue-400 bg-blue-50/80 dark:bg-blue-950/50 border border-blue-200/60 dark:border-blue-800 px-2 py-0.5 rounded-full w-fit mt-2.5">
+                  <ArrowUpRight className="h-3.5 w-3.5" />
+                  <span>{t("dashboard.today_revenue")}</span>
+                </div>
+              )}
             </Card>
 
-            {/* Today's Expenses */}
+            {/* Expenses Card */}
             <Card className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800 shadow-xs hover:shadow-lg hover:border-rose-300/80 dark:hover:border-rose-800 transition-all duration-300 p-5 group relative overflow-hidden">
               <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-rose-500 to-pink-500" />
               <div className="flex items-center justify-between pb-3">
                 <span className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                  {t("dashboard.today_expenses")}
+                  {safeStats.period?.label ? `${safeStats.period.label} Expenses` : t("dashboard.today_expenses")}
                 </span>
                 <div className="w-9 h-9 rounded-xl bg-rose-50 dark:bg-rose-950/60 border border-rose-100 dark:border-rose-800 flex items-center justify-center text-rose-600 dark:text-rose-400 group-hover:scale-110 group-hover:bg-rose-600 group-hover:text-white transition-all duration-300">
                   <TrendingDown className="h-4.5 w-4.5" />
                 </div>
               </div>
               <div className="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-slate-100 tracking-tight">
-                {formatCurrency(safeStats.today.expenses)}
+                {formatCurrency(safeStats.pop_comparison ? safeStats.pop_comparison.current_expenses : safeStats.today.expenses)}
               </div>
-              <div className="flex items-center gap-1 text-xs font-semibold text-rose-700 dark:text-rose-400 bg-rose-50/80 dark:bg-rose-950/50 border border-rose-200/60 dark:border-rose-800 px-2 py-0.5 rounded-full w-fit mt-2.5">
-                <ArrowDownRight className="h-3.5 w-3.5" />
-                <span>{t("dashboard.operating_cost")}</span>
+              {safeStats.pop_comparison ? (
+                <div className={`flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-full w-fit mt-2.5 ${
+                  safeStats.pop_comparison.expenses_growth <= 0
+                    ? "text-emerald-700 dark:text-emerald-400 bg-emerald-50/80 dark:bg-emerald-950/50 border border-emerald-200/60 dark:border-emerald-800"
+                    : "text-rose-700 dark:text-rose-400 bg-rose-50/80 dark:bg-rose-950/50 border border-rose-200/60 dark:border-rose-800"
+                }`}>
+                  {safeStats.pop_comparison.expenses_growth <= 0 ? <ArrowDownRight className="h-3.5 w-3.5" /> : <ArrowUpRight className="h-3.5 w-3.5" />}
+                  <span>{safeStats.pop_comparison.expenses_growth >= 0 ? `+${safeStats.pop_comparison.expenses_growth}%` : `${safeStats.pop_comparison.expenses_growth}%`} vs prior</span>
+                </div>
+              ) : (
+                <div className="flex items-center gap-1 text-xs font-semibold text-rose-700 dark:text-rose-400 bg-rose-50/80 dark:bg-rose-950/50 border border-rose-200/60 dark:border-rose-800 px-2 py-0.5 rounded-full w-fit mt-2.5">
+                  <ArrowDownRight className="h-3.5 w-3.5" />
+                  <span>{t("dashboard.operating_cost")}</span>
+                </div>
+              )}
+            </Card>
+
+            {/* Net Profit Card */}
+            <Card className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800 shadow-xs hover:shadow-lg hover:border-emerald-300/80 dark:hover:border-emerald-800 transition-all duration-300 p-5 group relative overflow-hidden">
+              <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-emerald-500 to-teal-500" />
+              <div className="flex items-center justify-between pb-3">
+                <span className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                  {safeStats.period?.label ? `${safeStats.period.label} Net Profit` : "Today's Profit"}
+                </span>
+                <div className="w-9 h-9 rounded-xl bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-100 dark:border-emerald-800 flex items-center justify-center text-emerald-600 dark:text-emerald-400 group-hover:scale-110 group-hover:bg-emerald-600 group-hover:text-white transition-all duration-300">
+                  <TrendingUp className="h-4.5 w-4.5" />
+                </div>
+              </div>
+              <div className={`text-2xl sm:text-3xl font-extrabold tracking-tight ${
+                (safeStats.pop_comparison ? safeStats.pop_comparison.current_net_profit : safeStats.today.profit) >= 0
+                  ? "text-slate-900 dark:text-slate-100"
+                  : "text-rose-600 dark:text-rose-400"
+              }`}>
+                {formatCurrency(safeStats.pop_comparison ? safeStats.pop_comparison.current_net_profit : safeStats.today.profit)}
+              </div>
+              {safeStats.pop_comparison ? (
+                <div className={`flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-full w-fit mt-2.5 ${
+                  safeStats.pop_comparison.profit_growth >= 0
+                    ? "text-emerald-700 dark:text-emerald-400 bg-emerald-50/80 dark:bg-emerald-950/50 border border-emerald-200/60 dark:border-emerald-800"
+                    : "text-rose-700 dark:text-rose-400 bg-rose-50/80 dark:bg-rose-950/50 border border-rose-200/60 dark:border-rose-800"
+                }`}>
+                  {safeStats.pop_comparison.profit_growth >= 0 ? <ArrowUpRight className="h-3.5 w-3.5" /> : <ArrowDownRight className="h-3.5 w-3.5" />}
+                  <span>{safeStats.pop_comparison.profit_growth >= 0 ? `+${safeStats.pop_comparison.profit_growth}%` : `${safeStats.pop_comparison.profit_growth}%`} vs prior</span>
+                </div>
+              ) : (
+                <div className="flex items-center gap-1 text-xs font-semibold text-emerald-700 dark:text-emerald-400 bg-emerald-50/80 dark:bg-emerald-950/50 border border-emerald-200/60 dark:border-emerald-800 px-2 py-0.5 rounded-full w-fit mt-2.5">
+                  <ArrowUpRight className="h-3.5 w-3.5" />
+                  <span>Gross margins</span>
+                </div>
+              )}
+            </Card>
+
+            {/* Total Orders & AOV Card */}
+            <Card className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800 shadow-xs hover:shadow-lg hover:border-amber-300/80 dark:hover:border-amber-800 transition-all duration-300 p-5 group relative overflow-hidden">
+              <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-amber-500 to-orange-500" />
+              <div className="flex items-center justify-between pb-3">
+                <span className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                  {safeStats.period?.label ? `${safeStats.period.label} Orders` : "Orders"}
+                </span>
+                <div className="w-9 h-9 rounded-xl bg-amber-50 dark:bg-amber-950/60 border border-amber-100 dark:border-amber-800 flex items-center justify-center text-amber-600 dark:text-amber-400 group-hover:scale-110 group-hover:bg-amber-600 group-hover:text-white transition-all duration-300">
+                  <ShoppingCart className="h-4.5 w-4.5" />
+                </div>
+              </div>
+              <div className="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-slate-100 tracking-tight">
+                {safeStats.pop_comparison ? safeStats.pop_comparison.current_orders : safeStats.online_preorders.today_count}{" "}
+                <span className="text-xs font-normal text-slate-400">sales</span>
+              </div>
+              <div className="flex items-center gap-1 text-xs font-semibold text-amber-700 dark:text-amber-400 bg-amber-50/80 dark:bg-amber-950/50 border border-amber-200/60 dark:border-amber-800 px-2 py-0.5 rounded-full w-fit mt-2.5">
+                <Sparkles className="h-3.5 w-3.5" />
+                <span>AOV: {formatCurrency(safeStats.pop_comparison?.current_aov || 0)}</span>
               </div>
             </Card>
 
-            {/* Today's Online Preorders */}
+            {/* Online Preorders Card */}
             <Card className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800 shadow-xs hover:shadow-lg hover:border-indigo-300/80 dark:hover:border-indigo-800 transition-all duration-300 p-5 group relative overflow-hidden">
               <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-indigo-500 to-violet-500" />
               <div className="flex items-center justify-between pb-3">
                 <span className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                  {t("dashboard.today_preorders")}
+                  {safeStats.period?.label ? `${safeStats.period.label} Preorders` : t("dashboard.today_preorders")}
                 </span>
                 <div className="w-9 h-9 rounded-xl bg-indigo-50 dark:bg-indigo-950/60 border border-indigo-100 dark:border-indigo-800 flex items-center justify-center text-indigo-600 dark:text-indigo-400 group-hover:scale-110 group-hover:bg-indigo-600 group-hover:text-white transition-all duration-300">
                   <ShoppingBag className="h-4.5 w-4.5" />
                 </div>
               </div>
               <div className="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-slate-100 tracking-tight">
-                {safeStats.online_preorders.today_count}{" "}
+                {safeStats.courier_performance ? safeStats.courier_performance.period_orders : safeStats.online_preorders.today_count}{" "}
                 <span className="text-xs font-normal text-slate-400">orders</span>
               </div>
               <div className="flex items-center gap-1 text-xs font-semibold text-indigo-700 dark:text-indigo-400 bg-indigo-50/80 dark:bg-indigo-950/50 border border-indigo-200/60 dark:border-indigo-800 px-2 py-0.5 rounded-full w-fit mt-2.5">
                 <ArrowUpRight className="h-3.5 w-3.5" />
-                <span>{formatCurrency(safeStats.online_preorders.today_amount)} today</span>
-              </div>
-            </Card>
-
-            {/* Monthly Sales */}
-            <Card className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800 shadow-xs hover:shadow-lg hover:border-emerald-300/80 dark:hover:border-emerald-800 transition-all duration-300 p-5 group relative overflow-hidden">
-              <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-emerald-500 to-teal-500" />
-              <div className="flex items-center justify-between pb-3">
-                <span className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                  {t("dashboard.monthly_sales")}
+                <span>
+                  {formatCurrency(
+                    safeStats.courier_performance
+                      ? safeStats.courier_performance.period_amount
+                      : safeStats.online_preorders.today_amount
+                  )}
                 </span>
-                <div className="w-9 h-9 rounded-xl bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-100 dark:border-emerald-800 flex items-center justify-center text-emerald-600 dark:text-emerald-400 group-hover:scale-110 group-hover:bg-emerald-600 group-hover:text-white transition-all duration-300">
-                  <TrendingUp className="h-4.5 w-4.5" />
-                </div>
-              </div>
-              <div className="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-slate-100 tracking-tight">
-                {formatCurrency(safeStats.monthly.sales)}
-              </div>
-              <div className="flex items-center gap-1 text-xs font-semibold text-emerald-700 dark:text-emerald-400 bg-emerald-50/80 dark:bg-emerald-950/50 border border-emerald-200/60 dark:border-emerald-800 px-2 py-0.5 rounded-full w-fit mt-2.5">
-                <ArrowUpRight className="h-3.5 w-3.5" />
-                <span>{t("dashboard.month_to_date")}</span>
-              </div>
-            </Card>
-
-            {/* Monthly Expenses */}
-            <Card className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800 shadow-xs hover:shadow-lg hover:border-pink-300/80 dark:hover:border-pink-800 transition-all duration-300 p-5 group relative overflow-hidden">
-              <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-pink-500 to-purple-500" />
-              <div className="flex items-center justify-between pb-3">
-                <span className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                  {t("dashboard.monthly_expenses")}
-                </span>
-                <div className="w-9 h-9 rounded-xl bg-pink-50 dark:bg-pink-950/60 border border-pink-100 dark:border-pink-800 flex items-center justify-center text-pink-600 dark:text-pink-400 group-hover:scale-110 group-hover:bg-pink-600 group-hover:text-white transition-all duration-300">
-                  <DollarSign className="h-4.5 w-4.5" />
-                </div>
-              </div>
-              <div className="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-slate-100 tracking-tight">
-                {formatCurrency(safeStats.monthly.expenses)}
-              </div>
-              <div className="flex items-center gap-1 text-xs font-semibold text-pink-700 dark:text-pink-400 bg-pink-50/80 dark:bg-pink-950/50 border border-pink-200/60 dark:border-pink-800 px-2 py-0.5 rounded-full w-fit mt-2.5">
-                <ArrowDownRight className="h-3.5 w-3.5" />
-                <span>{t("dashboard.total_spent")}</span>
               </div>
             </Card>
           </motion.div>
@@ -1062,6 +1122,77 @@ function DashboardContent() {
                 </div>
               </CardContent>
             </Card>
+          </motion.div>
+        )}
+
+        {/* ============================================================== */}
+        {/* ADVANCED BUSINESS INTELLIGENCE & PERFORMANCE ANALYTICS SECTION */}
+        {/* ============================================================== */}
+        {(widgetConfig.omniChannel ||
+          widgetConfig.hourlyHeatmap ||
+          widgetConfig.inventoryValuation ||
+          widgetConfig.courierPerformance ||
+          widgetConfig.customerInsights) && (
+          <motion.div variants={item} className="pt-6">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-200/80 dark:border-slate-800">
+              <div className="flex items-center space-x-3">
+                <div className="w-10 h-10 bg-gradient-to-tr from-indigo-600 via-violet-600 to-sky-500 rounded-xl flex items-center justify-center shadow-md shadow-indigo-500/20 text-white shrink-0">
+                  <Sparkles className="w-5 h-5" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h2 className="text-base sm:text-lg md:text-xl font-extrabold text-slate-900 dark:text-slate-100 tracking-tight">
+                      Advanced Business Intelligence & Performance
+                    </h2>
+                    <Badge variant="secondary" className="bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-400 border border-indigo-200/60 dark:border-indigo-800 text-[11px] font-semibold">
+                      Deep Analytics
+                    </Badge>
+                  </div>
+                  <p className="text-slate-500 dark:text-slate-400 mt-0.5 text-xs font-medium">
+                    Multi-channel revenue breakdown, store rush hours, warehouse valuation & customer retention
+                  </p>
+                </div>
+              </div>
+            </div>
+          </motion.div>
+        )}
+
+        {/* 1. Omni-Channel Sales Mix & Payment Methods Widget */}
+        {widgetConfig.omniChannel && (
+          <motion.div variants={item}>
+            <OmniChannelWidget
+              channels={safeStats.channel_breakdown}
+              paymentMethods={safeStats.payment_methods}
+              totalSales={safeStats.pop_comparison ? safeStats.pop_comparison.current_sales : safeStats.today.sales}
+            />
+          </motion.div>
+        )}
+
+        {/* 2. Peak Hours & Store Traffic Heatmap Widget */}
+        {widgetConfig.hourlyHeatmap && (
+          <motion.div variants={item}>
+            <HourlySalesWidget hourlySales={safeStats.hourly_sales} />
+          </motion.div>
+        )}
+
+        {/* 3. Inventory Capital & Stock Health Radar Widget */}
+        {widgetConfig.inventoryValuation && safeStats.inventory_health && (
+          <motion.div variants={item}>
+            <InventoryHealthWidget inventoryHealth={safeStats.inventory_health} />
+          </motion.div>
+        )}
+
+        {/* 4. Courier & Delivery Performance Widget */}
+        {widgetConfig.courierPerformance && safeStats.courier_performance && (
+          <motion.div variants={item}>
+            <CourierPerformanceWidget courierData={safeStats.courier_performance} />
+          </motion.div>
+        )}
+
+        {/* 5. Customer Loyalty & VIP Spenders Widget */}
+        {widgetConfig.customerInsights && safeStats.customer_insights && (
+          <motion.div variants={item}>
+            <CustomerInsightsWidget customerInsights={safeStats.customer_insights} />
           </motion.div>
         )}
       </div>
