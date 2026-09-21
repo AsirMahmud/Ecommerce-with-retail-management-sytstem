@@ -97,12 +97,13 @@ export function CourierTimeline({
     ? provider.trackUrl(consignmentId)
     : null;
 
-  // Determine stage flags
-  const isDelivered =
-    rawStatus.includes("delivered") ||
-    rawStatus.includes("completed") ||
-    order.status === "DELIVERED" ||
-    order.status === "COMPLETED";
+  // Determine current stage as a numeric level for proper timeline progression
+  // Stage 0: Booked (always true if we're showing the timeline)
+  // Stage 1: Picked up by courier
+  // Stage 2: In transit / sorting hub
+  // Stage 3: Out for delivery
+  // Stage 4: Delivered / Completed
+  // Stage -1: Cancelled / Returned / Failed
 
   const isReturnedOrCancelled =
     rawStatus.includes("cancel") ||
@@ -111,24 +112,42 @@ export function CourierTimeline({
     order.status === "CANCELLED" ||
     order.status === "RETURNED";
 
-  const isInTransit =
+  const isDelivered =
+    rawStatus.includes("delivered") ||
+    rawStatus.includes("completed") ||
+    order.status === "DELIVERED" ||
+    order.status === "COMPLETED";
+
+  // Compute the current stage level independently
+  let currentStage = 0; // Default: booked/registered
+  if (isDelivered) {
+    currentStage = 4;
+  } else if (isReturnedOrCancelled) {
+    currentStage = -1;
+  } else if (
+    rawStatus.includes("out_for_delivery") ||
+    rawStatus.includes("assigned_for_delivery")
+  ) {
+    currentStage = 3;
+  } else if (
     rawStatus.includes("transit") ||
-    rawStatus.includes("picked") ||
     rawStatus.includes("process") ||
     rawStatus.includes("hub") ||
-    isDelivered ||
-    isReturnedOrCancelled;
-
-  const isPickedUp =
+    rawStatus.includes("sorting")
+  ) {
+    currentStage = 2;
+  } else if (
     rawStatus.includes("picked") ||
-    isInTransit ||
-    isDelivered ||
-    isReturnedOrCancelled;
+    rawStatus.includes("pickup_done") ||
+    rawStatus.includes("pickup_complete")
+  ) {
+    currentStage = 1;
+  }
 
-  const isOutForDelivery =
-    rawStatus.includes("out_for_delivery") ||
-    rawStatus.includes("assigned_for_delivery") ||
-    isDelivered;
+  // Each step is active only if the current stage has reached or passed it
+  const isPickedUp = currentStage >= 1;
+  const isInTransit = currentStage >= 2;
+  const isOutForDelivery = currentStage >= 3;
 
   // Timestamps
   const dispatchDate = order.courier_dispatched_at
@@ -308,7 +327,7 @@ export function CourierTimeline({
             >
               Parcel Picked Up by Courier
             </div>
-            <div className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+            <div className={`text-xs mt-0.5 ${isPickedUp ? "text-slate-500 dark:text-slate-400" : "text-slate-400 dark:text-slate-600"}`}>
               {isPickedUp
                 ? "Handed over to courier rider / sorting center (Sent Today)"
                 : "Awaiting courier pickup rider arrival at store"}
@@ -337,7 +356,7 @@ export function CourierTimeline({
             >
               In Transit / Regional Sorting Hub
             </div>
-            <div className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+            <div className={`text-xs mt-0.5 ${isInTransit ? "text-slate-500 dark:text-slate-400" : "text-slate-400 dark:text-slate-600"}`}>
               {isInTransit
                 ? `Consignment moving through ${provider.label} delivery network`
                 : "Pending transfer to central transit hub"}
@@ -366,7 +385,7 @@ export function CourierTimeline({
             >
               Out for Doorstep Delivery
             </div>
-            <div className="text-xs text-slate-500 dark:text-slate-400 mt-0.5 truncate max-w-sm">
+            <div className={`text-xs mt-0.5 truncate max-w-sm ${isOutForDelivery ? "text-slate-500 dark:text-slate-400" : "text-slate-400 dark:text-slate-600"}`}>
               {isOutForDelivery
                 ? `Delivery agent dispatched to: ${addressStr}`
                 : "Will be dispatched once received at destination hub"}

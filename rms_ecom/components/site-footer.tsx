@@ -196,11 +196,6 @@ export function SiteFooter() {
                   Map preview will appear here when you add a Google Map embed URL in Home Page Settings.
                 </div>
               )}
-              ) : (
-                <div className="flex h-full w-full items-center justify-center text-sm text-white/60">
-                  Map preview will appear here when you add a Google Map embed URL in Home Page Settings.
-                </div>
-              )}
             </div>
           </div>
         </div>
