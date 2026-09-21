@@ -26,6 +26,7 @@ import {
     MoreHorizontal,
     RotateCcw,
     PauseCircle,
+    Receipt,
 } from "lucide-react";
 import { format } from "date-fns";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -43,6 +44,7 @@ import {
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { useQueryClient } from "@tanstack/react-query";
 import { ONLINE_PREORDERS_QUERY_KEY } from "@/hooks/queries/use-online-preorders";
+import { CourierTimeline } from "@/components/courier/courier-timeline";
 
 interface OrderDetailsSheetProps {
     order: OnlinePreorder | null;
@@ -368,6 +370,35 @@ export function OrderDetailsSheet({ order, isOpen, onClose, onRefresh, onEdit, o
         }
     };
 
+    const handleSyncCourierStatus = async (orderId: number) => {
+        try {
+            setIsCheckingSteadfastStatus(true);
+            const res = await courierApi.getOrderStatus(orderId);
+            if (res.data.success) {
+                toast({
+                    title: "Courier Status Synchronized",
+                    description: `Latest status: ${res.data.status || "Updated"}`,
+                });
+                queryClient.invalidateQueries({ queryKey: [ONLINE_PREORDERS_QUERY_KEY] });
+                onRefresh();
+            } else {
+                toast({
+                    title: "Sync Failed",
+                    description: res.data.message || "Failed to update tracking status",
+                    variant: "destructive",
+                });
+            }
+        } catch (err: any) {
+            toast({
+                title: "Sync Error",
+                description: err.response?.data?.message || "Failed to contact courier gateway",
+                variant: "destructive",
+            });
+        } finally {
+            setIsCheckingSteadfastStatus(false);
+        }
+    };
+
     const status = statusConfig[order.status] || { color: "bg-gray-100 text-gray-800", icon: AlertCircle };
     const StatusIcon = status.icon;
 
@@ -469,6 +500,34 @@ export function OrderDetailsSheet({ order, isOpen, onClose, onRefresh, onEdit, o
                                     );
                                 })}
                             </div>
+
+                            {/* Converted Sale Invoice Banner */}
+                            {order.invoice_number && (
+                                <div className="p-3.5 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 flex items-center justify-between gap-3 mt-3">
+                                    <div className="flex items-center gap-2.5">
+                                        <div className="w-8 h-8 rounded-lg bg-emerald-100 dark:bg-emerald-900/60 flex items-center justify-center text-emerald-700 dark:text-emerald-300 shrink-0">
+                                            <Receipt className="w-4 h-4" />
+                                        </div>
+                                        <div>
+                                            <div className="text-xs font-bold text-emerald-900 dark:text-emerald-200 flex items-center gap-1.5">
+                                                <span>Sale Invoice Linked</span>
+                                                <Badge className="bg-emerald-600 text-white text-[10px] font-mono px-1.5 py-0">
+                                                    {order.invoice_number}
+                                                </Badge>
+                                            </div>
+                                            <div className="text-[11px] text-emerald-700 dark:text-emerald-400">
+                                                Converted into retail sale record
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <Button asChild size="sm" variant="outline" className="h-7 text-xs border-emerald-300 dark:border-emerald-700 text-emerald-800 dark:text-emerald-200 hover:bg-emerald-100 dark:hover:bg-emerald-900/50 shrink-0">
+                                        <Link href={`/sales/sales-history?search=${encodeURIComponent(order.invoice_number)}`} target="_blank">
+                                            <ExternalLink className="w-3 h-3 mr-1" />
+                                            View Sale
+                                        </Link>
+                                    </Button>
+                                </div>
+                            )}
 
                             {/* HOLD Banner */}
                             {order.status === "HOLD" && (
@@ -1094,6 +1153,15 @@ export function OrderDetailsSheet({ order, isOpen, onClose, onRefresh, onEdit, o
                                 )}
                             </div>
                         </div>
+
+                        {/* Courier Delivery Timeline (when dispatched or consignment exists) */}
+                        {(order.courier_consignment_id || order.steadfast_consignment_id || order.courier_partner || order.courier_dispatched_at) && (
+                            <CourierTimeline
+                                order={order}
+                                onSyncStatus={handleSyncCourierStatus}
+                                isSyncing={isCheckingSteadfastStatus}
+                            />
+                        )}
                     </div>
                 </ScrollArea>
 

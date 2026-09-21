@@ -427,7 +427,37 @@ class OnlinePreorderSerializer(serializers.ModelSerializer):
         else:
             ret['return_expense_details'] = None
 
+        # Populate converted sale and invoice number for completed preorders
+        try:
+            conversion = getattr(instance, 'conversion', None)
+            if conversion and conversion.sale:
+                ret['sale_id'] = conversion.sale_id
+                ret['invoice_number'] = conversion.sale.invoice_number
+            else:
+                ret['sale_id'] = None
+                ret['invoice_number'] = None
+        except Exception:
+            ret['sale_id'] = None
+            ret['invoice_number'] = None
+
         return ret
+
+
+class CourierParcelSerializer(serializers.ModelSerializer):
+    """
+    High-performance lightweight serializer for courier partner management dashboard.
+    Bypasses heavy N+1 queries for product images, fraud scoring, and conversion lookups.
+    """
+    class Meta:
+        model = OnlinePreorder
+        fields = [
+            'id', 'customer_name', 'customer_phone', 'shipping_address',
+            'courier_partner', 'courier_consignment_id', 'courier_tracking_code',
+            'steadfast_consignment_id', 'steadfast_tracking_code',
+            'courier_status', 'steadfast_status', 'status',
+            'total_amount', 'courier_dispatched_at', 'courier_delivered_at',
+            'created_at', 'updated_at', 'notes', 'items'
+        ]
 
 
 class OnlinePreorderVerificationItemSerializer(serializers.ModelSerializer):
@@ -509,6 +539,28 @@ class CourierSettingSerializer(serializers.ModelSerializer):
 
     def get_has_keys(self, obj):
         return obj.has_valid_credentials()
+
+    def to_representation(self, instance):
+        ret = super().to_representation(instance)
+        sensitive_fields = ['api_key', 'secret_key', 'client_secret', 'password']
+        for field in sensitive_fields:
+            val = ret.get(field)
+            if val:
+                val_str = str(val)
+                if len(val_str) > 4:
+                    ret[field] = '••••••••' + val_str[-4:]
+                else:
+                    ret[field] = '••••••••'
+        return ret
+
+    def update(self, instance, validated_data):
+        sensitive_fields = ['api_key', 'secret_key', 'client_secret', 'password']
+        for field in sensitive_fields:
+            if field in validated_data:
+                val = validated_data[field]
+                if isinstance(val, str) and val.startswith('••••••••'):
+                    validated_data.pop(field)
+        return super().update(instance, validated_data)
 
 
 

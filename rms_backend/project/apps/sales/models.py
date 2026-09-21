@@ -58,6 +58,7 @@ class Sale(models.Model):
     gift_amount = models.DecimalField(max_digits=10, decimal_places=2, default=0, validators=[MinValueValidator(Decimal('0.00'))])
     
     notes = models.TextField(blank=True)
+    idempotency_key = models.CharField(max_length=120, unique=True, null=True, blank=True, db_index=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

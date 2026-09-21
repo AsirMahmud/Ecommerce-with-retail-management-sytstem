@@ -64,6 +64,9 @@ export interface OnlinePreorder {
   courier_dispatched_at?: string;
   courier_response?: any;
 
+  sale_id?: number | null;
+  invoice_number?: string | null;
+
   return_delivery_charge_paid_by_customer?: boolean;
   return_charge_amount?: number | string;
   return_reason?: string;
@@ -201,7 +204,7 @@ export const UNIFIED_DELIVERY_STATUSES = [
   { value: "not_dispatched", label: "Not Dispatched" },
   { value: "in_review", label: "In Review / Booked" },
   { value: "in_transit", label: "In Transit" },
-  { value: "delivered", label: "Delivered / Completed" },
+  { value: "delivered", label: "Delivered" },
   { value: "cancelled_returned", label: "Cancelled / Returned" },
 ];
 
@@ -228,6 +231,16 @@ export interface PaginatedResponse<T> {
 export interface OnlinePreorderMetrics {
   total_orders: number;
   today_orders: number;
+  today_picked_count?: number;
+  today_picked_cod_amount?: number;
+  today_delivered_count?: number;
+  today_delivered_cod_amount?: number;
+  in_transit_count?: number;
+  in_transit_cod_amount?: number;
+  delivered_courier_count?: number;
+  delivered_courier_cod_amount?: number;
+  returned_courier_count?: number;
+  returned_courier_cod_amount?: number;
   status_breakdown: {
     PENDING: number;
     CONFIRMED: number;

@@ -6,30 +6,40 @@ const publicPaths = [
     '/login',
     '/register',
     '/forgot-password',
-    '/manifest.json',
-    '/sw.js',
-    '/offline.html',
-    '/icons',
-    '/images',
-    '/torongox-logo',
-    '/favicon.ico',
 ];
 
 export function middleware(request: NextRequest) {
     const { pathname } = request.nextUrl;
-    const token = request.cookies.get('token')?.value;
 
-    // Check if the current path is public
+    // Fast-path bypass for Next internals, API calls, and static files (.json, .js, images, icons)
+    if (
+        pathname.startsWith('/_next') ||
+        pathname.startsWith('/api') ||
+        pathname === '/manifest.json' ||
+        pathname === '/sw.js' ||
+        pathname === '/offline.html' ||
+        pathname === '/favicon.ico' ||
+        pathname.startsWith('/icons/') ||
+        pathname.startsWith('/images/') ||
+        pathname.startsWith('/torongox-logo') ||
+        pathname.includes('.')
+    ) {
+        return NextResponse.next();
+    }
+
+    const token = request.cookies.get('token')?.value;
+    const refreshToken = request.cookies.get('refreshToken')?.value;
+
     const isPublicPath = publicPaths.some((path) => pathname.startsWith(path));
 
-    // If no token and trying to access protected route, redirect to login
-    if (!token && !isPublicPath) {
+    // If completely unauthenticated and trying to access a protected route
+    if (!token && !refreshToken && !isPublicPath) {
         const loginUrl = new URL('/login', request.url);
         loginUrl.searchParams.set('redirect', pathname);
         return NextResponse.redirect(loginUrl);
     }
 
-    // If has token, do basic expiration check
+    // If has access token, check expiration
     if (token) {
         try {
             const parts = token.split('.');
@@ -37,22 +47,24 @@ export function middleware(request: NextRequest) {
                 const payload = JSON.parse(atob(parts[1]));
                 const isExpired = payload.exp && payload.exp * 1000 < Date.now();
 
-                if (isExpired) {
+                // If access token expired and no refresh token exists, redirect to login
+                if (isExpired && !refreshToken) {
                     const response = NextResponse.redirect(new URL('/login', request.url));
                     response.cookies.delete('token');
                     return response;
                 }
             }
 
-            // If authenticated user tries to access login, redirect to dashboard
-            if (isPublicPath && pathname.startsWith('/login')) {
+            // If user is authenticated and visits /login, redirect to home
+            if (isPublicPath && pathname.startsWith('/login') && !refreshToken) {
                 return NextResponse.redirect(new URL('/', request.url));
             }
         } catch {
-            // Invalid token, clear and redirect
-            const response = NextResponse.redirect(new URL('/login', request.url));
-            response.cookies.delete('token');
-            return response;
+            if (!refreshToken) {
+                const response = NextResponse.redirect(new URL('/login', request.url));
+                response.cookies.delete('token');
+                return response;
+            }
         }
     }
 
@@ -61,6 +73,12 @@ export function middleware(request: NextRequest) {
 
 export const config = {
     matcher: [
-        '/((?!_next/static|_next/image|favicon.ico|manifest.json|sw.js|offline.html|icons|images|torongox-logo|api).*)',
+        /*
+         * Match all request paths except for the ones starting with:
+         * - _next/static (static files)
+         * - _next/image (image optimization files)
+         * - favicon.ico (favicon file)
+         */
+        '/((?!_next/static|_next/image|favicon.ico).*)',
     ],
 };

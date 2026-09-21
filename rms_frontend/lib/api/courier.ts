@@ -31,9 +31,16 @@ export interface ActiveCourier {
 export interface CourierParcelSummary {
   total_booked: number;
   in_transit: number;
+  in_transit_cod_amount?: number;
   delivered: number;
+  delivered_cod_amount?: number;
   cancelled: number;
+  cancelled_cod_amount?: number;
   total_cod_amount: number;
+  today_picked_count?: number;
+  today_picked_cod_amount?: number;
+  today_delivered_count?: number;
+  today_delivered_cod_amount?: number;
 }
 
 export interface CourierParcelsResponse {

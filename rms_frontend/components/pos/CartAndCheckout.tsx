@@ -8,6 +8,8 @@ import {
   Minus,
   ChevronLeft,
   ChevronRight,
+  Clock,
+  PauseCircle,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -62,6 +64,9 @@ export default function CartAndCheckout() {
     setSplitPayments,
     cashAmount,
     setCashAmount,
+    heldCarts,
+    holdCurrentCart,
+    setShowHeldCartsModal,
   } = usePOSStore();
 
   const [isMounted, setIsMounted] = useState(true);
@@ -212,7 +217,38 @@ export default function CartAndCheckout() {
                      <Badge className="ml-1 text-xs bg-blue-500 hover:bg-blue-600">{cart.length}</Badge>
                    )}
                  </h2>
-                <div className="flex gap-1">
+                <div className="flex items-center gap-1">
+                  {heldCarts.length > 0 && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setShowHeldCartsModal(true)}
+                      className="h-7 text-xs px-2 text-indigo-600 border-indigo-200 hover:bg-indigo-50 font-medium"
+                      title="View and resume parked sales"
+                    >
+                      <Clock className="h-3 w-3 mr-1" />
+                      Held ({heldCarts.length})
+                    </Button>
+                  )}
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      const held = holdCurrentCart();
+                      if (held) {
+                        toast({
+                          title: "Cart Held",
+                          description: "Sale parked. Ready for next customer.",
+                        });
+                      }
+                    }}
+                    disabled={cart.length === 0}
+                    className="h-7 text-xs px-2 text-amber-600 border-amber-200 hover:bg-amber-50 font-medium"
+                    title="Park active sale to serve next customer"
+                  >
+                    <PauseCircle className="h-3 w-3 mr-1" />
+                    Hold
+                  </Button>
                   <Button
                     variant="outline"
                     size="sm"

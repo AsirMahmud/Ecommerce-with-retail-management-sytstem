@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useMemo } from "react";
+import { useSearchParams } from "next/navigation";
 import {
   Card,
   CardContent,
@@ -177,7 +178,16 @@ const item = {
 };
 
 export default function SalesHistory() {
-  const [searchTerm, setSearchTerm] = useState("");
+  const searchParams = useSearchParams();
+  const [searchTerm, setSearchTerm] = useState(() => searchParams?.get("search") || searchParams?.get("invoice") || "");
+
+  useEffect(() => {
+    const query = searchParams?.get("search") || searchParams?.get("invoice");
+    if (query) {
+      setSearchTerm(query);
+    }
+  }, [searchParams]);
+
   const [statusFilter, setStatusFilter] = useState<SaleStatus | "all">("all");
   const [saleTypeFilter, setSaleTypeFilter] = useState<SaleType | "all">("all");
   const [paymentFilter, setPaymentFilter] = useState<PaymentMethod | "all">("all");

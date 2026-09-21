@@ -43,7 +43,12 @@ import {
   ArrowUpDown,
   SlidersHorizontal,
   X,
+  PackageCheck,
+  ChevronDown,
+  Receipt,
+  Printer,
 } from "lucide-react";
+import { printA4Invoice, type PrintableSale } from "@/lib/print-utils";
 import {
   onlinePreordersApi,
   type OnlinePreorder,
@@ -241,6 +246,48 @@ export default function OnlinePreordersPage() {
       addr.area
     ].filter(Boolean);
     return Array.from(new Set(parts)).join(", ");
+  };
+
+  const buildPrintableFromPreorder = (order: OnlinePreorder): PrintableSale => {
+    const customerAddr = formatAddressString(order.shipping_address) || "Bangladesh";
+    const totalDiscount =
+      (Number(order.coupon_discount_amount) || 0) +
+      (Number(order.automatic_discount_amount) || 0) +
+      (order.items?.reduce((sum, item) => sum + (Number(item.discount) || 0), 0) || 0);
+
+    return {
+      id: order.id,
+      invoice_number: order.invoice_number || `ORD-${order.id}`,
+      date: order.created_at,
+      customer: {
+        name: order.customer_name,
+        phone: order.customer_phone,
+        email: order.customer_email || undefined,
+        address: customerAddr,
+      },
+      customer_phone: order.customer_phone,
+      items:
+        order.items?.map((it) => ({
+          name: it.product_name || `Product #${it.product_id}`,
+          size: it.size,
+          color: it.color,
+          quantity: it.quantity,
+          price: Number(it.unit_price || 0),
+          unit_price: Number(it.unit_price || 0),
+          total: it.quantity * Number(it.unit_price || 0) - (Number(it.discount) || 0),
+        })) || [],
+      subtotal: Number(order.original_subtotal || order.total_amount),
+      discount: totalDiscount,
+      total: Number(order.total_amount),
+      amount_paid: Number(order.total_amount),
+      amount_due: 0,
+      payment_method: order.delivery_method || "Cash on Delivery",
+      status: order.status,
+    };
+  };
+
+  const handlePrintPreorderInvoice = (order: OnlinePreorder) => {
+    printA4Invoice(buildPrintableFromPreorder(order));
   };
 
   const openFastDispatchDialog = async (o: OnlinePreorder, courierProvider?: string) => {
@@ -568,13 +615,27 @@ export default function OnlinePreordersPage() {
     }
     return [
       { value: "all", label: "All Deliveries", count: metrics?.delivery_breakdown?.all ?? totalCount },
+      { value: "today_picked", label: "Today Picked (Sent)", count: metrics?.today_picked_count ?? 0 },
+      { value: "today_delivered", label: "Today Delivered", count: metrics?.today_delivered_count ?? 0 },
       { value: "not_dispatched", label: "Not Dispatched", count: metrics?.delivery_breakdown?.not_dispatched ?? 0 },
       { value: "in_transit", label: "In Transit", count: metrics?.delivery_breakdown?.in_transit ?? 0 },
       { value: "in_review", label: "In Review", count: metrics?.delivery_breakdown?.in_review ?? 0 },
-      { value: "delivered", label: "Delivered / Completed", count: metrics?.delivery_breakdown?.delivered ?? 0 },
+      { value: "delivered", label: "Delivered (All Time)", count: metrics?.delivery_breakdown?.delivered ?? 0 },
       { value: "cancelled_returned", label: "Returned / Cancelled", count: metrics?.delivery_breakdown?.cancelled_returned ?? 0 },
     ];
   }, [courierFilter, metrics, totalCount]);
+
+  // Order status options with live count metrics and color dots
+  const orderStatusOptions = useMemo(() => [
+    { value: "all", label: "All Orders", count: metrics?.total_orders ?? totalCount, dot: "bg-slate-400" },
+    { value: "PENDING", label: "Pending", count: metrics?.status_breakdown?.PENDING ?? 0, dot: "bg-amber-500" },
+    { value: "CONFIRMED", label: "Confirmed", count: metrics?.status_breakdown?.CONFIRMED ?? 0, dot: "bg-blue-500" },
+    { value: "HOLD", label: "Hold", count: metrics?.status_breakdown?.HOLD ?? 0, dot: "bg-orange-500" },
+    { value: "DELIVERED", label: "Delivered", count: metrics?.status_breakdown?.DELIVERED ?? 0, dot: "bg-indigo-500" },
+    { value: "COMPLETED", label: "Completed", count: metrics?.status_breakdown?.COMPLETED ?? 0, dot: "bg-emerald-500" },
+    { value: "RETURNED", label: "Returned", count: metrics?.status_breakdown?.RETURNED ?? 0, dot: "bg-purple-500" },
+    { value: "CANCELLED", label: "Cancelled", count: metrics?.status_breakdown?.CANCELLED ?? 0, dot: "bg-rose-500" },
+  ], [metrics, totalCount]);
 
   // Pagination calculation
   const fromRecord = totalCount === 0 ? 0 : (page - 1) * pageSize + 1;
@@ -664,87 +725,138 @@ export default function OnlinePreordersPage() {
       </div>
 
       {/* 2. Compact Horizontal Executive Ribbon (Only ~50px tall, collapsible) */}
+      {/* 2. Compact Horizontal Executive Ribbon (Collapsible) */}
       {showKpis && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5 sm:gap-5 animate-in fade-in duration-200">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3 sm:gap-3.5 animate-in fade-in duration-200">
           {/* Metric 1: Total Orders */}
-          <Card className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800 shadow-xs hover:shadow-lg hover:border-indigo-300/80 dark:hover:border-indigo-800 transition-all duration-300 p-5 group relative overflow-hidden">
+          <Card className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800 shadow-xs hover:shadow-lg hover:border-indigo-300/80 dark:hover:border-indigo-800 transition-all duration-300 p-4 sm:p-5 group relative overflow-hidden">
             <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-indigo-500 to-violet-500" />
-            <div className="flex items-center justify-between pb-3">
+            <div className="flex items-center justify-between pb-2">
               <span className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
                 Preorders
               </span>
-              <div className="w-9 h-9 rounded-xl bg-indigo-50 dark:bg-indigo-950/60 border border-indigo-100 dark:border-indigo-800 flex items-center justify-center text-indigo-600 dark:text-indigo-400 group-hover:scale-110 group-hover:bg-indigo-600 group-hover:text-white transition-all duration-300">
-                <ShoppingBag className="h-4.5 w-4.5" />
+              <div className="w-8 h-8 rounded-xl bg-indigo-50 dark:bg-indigo-950/60 border border-indigo-100 dark:border-indigo-800 flex items-center justify-center text-indigo-600 dark:text-indigo-400 group-hover:scale-110 group-hover:bg-indigo-600 group-hover:text-white transition-all duration-300">
+                <ShoppingBag className="h-4 w-4" />
               </div>
             </div>
-            <div className="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-slate-100 tracking-tight">
+            <div className="text-xl sm:text-2xl font-extrabold text-slate-900 dark:text-slate-100 tracking-tight">
               {isMetricsLoading ? "..." : (metrics?.total_orders ?? totalCount)}
             </div>
-            <div className="flex items-center gap-1 text-xs font-semibold text-emerald-700 dark:text-emerald-400 bg-emerald-50/80 dark:bg-emerald-950/50 border border-emerald-200/60 dark:border-emerald-800 px-2 py-0.5 rounded-full w-fit mt-2.5">
-              <TrendingUp className="h-3.5 w-3.5" />
-              <span>+{metrics?.today_orders || 0} today</span>
+            <div className="flex items-center gap-1 text-[11px] font-semibold text-indigo-700 dark:text-indigo-400 bg-indigo-50/80 dark:bg-indigo-950/50 border border-indigo-200/60 dark:border-indigo-800 px-2 py-0.5 rounded-full w-fit mt-2">
+              <TrendingUp className="h-3 w-3" />
+              <span>+{metrics?.today_orders || 0} new today</span>
             </div>
           </Card>
 
-          {/* Metric 2: Completed Revenue */}
-          <Card className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800 shadow-xs hover:shadow-lg hover:border-emerald-300/80 dark:hover:border-emerald-800 transition-all duration-300 p-5 group relative overflow-hidden">
+          {/* Metric 2: Today Picked (Sent Today) */}
+          <Card
+            onClick={() => applyPreset("all", "today_picked")}
+            className="cursor-pointer bg-white dark:bg-slate-900 rounded-2xl border border-indigo-200/80 dark:border-indigo-800 shadow-xs hover:shadow-lg hover:border-indigo-400 dark:hover:border-indigo-700 transition-all duration-300 p-4 sm:p-5 group relative overflow-hidden"
+          >
+            <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-blue-500 to-indigo-600" />
+            <div className="flex items-center justify-between pb-2">
+              <span className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                Today Picked (Sent)
+              </span>
+              <div className="w-8 h-8 rounded-xl bg-indigo-50 dark:bg-indigo-950/60 border border-indigo-100 dark:border-indigo-800 flex items-center justify-center text-indigo-600 dark:text-indigo-400 group-hover:scale-110 group-hover:bg-indigo-600 group-hover:text-white transition-all duration-300">
+                <Truck className="h-4 w-4" />
+              </div>
+            </div>
+            <div className="text-xl sm:text-2xl font-extrabold text-indigo-600 dark:text-indigo-400 tracking-tight">
+              {isMetricsLoading ? "..." : (metrics?.today_picked_count ?? 0)}
+            </div>
+            <div className="flex items-center gap-1 text-[11px] font-semibold text-indigo-700 dark:text-indigo-400 bg-indigo-50/80 dark:bg-indigo-950/50 border border-indigo-200/60 dark:border-indigo-800 px-2 py-0.5 rounded-full w-fit mt-2 truncate">
+              <Truck className="h-3 w-3 shrink-0" />
+              <span className="truncate">৳{(metrics?.today_picked_cod_amount ?? 0).toLocaleString()} sent today</span>
+            </div>
+          </Card>
+
+          {/* Metric 3: Today Delivered */}
+          <Card
+            onClick={() => applyPreset("all", "today_delivered")}
+            className="cursor-pointer bg-white dark:bg-slate-900 rounded-2xl border border-teal-200/80 dark:border-teal-800 shadow-xs hover:shadow-lg hover:border-teal-400 dark:hover:border-teal-700 transition-all duration-300 p-4 sm:p-5 group relative overflow-hidden"
+          >
+            <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-teal-500 to-emerald-500" />
+            <div className="flex items-center justify-between pb-2">
+              <span className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                Today Delivered
+              </span>
+              <div className="w-8 h-8 rounded-xl bg-teal-50 dark:bg-teal-950/60 border border-teal-100 dark:border-teal-800 flex items-center justify-center text-teal-600 dark:text-teal-400 group-hover:scale-110 group-hover:bg-teal-600 group-hover:text-white transition-all duration-300">
+                <PackageCheck className="h-4 w-4" />
+              </div>
+            </div>
+            <div className="text-xl sm:text-2xl font-extrabold text-teal-600 dark:text-teal-400 tracking-tight truncate">
+              {isMetricsLoading ? "..." : (metrics?.today_delivered_count ?? 0)}
+            </div>
+            <div className="flex items-center gap-1 text-[11px] font-semibold text-teal-700 dark:text-teal-400 bg-teal-50/80 dark:bg-teal-950/50 border border-teal-200/60 dark:border-teal-800 px-2 py-0.5 rounded-full w-fit mt-2">
+              <Check className="h-3 w-3 shrink-0" />
+              <span className="truncate">৳{(metrics?.today_delivered_cod_amount ?? 0).toLocaleString()} delivered today</span>
+            </div>
+          </Card>
+
+          {/* Metric 4: In-Transit Floating COD */}
+          <Card
+            onClick={() => applyPreset("all", "in_transit")}
+            className="cursor-pointer bg-white dark:bg-slate-900 rounded-2xl border border-blue-200/80 dark:border-blue-800 shadow-xs hover:shadow-lg hover:border-blue-400 dark:hover:border-blue-700 transition-all duration-300 p-4 sm:p-5 group relative overflow-hidden"
+          >
+            <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-sky-500 to-blue-600" />
+            <div className="flex items-center justify-between pb-2">
+              <span className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                In Transit COD
+              </span>
+              <div className="w-8 h-8 rounded-xl bg-blue-50 dark:bg-blue-950/60 border border-blue-100 dark:border-blue-800 flex items-center justify-center text-blue-600 dark:text-blue-400 group-hover:scale-110 group-hover:bg-blue-600 group-hover:text-white transition-all duration-300">
+                <Package className="h-4 w-4" />
+              </div>
+            </div>
+            <div className="text-xl sm:text-2xl font-extrabold text-blue-600 dark:text-blue-400 tracking-tight truncate">
+              {isMetricsLoading ? "..." : formatCurrency(metrics?.in_transit_cod_amount ?? 0)}
+            </div>
+            <div className="flex items-center gap-1 text-[11px] font-semibold text-blue-700 dark:text-blue-400 bg-blue-50/80 dark:bg-blue-950/50 border border-blue-200/60 dark:border-blue-800 px-2 py-0.5 rounded-full w-fit mt-2">
+              <Truck className="h-3 w-3 shrink-0" />
+              <span>{metrics?.in_transit_count ?? 0} with couriers</span>
+            </div>
+          </Card>
+
+          {/* Metric 5: Delivered COD (All Time) */}
+          <Card
+            onClick={() => applyPreset("all", "delivered")}
+            className="cursor-pointer bg-white dark:bg-slate-900 rounded-2xl border border-emerald-200/80 dark:border-emerald-800 shadow-xs hover:shadow-lg hover:border-emerald-300/80 dark:hover:border-emerald-800 transition-all duration-300 p-4 sm:p-5 group relative overflow-hidden"
+          >
             <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-emerald-500 to-teal-500" />
-            <div className="flex items-center justify-between pb-3">
+            <div className="flex items-center justify-between pb-2">
               <span className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                Completed COD
+                Delivered (All Time)
               </span>
-              <div className="w-9 h-9 rounded-xl bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-100 dark:border-emerald-800 flex items-center justify-center text-emerald-600 dark:text-emerald-400 group-hover:scale-110 group-hover:bg-emerald-600 group-hover:text-white transition-all duration-300">
-                <DollarSign className="h-4.5 w-4.5" />
+              <div className="w-8 h-8 rounded-xl bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-100 dark:border-emerald-800 flex items-center justify-center text-emerald-600 dark:text-emerald-400 group-hover:scale-110 group-hover:bg-emerald-600 group-hover:text-white transition-all duration-300">
+                <DollarSign className="h-4 w-4" />
               </div>
             </div>
-            <div className="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-slate-100 tracking-tight">
-              {isMetricsLoading ? "..." : formatCurrency(metrics?.financials?.completed_revenue ?? 0)}
-              {" "}<span className="text-xs font-normal text-slate-400">({metrics?.status_breakdown?.COMPLETED ?? 0} del.)</span>
+            <div className="text-xl sm:text-2xl font-extrabold text-emerald-600 dark:text-emerald-400 tracking-tight truncate">
+              {isMetricsLoading ? "..." : formatCurrency(metrics?.delivered_courier_cod_amount ?? metrics?.financials?.completed_revenue ?? 0)}
             </div>
-            <div className="flex items-center gap-1 text-xs font-semibold text-emerald-700 dark:text-emerald-400 bg-emerald-50/80 dark:bg-emerald-950/50 border border-emerald-200/60 dark:border-emerald-800 px-2 py-0.5 rounded-full w-fit mt-2.5">
-              <DollarSign className="h-3.5 w-3.5" />
-              <span>Total revenue</span>
+            <div className="flex items-center gap-1 text-[11px] font-semibold text-emerald-700 dark:text-emerald-400 bg-emerald-50/80 dark:bg-emerald-950/50 border border-emerald-200/60 dark:border-emerald-800 px-2 py-0.5 rounded-full w-fit mt-2">
+              <Check className="h-3 w-3 shrink-0" />
+              <span>{metrics?.delivered_courier_count ?? metrics?.status_breakdown?.COMPLETED ?? 0} all-time deliveries</span>
             </div>
           </Card>
 
-          {/* Metric 3: Fulfillment Rate */}
-          <Card className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800 shadow-xs hover:shadow-lg hover:border-blue-300/80 dark:hover:border-blue-800 transition-all duration-300 p-5 group relative overflow-hidden">
-            <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-blue-500 to-indigo-500" />
-            <div className="flex items-center justify-between pb-3">
+          {/* Metric 6: Delivery Success Rate */}
+          <Card className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800 shadow-xs hover:shadow-lg hover:border-purple-300/80 dark:hover:border-purple-800 transition-all duration-300 p-4 sm:p-5 group relative overflow-hidden">
+            <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-purple-500 to-pink-500" />
+            <div className="flex items-center justify-between pb-2">
               <span className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                Delivery Rate
+                Delivery Success
               </span>
-              <div className="w-9 h-9 rounded-xl bg-blue-50 dark:bg-blue-950/60 border border-blue-100 dark:border-blue-800 flex items-center justify-center text-blue-600 dark:text-blue-400 group-hover:scale-110 group-hover:bg-blue-600 group-hover:text-white transition-all duration-300">
-                <Truck className="h-4.5 w-4.5" />
+              <div className="w-8 h-8 rounded-xl bg-purple-50 dark:bg-purple-950/60 border border-purple-100 dark:border-purple-800 flex items-center justify-center text-purple-600 dark:text-purple-400 group-hover:scale-110 group-hover:bg-purple-600 group-hover:text-white transition-all duration-300">
+                <Truck className="h-4 w-4" />
               </div>
             </div>
-            <div className="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-slate-100 tracking-tight">
+            <div className="text-xl sm:text-2xl font-extrabold text-slate-900 dark:text-slate-100 tracking-tight">
               {isMetricsLoading ? "..." : `${metrics?.rates?.fulfillment_rate ?? 0}%`}
             </div>
-            <div className="flex items-center gap-1 text-xs font-semibold text-purple-700 dark:text-purple-400 bg-purple-50/80 dark:bg-purple-950/50 border border-purple-200/60 dark:border-purple-800 px-2 py-0.5 rounded-full w-fit mt-2.5">
-              <Truck className="h-3.5 w-3.5" />
-              <span>{metrics?.rates?.return_rate ?? 0}% ret.</span>
-            </div>
-          </Card>
-
-          {/* Metric 4: Avg Order Value */}
-          <Card className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800 shadow-xs hover:shadow-lg hover:border-pink-300/80 dark:hover:border-pink-800 transition-all duration-300 p-5 group relative overflow-hidden">
-            <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-pink-500 to-purple-500" />
-            <div className="flex items-center justify-between pb-3">
-              <span className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                Avg Order Value
-              </span>
-              <div className="w-9 h-9 rounded-xl bg-pink-50 dark:bg-pink-950/60 border border-pink-100 dark:border-pink-800 flex items-center justify-center text-pink-600 dark:text-pink-400 group-hover:scale-110 group-hover:bg-pink-600 group-hover:text-white transition-all duration-300">
-                <TrendingUp className="h-4.5 w-4.5" />
-              </div>
-            </div>
-            <div className="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-slate-100 tracking-tight">
-              {isMetricsLoading ? "..." : formatCurrency(metrics?.financials?.average_order_value ?? 0)}
-              {" "}<span className="text-xs font-normal text-slate-400">/ {formatCurrency(metrics?.financials?.total_revenue ?? 0)}</span>
-            </div>
-            <div className="flex items-center gap-1 text-xs font-semibold text-pink-700 dark:text-pink-400 bg-pink-50/80 dark:bg-pink-950/50 border border-pink-200/60 dark:border-pink-800 px-2 py-0.5 rounded-full w-fit mt-2.5">
-              <TrendingUp className="h-3.5 w-3.5" />
-              <span>Per order avg</span>
+            <div className="flex items-center gap-1 text-[11px] font-semibold text-purple-700 dark:text-purple-400 bg-purple-50/80 dark:bg-purple-950/50 border border-purple-200/60 dark:border-purple-800 px-2 py-0.5 rounded-full w-fit mt-2">
+              <Truck className="h-3 w-3 shrink-0" />
+              <span>{metrics?.rates?.return_rate ?? 0}% return rate</span>
             </div>
           </Card>
         </div>
@@ -759,39 +871,41 @@ export default function OnlinePreordersPage() {
         }}
         className="w-full space-y-3"
       >
-        <TabsList className="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 p-1 h-10 shadow-xs rounded-2xl inline-flex">
-          <TabsTrigger
-            value="orders"
-            className="rounded-lg data-[state=active]:bg-indigo-600 data-[state=active]:text-white px-4 py-1 text-xs font-bold transition-all flex items-center gap-1.5"
-          >
-            <ShoppingBag className="w-3.5 h-3.5" />
-            Orders
-            <span className="text-[10px] px-1.5 py-0.2 rounded-full font-mono font-semibold bg-white/20">
-              {metrics?.total_orders ?? totalCount}
-            </span>
-          </TabsTrigger>
-          <TabsTrigger
-            value="analytics"
-            className="rounded-lg data-[state=active]:bg-indigo-600 data-[state=active]:text-white px-4 py-1 text-xs font-bold transition-all flex items-center gap-1.5"
-          >
-            <BarChart3 className="w-3.5 h-3.5" />
-            Analytics &amp; Trends
-          </TabsTrigger>
-          <TabsTrigger
-            value="manual"
-            className="rounded-lg data-[state=active]:bg-indigo-600 data-[state=active]:text-white px-4 py-1 text-xs font-bold transition-all flex items-center gap-1.5"
-          >
-            {editingOrder ? <Edit className="w-3.5 h-3.5" /> : <Plus className="w-3.5 h-3.5" />}
-            {editingOrder ? "Edit Order" : "Manual Order"}
-          </TabsTrigger>
-          <TabsTrigger
-            value="customers"
-            className="rounded-lg data-[state=active]:bg-indigo-600 data-[state=active]:text-white px-4 py-1 text-xs font-bold transition-all flex items-center gap-1.5"
-          >
-            <User className="w-3.5 h-3.5" />
-            Customers
-          </TabsTrigger>
-        </TabsList>
+        <div className="w-full overflow-x-auto no-scrollbar scrollbar-none pb-1 -mx-1 px-1 sm:mx-0 sm:px-0">
+          <TabsList className="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 p-1 h-auto min-h-10 shadow-xs rounded-2xl inline-flex w-max min-w-full sm:min-w-0 sm:w-auto items-center gap-1">
+            <TabsTrigger
+              value="orders"
+              className="rounded-xl data-[state=active]:bg-indigo-600 data-[state=active]:text-white px-3.5 sm:px-4 py-1.5 text-xs font-bold transition-all flex items-center gap-1.5 shrink-0"
+            >
+              <ShoppingBag className="w-3.5 h-3.5" />
+              <span>Orders</span>
+              <span className="text-[10px] px-1.5 py-0.2 rounded-full font-mono font-semibold bg-white/20">
+                {metrics?.total_orders ?? totalCount}
+              </span>
+            </TabsTrigger>
+            <TabsTrigger
+              value="analytics"
+              className="rounded-xl data-[state=active]:bg-indigo-600 data-[state=active]:text-white px-3.5 sm:px-4 py-1.5 text-xs font-bold transition-all flex items-center gap-1.5 shrink-0"
+            >
+              <BarChart3 className="w-3.5 h-3.5" />
+              <span>Analytics &amp; Trends</span>
+            </TabsTrigger>
+            <TabsTrigger
+              value="manual"
+              className="rounded-xl data-[state=active]:bg-indigo-600 data-[state=active]:text-white px-3.5 sm:px-4 py-1.5 text-xs font-bold transition-all flex items-center gap-1.5 shrink-0"
+            >
+              {editingOrder ? <Edit className="w-3.5 h-3.5" /> : <Plus className="w-3.5 h-3.5" />}
+              <span>{editingOrder ? "Edit Order" : "Manual Order"}</span>
+            </TabsTrigger>
+            <TabsTrigger
+              value="customers"
+              className="rounded-xl data-[state=active]:bg-indigo-600 data-[state=active]:text-white px-3.5 sm:px-4 py-1.5 text-xs font-bold transition-all flex items-center gap-1.5 shrink-0"
+            >
+              <User className="w-3.5 h-3.5" />
+              <span>Customers</span>
+            </TabsTrigger>
+          </TabsList>
+        </div>
 
         {/* Analytics Tab Content */}
         <TabsContent value="analytics" className="space-y-4 mt-0">
@@ -807,220 +921,10 @@ export default function OnlinePreordersPage() {
         <TabsContent value="orders" className="space-y-3 mt-0">
           <Card className="border border-slate-200/80 dark:border-slate-800 shadow-xs hover:shadow-md transition-all duration-300 bg-white dark:bg-slate-900 overflow-hidden rounded-2xl">
             {/* Unified Filter & Toolbar Header */}
-            <CardHeader className="border-b border-slate-100 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-800/50 p-4 sm:p-5 space-y-3">
-              {/* Row 1: Order Status Pills Strip */}
-              <div className="space-y-1.5">
-                <div className="flex items-center justify-between text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                  <div className="flex items-center gap-1.5">
-                    <ShoppingBag className="w-3.5 h-3.5 text-indigo-500" />
-                    <span>Order Status</span>
-                  </div>
-                  {status !== "all" && (
-                    <button
-                      type="button"
-                      onClick={() => handleStatusChange("all")}
-                      className="text-indigo-600 hover:text-indigo-700 text-[10px] font-semibold lowercase"
-                    >
-                      reset order status
-                    </button>
-                  )}
-                </div>
-                <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar pb-0.5">
-                  {[
-                    { key: "all", label: "All Orders", count: metrics?.total_orders ?? totalCount },
-                    { key: "PENDING", label: "Pending", count: metrics?.status_breakdown?.PENDING ?? 0 },
-                    { key: "CONFIRMED", label: "Confirmed", count: metrics?.status_breakdown?.CONFIRMED ?? 0 },
-                    { key: "HOLD", label: "Hold", count: metrics?.status_breakdown?.HOLD ?? 0 },
-                    { key: "DELIVERED", label: "Delivered", count: metrics?.status_breakdown?.DELIVERED ?? 0 },
-                    { key: "COMPLETED", label: "Completed", count: metrics?.status_breakdown?.COMPLETED ?? 0 },
-                    { key: "RETURNED", label: "Returned", count: metrics?.status_breakdown?.RETURNED ?? 0 },
-                    { key: "CANCELLED", label: "Cancelled", count: metrics?.status_breakdown?.CANCELLED ?? 0 },
-                  ].map((item) => {
-                    const isActive = status === item.key;
-                    return (
-                      <button
-                        key={item.key}
-                        type="button"
-                        onClick={() => handleStatusChange(item.key)}
-                        className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all shrink-0 flex items-center gap-1.5 ${
-                          isActive
-                            ? "bg-indigo-600 text-white shadow-xs"
-                            : "bg-white dark:bg-slate-900 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700"
-                        }`}
-                      >
-                        <span>{item.label}</span>
-                        <span
-                          className={`text-[10px] px-1.5 py-0.2 rounded-full font-mono font-bold ${
-                            isActive ? "bg-white/20 text-white" : "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400"
-                          }`}
-                        >
-                          {item.count}
-                        </span>
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-
-              {/* Row 2: Delivery Order Status Pills Strip */}
-              <div className="space-y-1.5 pt-1.5 border-t border-slate-200/50 dark:border-slate-800/60">
-                <div className="flex items-center justify-between text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                  <div className="flex items-center gap-1.5">
-                    <Truck className="w-3.5 h-3.5 text-blue-500" />
-                    <span>
-                      Delivery Status
-                      {courierFilter !== "all" && (
-                        <span className="ml-1.5 text-[10px] px-1.5 py-0.2 rounded font-semibold bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-300">
-                          {courierFilter}
-                        </span>
-                      )}
-                    </span>
-                  </div>
-                  {deliveryStatus !== "all" && (
-                    <button
-                      type="button"
-                      onClick={() => handleDeliveryStatusChange("all")}
-                      className="text-blue-600 hover:text-blue-700 text-[10px] font-semibold lowercase"
-                    >
-                      reset delivery status
-                    </button>
-                  )}
-                </div>
-                <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar pb-0.5">
-                  {deliveryStatusOptions.map((item) => {
-                    const isActive = deliveryStatus === item.value;
-                    return (
-                      <button
-                        key={item.value}
-                        type="button"
-                        onClick={() => handleDeliveryStatusChange(item.value)}
-                        className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all shrink-0 flex items-center gap-1.5 ${
-                          isActive
-                            ? "bg-blue-600 text-white shadow-xs"
-                            : "bg-white dark:bg-slate-900 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700"
-                        }`}
-                      >
-                        <span>{item.label}</span>
-                        {item.count !== undefined && (
-                          <span
-                            className={`text-[10px] px-1.5 py-0.2 rounded-full font-mono font-bold ${
-                              isActive ? "bg-white/20 text-white" : "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400"
-                            }`}
-                          >
-                            {item.count}
-                          </span>
-                        )}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-
-              {/* Row 3: Active Filters & Smart Quick Presets */}
-              <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-slate-200/60 dark:border-slate-800">
-                {/* Active Filter Tags */}
-                <div className="flex flex-wrap items-center gap-1.5">
-                  <span className="text-[11px] font-semibold text-slate-400 dark:text-slate-500 mr-1">
-                    Active:
-                  </span>
-                  {status !== "all" ? (
-                    <Badge variant="secondary" className="bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800 text-[11px] font-medium gap-1 pl-2 pr-1 py-0.5">
-                      <span>Order: <strong>{status}</strong></span>
-                      <button
-                        type="button"
-                        onClick={() => handleStatusChange("all")}
-                        className="hover:bg-indigo-200/60 rounded p-0.5"
-                      >
-                        <X className="w-3 h-3" />
-                      </button>
-                    </Badge>
-                  ) : (
-                    <span className="text-[11px] text-slate-400">All Orders</span>
-                  )}
-
-                  <span className="text-slate-300 dark:text-slate-700 text-xs">•</span>
-
-                  {deliveryStatus !== "all" ? (
-                    <Badge variant="secondary" className="bg-blue-50 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800 text-[11px] font-medium gap-1 pl-2 pr-1 py-0.5">
-                      <span>Delivery: <strong>{deliveryStatus.replace(/_/g, " ")}</strong></span>
-                      <button
-                        type="button"
-                        onClick={() => handleDeliveryStatusChange("all")}
-                        className="hover:bg-blue-200/60 rounded p-0.5"
-                      >
-                        <X className="w-3 h-3" />
-                      </button>
-                    </Badge>
-                  ) : (
-                    <span className="text-[11px] text-slate-400">All Deliveries</span>
-                  )}
-
-                  {courierFilter !== "all" && (
-                    <>
-                      <span className="text-slate-300 dark:text-slate-700 text-xs">•</span>
-                      <Badge variant="secondary" className="bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 text-[11px] font-medium gap-1 pl-2 pr-1 py-0.5">
-                        <span>Courier: <strong>{courierFilter}</strong></span>
-                        <button
-                          type="button"
-                          onClick={() => handleCourierFilterChange("all")}
-                          className="hover:bg-emerald-200/60 rounded p-0.5"
-                        >
-                          <X className="w-3 h-3" />
-                        </button>
-                      </Badge>
-                    </>
-                  )}
-
-                  {(status !== "all" && deliveryStatus !== "all") && (
-                    <Badge className="bg-gradient-to-r from-indigo-600 to-blue-600 text-white text-[10px] font-bold uppercase tracking-wider ml-1 shadow-2xs">
-                      Filtered by Both
-                    </Badge>
-                  )}
-                </div>
-
-                {/* 1-Click Quick Presets */}
-                <div className="flex items-center gap-1.5 ml-auto">
-                  <span className="text-[10px] uppercase tracking-wider font-bold text-slate-400 hidden sm:inline">
-                    Presets:
-                  </span>
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="outline"
-                    onClick={() => applyPreset("CONFIRMED", "not_dispatched")}
-                    className="h-7 px-2 text-[11px] font-semibold border-amber-300 bg-amber-50/60 hover:bg-amber-100 text-amber-900 flex items-center gap-1 shadow-2xs"
-                    title="Filter: Order Confirmed + Not Dispatched"
-                  >
-                    <Zap className="w-3 h-3 text-amber-600" />
-                    <span>Ready to Dispatch</span>
-                  </Button>
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="outline"
-                    onClick={() => applyPreset("CONFIRMED", "in_transit")}
-                    className="h-7 px-2 text-[11px] font-semibold border-blue-300 bg-blue-50/60 hover:bg-blue-100 text-blue-900 flex items-center gap-1 shadow-2xs"
-                    title="Filter: Confirmed & In Transit"
-                  >
-                    <Truck className="w-3 h-3 text-blue-600" />
-                    <span>In Transit</span>
-                  </Button>
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="outline"
-                    onClick={() => applyPreset("DELIVERED", "completed")}
-                    className="h-7 px-2 text-[11px] font-semibold border-emerald-300 bg-emerald-50/60 hover:bg-emerald-100 text-emerald-900 flex items-center gap-1 shadow-2xs"
-                    title="Filter: Delivered & Completed"
-                  >
-                    <Check className="w-3 h-3 text-emerald-600" />
-                    <span>Delivered & Completed</span>
-                  </Button>
-                </div>
-              </div>
-
-              {/* Row 4: Search Input & Dropdowns */}
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 pt-2 border-t border-slate-200/60 dark:border-slate-800">
+            <CardHeader className="border-b border-slate-100 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-800/50 p-3 sm:p-4 space-y-2.5">
+              {/* Primary Toolbar Row */}
+              <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-2.5">
+                {/* Search Bar */}
                 <div className="relative flex-1 max-w-md">
                   <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
                   <Input
@@ -1040,11 +944,65 @@ export default function OnlinePreordersPage() {
                   )}
                 </div>
 
+                {/* Filter Dropdowns Grid */}
                 <div className="flex flex-wrap items-center gap-2">
+                  {/* Order Status Select Dropdown */}
+                  <Select value={status} onValueChange={handleStatusChange}>
+                    <SelectTrigger className="w-[170px] h-9 bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 rounded-lg text-xs font-semibold">
+                      <ShoppingBag className="w-3.5 h-3.5 mr-1.5 text-indigo-500 shrink-0" />
+                      <span className="truncate">
+                        {status === "all"
+                          ? `All Orders (${metrics?.total_orders ?? totalCount})`
+                          : `${orderStatusOptions.find((o) => o.value === status)?.label || status} (${metrics?.status_breakdown?.[status] ?? 0})`}
+                      </span>
+                    </SelectTrigger>
+                    <SelectContent>
+                      {orderStatusOptions.map((opt) => (
+                        <SelectItem key={opt.value} value={opt.value}>
+                          <div className="flex items-center justify-between w-full gap-2">
+                            <span className="flex items-center gap-2">
+                              <span className={`w-2 h-2 rounded-full ${opt.dot} shrink-0`} />
+                              <span>{opt.label}</span>
+                            </span>
+                            <span className="text-[10px] px-1.5 py-0.2 rounded-full font-mono bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 font-bold ml-1.5">
+                              {opt.count}
+                            </span>
+                          </div>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+
+                  {/* Delivery Status Dropdown Select */}
+                  <Select value={deliveryStatus} onValueChange={handleDeliveryStatusChange}>
+                    <SelectTrigger className="w-[175px] h-9 bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 rounded-lg text-xs font-semibold">
+                      <Truck className="w-3.5 h-3.5 mr-1.5 text-blue-500 shrink-0" />
+                      <span className="truncate">
+                        {deliveryStatus === "all"
+                          ? `All Deliveries (${metrics?.delivery_breakdown?.all ?? totalCount})`
+                          : (deliveryStatusOptions.find((o) => o.value === deliveryStatus)?.label || deliveryStatus)}
+                      </span>
+                    </SelectTrigger>
+                    <SelectContent>
+                      {deliveryStatusOptions.map((opt) => (
+                        <SelectItem key={opt.value} value={opt.value}>
+                          <div className="flex items-center justify-between w-full gap-2">
+                            <span>{opt.label}</span>
+                            {opt.count !== undefined && (
+                              <span className="text-[10px] px-1.5 py-0.2 rounded-full font-mono bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 font-bold ml-1.5">
+                                {opt.count}
+                              </span>
+                            )}
+                          </div>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+
                   {/* Delivery Partner Select */}
                   <Select value={courierFilter} onValueChange={handleCourierFilterChange}>
-                    <SelectTrigger className="w-[140px] h-9 bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 rounded-lg text-xs font-semibold">
-                      <Truck className="w-3.5 h-3.5 mr-1.5 text-slate-400" />
+                    <SelectTrigger className="w-[135px] h-9 bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 rounded-lg text-xs font-semibold">
+                      <Package className="w-3.5 h-3.5 mr-1.5 text-slate-400 shrink-0" />
                       <SelectValue placeholder="Delivery Partner" />
                     </SelectTrigger>
                     <SelectContent>
@@ -1056,25 +1014,10 @@ export default function OnlinePreordersPage() {
                     </SelectContent>
                   </Select>
 
-                  {/* Delivery Status Dropdown Select */}
-                  <Select value={deliveryStatus} onValueChange={handleDeliveryStatusChange}>
-                    <SelectTrigger className="w-[155px] h-9 bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 rounded-lg text-xs font-semibold">
-                      <Package className="w-3.5 h-3.5 mr-1.5 text-slate-400" />
-                      <SelectValue placeholder="Delivery Status" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {deliveryStatusOptions.map((opt) => (
-                        <SelectItem key={opt.value} value={opt.value}>
-                          {opt.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-
                   {/* Sort Order Select */}
                   <Select value={ordering} onValueChange={(val) => { setOrdering(val); setPage(1); }}>
                     <SelectTrigger className="w-[135px] h-9 bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 rounded-lg text-xs font-semibold">
-                      <ArrowUpDown className="w-3.5 h-3.5 mr-1.5 text-slate-400" />
+                      <ArrowUpDown className="w-3.5 h-3.5 mr-1.5 text-slate-400 shrink-0" />
                       <SelectValue placeholder="Sort Order" />
                     </SelectTrigger>
                     <SelectContent>
@@ -1085,6 +1028,76 @@ export default function OnlinePreordersPage() {
                     </SelectContent>
                   </Select>
 
+                  {/* Quick Presets Dropdown */}
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="h-9 px-2.5 rounded-lg text-xs font-semibold border-amber-300/80 bg-amber-50/50 hover:bg-amber-100/70 text-amber-900 dark:bg-amber-950/30 dark:border-amber-800 dark:text-amber-200 flex items-center gap-1.5 shadow-2xs"
+                      >
+                        <Zap className="w-3.5 h-3.5 text-amber-600" />
+                        <span>Presets</span>
+                        <ChevronDown className="w-3 h-3 opacity-60" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="w-56">
+                      <DropdownMenuLabel className="text-xs">Quick Filter Presets</DropdownMenuLabel>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem
+                        onClick={() => applyPreset("all", "today_delivered")}
+                        className="text-xs cursor-pointer flex items-center gap-2"
+                      >
+                        <PackageCheck className="w-3.5 h-3.5 text-teal-600" />
+                        <div>
+                          <div className="font-semibold">Today Delivered</div>
+                          <div className="text-[10px] text-slate-400">Delivered today by courier ({metrics?.today_delivered_count ?? 0})</div>
+                        </div>
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        onClick={() => applyPreset("all", "today_picked")}
+                        className="text-xs cursor-pointer flex items-center gap-2"
+                      >
+                        <Truck className="w-3.5 h-3.5 text-indigo-600" />
+                        <div>
+                          <div className="font-semibold">Today Picked (Sent)</div>
+                          <div className="text-[10px] text-slate-400">Handed to courier today ({metrics?.today_picked_count ?? 0})</div>
+                        </div>
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        onClick={() => applyPreset("CONFIRMED", "not_dispatched")}
+                        className="text-xs cursor-pointer flex items-center gap-2"
+                      >
+                        <Zap className="w-3.5 h-3.5 text-amber-600" />
+                        <div>
+                          <div className="font-semibold">Ready to Dispatch</div>
+                          <div className="text-[10px] text-slate-400">Confirmed + Not Dispatched</div>
+                        </div>
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        onClick={() => applyPreset("all", "in_transit")}
+                        className="text-xs cursor-pointer flex items-center gap-2"
+                      >
+                        <Truck className="w-3.5 h-3.5 text-blue-600" />
+                        <div>
+                          <div className="font-semibold">In Transit</div>
+                          <div className="text-[10px] text-slate-400">Parcels on the road</div>
+                        </div>
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        onClick={() => applyPreset("all", "delivered")}
+                        className="text-xs cursor-pointer flex items-center gap-2"
+                      >
+                        <Check className="w-3.5 h-3.5 text-emerald-600" />
+                        <div>
+                          <div className="font-semibold">Delivered (All Time)</div>
+                          <div className="text-[10px] text-slate-400">All completed deliveries</div>
+                        </div>
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+
+                  {/* View Charts Button */}
                   <Button
                     variant="outline"
                     size="sm"
@@ -1092,21 +1105,89 @@ export default function OnlinePreordersPage() {
                     className="h-9 px-2.5 rounded-lg text-xs font-semibold border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800 text-indigo-600 dark:text-indigo-400 flex items-center gap-1.5"
                   >
                     <BarChart3 className="w-3.5 h-3.5" />
-                    View Charts
+                    <span className="hidden sm:inline">View Charts</span>
                   </Button>
 
+                  {/* Clear Filters Button */}
                   {isFiltered && (
                     <Button
                       variant="ghost"
                       size="sm"
                       onClick={clearFilters}
-                      className="h-9 px-2 text-xs text-rose-600 hover:text-rose-700 hover:bg-rose-50 dark:hover:bg-rose-950/40"
+                      className="h-9 px-2 text-xs text-rose-600 hover:text-rose-700 hover:bg-rose-50 dark:hover:bg-rose-950/40 font-semibold"
                     >
                       Clear All
                     </Button>
                   )}
                 </div>
               </div>
+
+              {/* Minimal Active Filters Indicator (Only shown when filters are active) */}
+              {isFiltered && (
+                <div className="flex flex-wrap items-center gap-1.5 pt-2 border-t border-slate-200/60 dark:border-slate-800 text-xs">
+                  <span className="text-[11px] font-semibold text-slate-400 mr-1">Active:</span>
+
+                  {status !== "all" && (
+                    <Badge variant="secondary" className="bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800 text-[11px] font-medium gap-1 pl-2 pr-1 py-0.5">
+                      <span>Order: <strong>{status}</strong></span>
+                      <button
+                        type="button"
+                        onClick={() => handleStatusChange("all")}
+                        className="hover:bg-indigo-200/60 rounded p-0.5"
+                      >
+                        <X className="w-3 h-3" />
+                      </button>
+                    </Badge>
+                  )}
+
+                  {deliveryStatus !== "all" && (
+                    <Badge variant="secondary" className="bg-blue-50 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800 text-[11px] font-medium gap-1 pl-2 pr-1 py-0.5">
+                      <span>Delivery: <strong>{deliveryStatus.replace(/_/g, " ")}</strong></span>
+                      <button
+                        type="button"
+                        onClick={() => handleDeliveryStatusChange("all")}
+                        className="hover:bg-blue-200/60 rounded p-0.5"
+                      >
+                        <X className="w-3 h-3" />
+                      </button>
+                    </Badge>
+                  )}
+
+                  {courierFilter !== "all" && (
+                    <Badge variant="secondary" className="bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 text-[11px] font-medium gap-1 pl-2 pr-1 py-0.5">
+                      <span>Courier: <strong>{courierFilter}</strong></span>
+                      <button
+                        type="button"
+                        onClick={() => handleCourierFilterChange("all")}
+                        className="hover:bg-emerald-200/60 rounded p-0.5"
+                      >
+                        <X className="w-3 h-3" />
+                      </button>
+                    </Badge>
+                  )}
+
+                  {search && (
+                    <Badge variant="secondary" className="bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 text-[11px] font-medium gap-1 pl-2 pr-1 py-0.5">
+                      <span>Search: <strong>"{search}"</strong></span>
+                      <button
+                        type="button"
+                        onClick={() => setSearch("")}
+                        className="hover:bg-slate-200/60 rounded p-0.5"
+                      >
+                        <X className="w-3 h-3" />
+                      </button>
+                    </Badge>
+                  )}
+
+                  <button
+                    type="button"
+                    onClick={clearFilters}
+                    className="text-[11px] text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 underline ml-1 cursor-pointer"
+                  >
+                    Reset all filters
+                  </button>
+                </div>
+              )}
             </CardHeader>
 
             <CardContent className="p-0">
@@ -1204,8 +1285,83 @@ export default function OnlinePreordersPage() {
                         <TableHead className="font-bold text-slate-700 text-xs text-center">Items</TableHead>
                         <TableHead className="font-bold text-slate-700 text-xs">Amount</TableHead>
                         <TableHead className="font-bold text-slate-700 text-xs">Discount</TableHead>
-                        <TableHead className="font-bold text-slate-700 text-xs">Status</TableHead>
-                        <TableHead className="font-bold text-slate-700 text-xs">Courier Partner</TableHead>
+                        <TableHead className="font-bold text-slate-700 text-xs">
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <button
+                                type="button"
+                                className="flex items-center gap-1 hover:text-indigo-600 transition-colors focus:outline-none cursor-pointer"
+                              >
+                                <span>Status</span>
+                                {status !== "all" ? (
+                                  <span className="w-2 h-2 rounded-full bg-indigo-600 shrink-0" />
+                                ) : (
+                                  <ChevronDown className="w-3 h-3 text-slate-400" />
+                                )}
+                              </button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="start" className="w-48">
+                              <DropdownMenuLabel className="text-xs">Filter by Status</DropdownMenuLabel>
+                              <DropdownMenuSeparator />
+                              {orderStatusOptions.map((opt) => (
+                                <DropdownMenuItem
+                                  key={opt.value}
+                                  onClick={() => handleStatusChange(opt.value)}
+                                  className={`text-xs flex items-center justify-between cursor-pointer ${
+                                    status === opt.value ? "font-bold text-indigo-600 bg-indigo-50 dark:bg-indigo-950/60" : ""
+                                  }`}
+                                >
+                                  <div className="flex items-center gap-2">
+                                    <span className={`w-2 h-2 rounded-full ${opt.dot}`} />
+                                    <span>{opt.label}</span>
+                                  </div>
+                                  <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-slate-100 dark:bg-slate-800 font-mono text-slate-600 dark:text-slate-400">
+                                    {opt.count}
+                                  </span>
+                                </DropdownMenuItem>
+                              ))}
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </TableHead>
+                        <TableHead className="font-bold text-slate-700 text-xs">
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <button
+                                type="button"
+                                className="flex items-center gap-1 hover:text-blue-600 transition-colors focus:outline-none cursor-pointer"
+                              >
+                                <span>Courier</span>
+                                {courierFilter !== "all" || deliveryStatus !== "all" ? (
+                                  <span className="w-2 h-2 rounded-full bg-blue-600 shrink-0" />
+                                ) : (
+                                  <ChevronDown className="w-3 h-3 text-slate-400" />
+                                )}
+                              </button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="start" className="w-48">
+                              <DropdownMenuLabel className="text-xs">Filter Courier</DropdownMenuLabel>
+                              <DropdownMenuSeparator />
+                              {[
+                                { value: "all", label: "All Couriers" },
+                                { value: "STEADFAST", label: "Steadfast" },
+                                { value: "PATHAO", label: "Pathao" },
+                                { value: "REDX", label: "RedX" },
+                                { value: "CARRYBEE", label: "Carrybee" },
+                              ].map((opt) => (
+                                <DropdownMenuItem
+                                  key={opt.value}
+                                  onClick={() => handleCourierFilterChange(opt.value)}
+                                  className={`text-xs flex items-center justify-between cursor-pointer ${
+                                    courierFilter === opt.value ? "font-bold text-blue-600 bg-blue-50 dark:bg-blue-950/60" : ""
+                                  }`}
+                                >
+                                  <span>{opt.label}</span>
+                                  {courierFilter === opt.value && <Check className="w-3 h-3 text-blue-600" />}
+                                </DropdownMenuItem>
+                              ))}
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </TableHead>
                         <TableHead className="font-bold text-slate-700 text-xs">Date</TableHead>
                         <TableHead className="font-bold text-slate-700 text-xs text-right pr-4">Actions</TableHead>
                       </TableRow>
@@ -1488,6 +1644,53 @@ export default function OnlinePreordersPage() {
                                     <Clock className="mr-2 h-4 w-4 text-amber-600" />
                                     Change Status
                                   </DropdownMenuItem>
+
+                                  {/* Invoice Actions */}
+                                  <DropdownMenuSeparator />
+                                  {o.invoice_number ? (
+                                    <>
+                                      <DropdownMenuItem asChild>
+                                        <Link
+                                          href={`/sales/sales-history?search=${encodeURIComponent(o.invoice_number)}`}
+                                          target="_blank"
+                                          onClick={(e) => e.stopPropagation()}
+                                          className="cursor-pointer font-semibold flex items-center justify-between text-emerald-700 dark:text-emerald-400 focus:text-emerald-800"
+                                        >
+                                          <div className="flex items-center">
+                                            <Receipt className="mr-2 h-4 w-4 text-emerald-600" />
+                                            <span>Invoice</span>
+                                          </div>
+                                          <div className="flex items-center gap-1">
+                                            <span className="text-[10px] font-mono bg-emerald-100 dark:bg-emerald-900/60 text-emerald-800 dark:text-emerald-200 px-1.5 py-0.5 rounded font-bold">
+                                              {o.invoice_number}
+                                            </span>
+                                            <ExternalLink className="w-3 h-3 opacity-60" />
+                                          </div>
+                                        </Link>
+                                      </DropdownMenuItem>
+                                      <DropdownMenuItem
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          handlePrintPreorderInvoice(o);
+                                        }}
+                                        className="cursor-pointer font-medium"
+                                      >
+                                        <Printer className="mr-2 h-4 w-4 text-slate-500" />
+                                        <span>Print Invoice</span>
+                                      </DropdownMenuItem>
+                                    </>
+                                  ) : (
+                                    <DropdownMenuItem
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        handlePrintPreorderInvoice(o);
+                                      }}
+                                      className="cursor-pointer font-medium"
+                                    >
+                                      <Printer className="mr-2 h-4 w-4 text-slate-500" />
+                                      <span>Print Invoice</span>
+                                    </DropdownMenuItem>
+                                  )}
 
                                   {/* Courier partner actions */}
                                   {o.status !== "CANCELLED" && (

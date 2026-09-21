@@ -6,16 +6,19 @@ from django.utils import timezone
 from datetime import datetime, timedelta
 from .models import Expense, ExpenseCategory
 from .serializers import ExpenseSerializer, ExpenseCategorySerializer
+from apps.authentication.permissions import IsAccountantOrAbove
 
 class ExpenseCategoryViewSet(viewsets.ModelViewSet):
     queryset = ExpenseCategory.objects.all()
     serializer_class = ExpenseCategorySerializer
+    permission_classes = [IsAccountantOrAbove]
     filter_backends = [filters.SearchFilter]
     search_fields = ['name', 'description']
 
 class ExpenseViewSet(viewsets.ModelViewSet):
     queryset = Expense.objects.all()
     serializer_class = ExpenseSerializer
+    permission_classes = [IsAccountantOrAbove]
     filter_backends = [filters.SearchFilter, filters.OrderingFilter]
     search_fields = ['description', 'reference_number', 'notes']
     ordering_fields = ['date', 'amount', 'status', 'created_at']

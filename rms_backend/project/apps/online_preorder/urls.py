@@ -7,8 +7,8 @@ router.register(r'orders', OnlinePreorderViewSet, basename='online-preorders')
 router.register(r'courier-settings', CourierSettingViewSet, basename='courier-settings')
 
 urlpatterns = [
-    path('', include(router.urls)),
     path('orders/create/', PublicCreateOnlinePreorderView.as_view(), name='online-preorder-create'),
+    path('', include(router.urls)),
 ]
 
 

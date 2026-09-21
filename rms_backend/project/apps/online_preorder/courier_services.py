@@ -521,16 +521,16 @@ class CourierManager:
 
         res = service.get_status(cid)
         if res.get('success'):
-            order.courier_status = res.get('status')
+            new_status = res.get('status')
+            order.courier_status = new_status
             update_fields = ['courier_status', 'updated_at']
             if provider == 'STEADFAST':
-                order.steadfast_status = res.get('status')
+                order.steadfast_status = new_status
                 update_fields.append('steadfast_status')
-
-            if str(res.get('status')).lower() in ['delivered'] and order.status != 'DELIVERED':
-                order.status = 'DELIVERED'
-                update_fields.append('status')
-
+            if str(new_status or '').strip().lower() in ['delivered', 'completed', 'delivered_approval_pending']:
+                if not order.courier_delivered_at:
+                    order.courier_delivered_at = timezone.now()
+                    update_fields.append('courier_delivered_at')
             order.save(update_fields=update_fields)
 
         return res

@@ -10,6 +10,7 @@ interface BeforeInstallPromptEvent extends Event {
 export function usePwa() {
   const [isSupported, setIsSupported] = useState(false);
   const [isInstalled, setIsInstalled] = useState(false);
+  const [isIOS, setIsIOS] = useState(false);
   const [canInstall, setCanInstall] = useState(false);
   const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null);
   const [isOnline, setIsOnline] = useState(true);
@@ -17,6 +18,13 @@ export function usePwa() {
 
   useEffect(() => {
     if (typeof window === "undefined") return;
+
+    // Detect iOS devices (iPhone, iPad, iPod)
+    const ua = window.navigator.userAgent.toLowerCase();
+    const isIosPlatform =
+      /iphone|ipad|ipod/.test(ua) ||
+      (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+    setIsIOS(isIosPlatform);
 
     setIsOnline(navigator.onLine);
     const handleOnline = () => setIsOnline(true);
@@ -92,6 +100,7 @@ export function usePwa() {
   return {
     isSupported,
     isInstalled,
+    isIOS,
     canInstall,
     isOnline,
     registration,

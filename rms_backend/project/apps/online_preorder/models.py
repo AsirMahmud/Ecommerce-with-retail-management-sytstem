@@ -77,6 +77,7 @@ class OnlinePreorder(models.Model):
     courier_tracking_code = models.CharField(max_length=100, null=True, blank=True)
     courier_status = models.CharField(max_length=100, null=True, blank=True)
     courier_dispatched_at = models.DateTimeField(null=True, blank=True)
+    courier_delivered_at = models.DateTimeField(null=True, blank=True)
     courier_response = models.JSONField(null=True, blank=True)
 
     # Return & Hold Management fields

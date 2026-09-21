@@ -442,7 +442,7 @@ export function NotificationsCenter() {
               }`}
             />
             <span className="text-[11px] font-medium text-slate-600 dark:text-slate-400">
-              Desktop Push:{" "}
+              Push Alerts:{" "}
               <strong
                 className={
                   push.isEnabled
@@ -450,32 +450,38 @@ export function NotificationsCenter() {
                     : "text-slate-500 font-normal"
                 }
               >
-                {push.isEnabled ? "Active" : "Off"}
+                {!push.isSupported
+                  ? "Add to Home Screen (iOS)"
+                  : push.isEnabled
+                  ? "Active"
+                  : "Off"}
               </strong>
             </span>
           </div>
           <div className="flex items-center gap-1">
-            {push.isEnabled && (
+            {push.isSupported && push.isEnabled && (
               <button
                 type="button"
                 onClick={push.sendTestNotification}
                 className="text-[10px] font-semibold text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300 px-1.5 py-0.5 rounded hover:bg-indigo-50 dark:hover:bg-indigo-950/60 transition-colors"
-                title="Send a test notification to your desktop"
+                title="Send a test notification to your desktop or device"
               >
                 Test Push
               </button>
             )}
-            <button
-              type="button"
-              onClick={() => push.toggleNotifications(!push.isEnabled)}
-              className={`text-[10px] font-semibold px-2 py-0.5 rounded-md transition-colors ${
-                push.isEnabled
-                  ? "text-slate-500 hover:text-slate-700 dark:text-slate-400 hover:bg-slate-200/60 dark:hover:bg-slate-800"
-                  : "bg-indigo-600 hover:bg-indigo-700 text-white shadow-2xs"
-              }`}
-            >
-              {push.isEnabled ? "Turn Off" : "Enable"}
-            </button>
+            {push.isSupported && (
+              <button
+                type="button"
+                onClick={() => push.toggleNotifications(!push.isEnabled)}
+                className={`text-[10px] font-semibold px-2 py-0.5 rounded-md transition-colors ${
+                  push.isEnabled
+                    ? "text-slate-500 hover:text-slate-700 dark:text-slate-400 hover:bg-slate-200/60 dark:hover:bg-slate-800"
+                    : "bg-indigo-600 hover:bg-indigo-700 text-white shadow-2xs"
+                }`}
+              >
+                {push.isEnabled ? "Turn Off" : "Enable"}
+              </button>
+            )}
           </div>
         </div>
 

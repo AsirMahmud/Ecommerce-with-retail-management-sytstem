@@ -27,6 +27,7 @@ from apps.inventory.models import Product, Category, StockMovement
 from apps.customer.models import Customer
 from apps.preorder.models import Preorder, PreorderProduct
 from apps.online_preorder.models import OnlinePreorder
+from apps.authentication.permissions import IsAccountantOrAbove
 
 logger = logging.getLogger(__name__)
 
@@ -35,6 +36,7 @@ BUSINESS_TIMEZONE = ZoneInfo('Asia/Dhaka')
 class ReportViewSet(viewsets.ModelViewSet):
     queryset = Report.objects.all()
     serializer_class = ReportSerializer
+    permission_classes = [IsAccountantOrAbove]
 
     def _get_date_range(self, request):
         date_from_str = request.query_params.get('date_from')
@@ -1352,6 +1354,7 @@ class ReportViewSet(viewsets.ModelViewSet):
 class SavedReportViewSet(viewsets.ModelViewSet):
     queryset = SavedReport.objects.all()
     serializer_class = SavedReportSerializer
+    permission_classes = [IsAccountantOrAbove]
 
     def perform_create(self, serializer):
         report = Report.objects.get(id=serializer.validated_data['report_id'])

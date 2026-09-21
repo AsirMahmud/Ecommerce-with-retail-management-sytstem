@@ -12,6 +12,7 @@ https://docs.djangoproject.com/en/4.2/ref/settings/
 
 from pathlib import Path
 from datetime import timedelta
+from django.core.exceptions import ImproperlyConfigured
 import os
 from dotenv import load_dotenv
 
@@ -28,11 +29,19 @@ load_dotenv(os.path.join(BASE_DIR, '.env'), override=True)
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/4.2/howto/deployment/checklist/
 
-# SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = os.getenv('SECRET_KEY', 'django-insecure-=i3-$(--y)2nbeogrplsh-c1z%bnj8ufv87+6azgiocp=rb)fn')
-
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = os.getenv('DEBUG', 'False').lower() in ('true', '1', 't')
+
+# SECURITY WARNING: keep the secret key used in production secret!
+SECRET_KEY = os.getenv('SECRET_KEY')
+if not SECRET_KEY:
+    if DEBUG:
+        SECRET_KEY = 'django-insecure-=i3-$(--y)2nbeogrplsh-c1z%bnj8ufv87+6azgiocp=rb)fn'
+    else:
+        raise ImproperlyConfigured("SECRET_KEY environment variable is required and must not be empty in production.")
+elif not DEBUG and SECRET_KEY.startswith('django-insecure-'):
+    raise ImproperlyConfigured("Insecure default SECRET_KEY detected in production. Configure a unique SECRET_KEY in your environment.")
+
 
 allowed_hosts_env = os.getenv('ALLOWED_HOSTS', '')
 if allowed_hosts_env:
@@ -48,6 +57,9 @@ else:
         "localhost",
         "127.0.0.1",
     ]
+
+if DEBUG and "testserver" not in ALLOWED_HOSTS:
+    ALLOWED_HOSTS.append("testserver")
 
 
 # Application definition
@@ -82,6 +94,9 @@ REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': (
         'rest_framework_simplejwt.authentication.JWTAuthentication',
     ),
+    'DEFAULT_PERMISSION_CLASSES': (
+        'rest_framework.permissions.IsAuthenticated',
+    ),
     'DEFAULT_FILTER_BACKENDS': (
         'django_filters.rest_framework.DjangoFilterBackend',
     ),
@@ -89,7 +104,7 @@ REST_FRAMEWORK = {
 
 # JWT Settings
 SIMPLE_JWT = {
-    'ACCESS_TOKEN_LIFETIME': timedelta(days=1),
+    'ACCESS_TOKEN_LIFETIME': timedelta(minutes=15),
     'REFRESH_TOKEN_LIFETIME': timedelta(days=7),
     'ROTATE_REFRESH_TOKENS': True,
     'BLACKLIST_AFTER_ROTATION': True,
@@ -115,17 +130,12 @@ MIDDLEWARE = [
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
 
-# Add CSRF exemption for API views
-CSRF_TRUSTED_ORIGINS = [
-    "http://localhost:3000",
-    "http://127.0.0.1:3000",
-    "https://rawstitch.info"
-]
+# CSRF and Session Security
+CSRF_COOKIE_SECURE = not DEBUG
+CSRF_COOKIE_HTTPONLY = True
+SESSION_COOKIE_SECURE = not DEBUG
+SESSION_COOKIE_HTTPONLY = True
 
-# Exempt API views from CSRF
-CSRF_COOKIE_SECURE = False
-CSRF_USE_SESSIONS = False
-CSRF_COOKIE_HTTPONLY = False
 
 ROOT_URLCONF = 'rms.urls'
 
@@ -237,32 +247,47 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 AUTH_USER_MODEL = 'authentication.CustomUser'
 
 # CORS settings
-CORS_ALLOWED_ORIGINS = [
-    "http://localhost:3000",
-    "http://localhost:3001",
-    "http://localhost:3002",
-    "http://127.0.0.1:3000",
-    "https://rawstitch.info",
-    "https://rawstitch.vercel.app",
-    "https://retail-management-sytstem-omega.vercel.app",
-    "https://www.rawstitch.com.bd",
-    "https://rawstitch.com.bd",
-    "https://api.rawstitch.com.bd",
-]
+cors_origins_env = os.getenv('CORS_ALLOWED_ORIGINS')
+if cors_origins_env:
+    CORS_ALLOWED_ORIGINS = [origin.strip() for origin in cors_origins_env.split(',') if origin.strip()]
+elif not DEBUG:
+    CORS_ALLOWED_ORIGINS = [
+        "https://rawstitch.com.bd",
+        "https://www.rawstitch.com.bd",
+        "https://rawstitch.info",
+    ]
+else:
+    CORS_ALLOWED_ORIGINS = [
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
+        "https://rawstitch.info",
+        "https://rawstitch.vercel.app",
+        "https://rawstitch.com.bd",
+        "https://www.rawstitch.com.bd",
+    ]
 
 CORS_ALLOW_CREDENTIALS = True
 
 # CSRF settings
-CSRF_TRUSTED_ORIGINS = [
-    "https://api.rawstitch.com.bd",
-    "https://rawstitch.com.bd",
-    "https://www.rawstitch.com.bd",
-    "https://rawstitch.info",
-    "https://rawstitch.vercel.app",
-    "https://retail-management-sytstem-omega.vercel.app",
-    "http://localhost:3000",
-    "http://127.0.0.1:3000",
-]
+csrf_trusted_env = os.getenv('CSRF_TRUSTED_ORIGINS')
+if csrf_trusted_env:
+    CSRF_TRUSTED_ORIGINS = [origin.strip() for origin in csrf_trusted_env.split(',') if origin.strip()]
+elif not DEBUG:
+    CSRF_TRUSTED_ORIGINS = [
+        "https://api.rawstitch.com.bd",
+        "https://rawstitch.com.bd",
+        "https://www.rawstitch.com.bd",
+        "https://rawstitch.info",
+    ]
+else:
+    CSRF_TRUSTED_ORIGINS = [
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
+        "https://api.rawstitch.com.bd",
+        "https://rawstitch.com.bd",
+        "https://rawstitch.info",
+    ]
+
 
 # Email Configuration (Gmail)
 EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'

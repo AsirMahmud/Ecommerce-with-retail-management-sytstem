@@ -135,15 +135,33 @@ const utilityNavItems = [
 ];
 
 import { useTranslations } from "next-intl";
+import { getRoleBadge } from "@/lib/permissions";
 
 export function SideNav() {
   const [open, setOpen] = useState(false);
   const [openCollapsibles, setOpenCollapsibles] = useState<Record<string, boolean>>({});
   const pathname = usePathname();
   const router = useRouter();
-  const { logout } = useAuth();
+  const { logout, user, role, canAccess } = useAuth();
   const t = useTranslations();
   const [branding, setBranding] = useState<HomePageSettings | null>(null);
+
+  const filteredMainNavItems = mainNavItems
+    .filter((item) => (canAccess ? canAccess(item.href) : true))
+    .map((item) => {
+      if (item.subItems) {
+        return {
+          ...item,
+          subItems: item.subItems.filter((sub) => (canAccess ? canAccess(sub.href) : true)),
+        };
+      }
+      return item;
+    });
+
+  const filteredUtilityNavItems = utilityNavItems.filter((item) =>
+    canAccess ? canAccess(item.href) : true
+  );
+
 
   const getNavLabel = (title: string) => {
     const map: Record<string, string> = {
@@ -255,7 +273,7 @@ export function SideNav() {
           <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider px-3 py-1">
             {t("nav.menu")}
           </p>
-          {mainNavItems.map((item) => {
+          {filteredMainNavItems.map((item) => {
             const active = isActive(item.href);
             const isOpen = openCollapsibles[item.title] !== undefined
               ? openCollapsibles[item.title]
@@ -360,38 +378,42 @@ export function SideNav() {
           })}
         </div>
 
-        <Separator className="my-3 mx-1 bg-slate-100" />
+        {filteredUtilityNavItems.length > 0 && (
+          <>
+            <Separator className="my-3 mx-1 bg-slate-100" />
 
-        {/* System Settings */}
-        <div className="space-y-1">
-          <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider px-3 py-1">
-            {t("nav.system")}
-          </p>
-          {utilityNavItems.map((item) => {
-            const active = isActive(item.href);
-            return (
-              <Link
-                key={item.title}
-                href={item.href}
-                onClick={() => isMobile && setOpen(false)}
-                className={cn(
-                  "group flex items-center gap-3 rounded-xl px-3 py-2 text-sm font-medium transition-all duration-150",
-                  active
-                    ? "bg-blue-50 text-blue-700 font-semibold"
-                    : "text-slate-600 hover:text-slate-900 hover:bg-slate-50"
-                )}
-              >
-                <item.icon
-                  className={cn(
-                    "h-4.5 w-4.5 shrink-0 transition-colors",
-                    active ? "text-blue-600" : "text-slate-400 group-hover:text-slate-600"
-                  )}
-                />
-                <span>{getNavLabel(item.title)}</span>
-              </Link>
-            );
-          })}
-        </div>
+            {/* System Settings */}
+            <div className="space-y-1">
+              <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider px-3 py-1">
+                {t("nav.system")}
+              </p>
+              {filteredUtilityNavItems.map((item) => {
+                const active = isActive(item.href);
+                return (
+                  <Link
+                    key={item.title}
+                    href={item.href}
+                    onClick={() => isMobile && setOpen(false)}
+                    className={cn(
+                      "group flex items-center gap-3 rounded-xl px-3 py-2 text-sm font-medium transition-all duration-150",
+                      active
+                        ? "bg-blue-50 text-blue-700 font-semibold"
+                        : "text-slate-600 hover:text-slate-900 hover:bg-slate-50"
+                    )}
+                  >
+                    <item.icon
+                      className={cn(
+                        "h-4.5 w-4.5 shrink-0 transition-colors",
+                        active ? "text-blue-600" : "text-slate-400 group-hover:text-slate-600"
+                      )}
+                    />
+                    <span>{getNavLabel(item.title)}</span>
+                  </Link>
+                );
+              })}
+            </div>
+          </>
+        )}
 
         {/* Our Brands */}
         <div className="px-2 py-4 mt-2">
@@ -409,12 +431,18 @@ export function SideNav() {
       <div className="p-3 border-t border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/40">
         <div className="flex items-center justify-between p-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-2xs">
           <div className="flex items-center gap-2.5 min-w-0">
-            <div className="w-8 h-8 rounded-lg bg-indigo-600 text-white flex items-center justify-center font-bold text-xs shrink-0 shadow-2xs">
-              RS
+            <div className="w-8 h-8 rounded-lg bg-indigo-600 text-white flex items-center justify-center font-bold text-xs shrink-0 shadow-2xs uppercase">
+              {user?.username ? user.username.slice(0, 2) : "RS"}
             </div>
             <div className="min-w-0">
-              <p className="text-xs font-bold text-slate-800 dark:text-slate-200 truncate">{t("user.admin")}</p>
-              <p className="text-[10px] text-slate-500 dark:text-slate-400 truncate">{t("user.store_management")}</p>
+              <p className="text-xs font-bold text-slate-800 dark:text-slate-200 truncate">
+                {user?.username || t("user.admin")}
+              </p>
+              <div className="flex items-center gap-1.5 mt-0.5">
+                <span className={cn("text-[9px] font-semibold px-1.5 py-0.5 rounded border capitalize", getRoleBadge(role).className)}>
+                  {getRoleBadge(role).label}
+                </span>
+              </div>
             </div>
           </div>
           <Button

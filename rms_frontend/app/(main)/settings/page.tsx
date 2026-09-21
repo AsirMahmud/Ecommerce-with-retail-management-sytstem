@@ -27,6 +27,7 @@ import { useBismillah } from "@/contexts/bismillah-context";
 import { Loader2, Trash2 } from "lucide-react";
 import { Separator } from "@/components/ui/separator";
 import { CourierSettingsManager } from "@/components/settings/courier-settings-manager";
+import { RoleGuard } from "@/components/auth/role-guard";
 
 const databaseOptions = [
   { id: "sales", label: "Sales Database" },
@@ -47,8 +48,9 @@ export default function SettingsPage() {
   };
 
   return (
-    <div className="container mx-auto py-6">
-      <h1 className="text-3xl font-bold mb-6">Settings</h1>
+    <RoleGuard allowedRoles={["admin"]}>
+      <div className="container mx-auto py-6">
+        <h1 className="text-3xl font-bold mb-6">Settings</h1>
 
       <Card className="mb-6">
         <CardHeader>
@@ -205,6 +207,8 @@ export default function SettingsPage() {
           </div>
         </CardContent>
       </Card>
-    </div>
+      </div>
+    </RoleGuard>
   );
 }
+

@@ -51,6 +51,7 @@ import DiscountModal from "./DiscountModal";
 import { usePOSStore } from "@/store/pos-store";
 import { Product, ProductVariation } from "@/types/inventory";
 import ReceiptModal from "./ReceiptModal";
+import HeldCartsModal from "./held-carts-modal";
 import { productsApi } from "@/lib/api/inventory";
 
 // Sample product data
@@ -940,6 +941,9 @@ export function ModernPOS() {
 
       {/* Discount Modal */}
       <DiscountModal />
+
+      {/* Held Carts / Drafts Modal */}
+      <HeldCartsModal />
 
       {/* Receipt Modal */}
       <ReceiptModal

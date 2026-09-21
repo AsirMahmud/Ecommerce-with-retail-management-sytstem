@@ -3,6 +3,7 @@ from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
 from rest_framework_simplejwt.authentication import JWTAuthentication
+from apps.authentication.permissions import IsAdminUserRole
 from django.db import connection
 from apps.sales.models import Sale
 from apps.customer.models import Customer
@@ -10,7 +11,7 @@ from apps.expenses.models import Expense
 from apps.reports.models import Report
 
 class FlushDatabaseView(APIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAdminUserRole]
     authentication_classes = [JWTAuthentication]
 
     def delete(self, request):

@@ -14,6 +14,7 @@ from .serializers import (
 )
 from apps.inventory.models import Product, ProductVariation, StockMovement, InventoryAlert, Category
 from apps.customer.models import Customer
+from apps.authentication.permissions import IsAdminUserRole
 from decimal import Decimal
 
 class StandardResultsSetPagination(PageNumberPagination):
@@ -29,6 +30,31 @@ class SaleViewSet(viewsets.ModelViewSet):
     ordering_fields = ['date', 'total', 'status']
     ordering = ['-date']
     pagination_class = StandardResultsSetPagination
+
+    def get_permissions(self):
+        if self.action in ['destroy', 'delete_all_sales']:
+            return [IsAdminUserRole()]
+        return super().get_permissions()
+
+    def create(self, request, *args, **kwargs):
+        # Check idempotency key from headers or request payload
+        idempotency_key = request.headers.get('Idempotency-Key') or request.data.get('idempotency_key')
+        
+        if idempotency_key:
+            existing_sale = Sale.objects.filter(idempotency_key=idempotency_key).first()
+            if existing_sale:
+                serializer = self.get_serializer(existing_sale)
+                return Response(serializer.data, status=status.HTTP_200_OK)
+            
+            # If request.data is mutable, attach idempotency_key if missing
+            if hasattr(request.data, '_mutable'):
+                request.data._mutable = True
+                request.data['idempotency_key'] = idempotency_key
+            elif isinstance(request.data, dict) and 'idempotency_key' not in request.data:
+                request.data['idempotency_key'] = idempotency_key
+
+        with transaction.atomic():
+            return super().create(request, *args, **kwargs)
 
     def get_queryset(self):
         queryset = super().get_queryset()
@@ -616,7 +642,7 @@ class SaleViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST
             )
 
-    @action(detail=False, methods=['post'])
+    @action(detail=False, methods=['post'], permission_classes=[IsAdminUserRole])
     @transaction.atomic
     def delete_all_sales(self, request):
         """Delete all sales data"""

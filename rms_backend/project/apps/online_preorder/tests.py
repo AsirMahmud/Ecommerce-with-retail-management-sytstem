@@ -1,13 +1,24 @@
-from django.test import TestCase, Client
+from django.test import TestCase
+from rest_framework.test import APIClient
 from rest_framework import status
+from django.contrib.auth import get_user_model
 from apps.online_preorder.models import OnlinePreorder, MetaEventLog
 from apps.online_preorder.services.fraud_scoring import calculate_fraud_score
 from apps.online_preorder.services.meta_capi import dispatch_meta_purchase_event
 
+User = get_user_model()
+
 
 class OrderTrackingFraudMetaTest(TestCase):
     def setUp(self):
-        self.client = Client()
+        self.admin_user = User.objects.create_user(
+            username="admin_test",
+            email="admin@example.com",
+            password="password123",
+            role="admin"
+        )
+        self.client = APIClient()
+        self.client.force_authenticate(user=self.admin_user)
         from apps.inventory.models import Product, ProductVariation
         self.product = Product.objects.create(
             id=1,
@@ -294,7 +305,14 @@ class OrderTrackingFraudMetaTest(TestCase):
 
 class CourierIntegrationTest(TestCase):
     def setUp(self):
-        self.client = Client()
+        self.admin_user = User.objects.create_user(
+            username="courier_admin_test",
+            email="courier_admin@example.com",
+            password="password123",
+            role="admin"
+        )
+        self.client = APIClient()
+        self.client.force_authenticate(user=self.admin_user)
         from apps.online_preorder.models import CourierSetting
         for code in ['STEADFAST', 'PATHAO', 'REDX', 'CARRYBEE']:
             CourierSetting.objects.get_or_create(provider=code)
@@ -400,6 +418,207 @@ class CourierIntegrationTest(TestCase):
         resp_phone = self.client.get('/api/online-preorder/orders/courier-fraud-check/?phone=01811223344&provider=PATHAO')
         self.assertEqual(resp_phone.status_code, status.HTTP_200_OK)
         self.assertEqual(resp_phone.data.get('provider'), 'PATHAO')
+
+    def test_courier_status_sync_does_not_change_order_status(self):
+        """
+        Syncing live status from courier should update courier_status / steadfast_status
+        but MUST NOT change order.status (e.g. from CONFIRMED to DELIVERED).
+        """
+        from unittest.mock import patch
+        from apps.online_preorder.courier_services import CourierManager
+        from apps.online_preorder.models import OnlinePreorder
+
+        order = OnlinePreorder.objects.create(
+            customer_name="Test Sync Customer",
+            customer_phone="01711223344",
+            total_amount=3000,
+            status="CONFIRMED",
+            courier_partner="STEADFAST",
+            courier_consignment_id="SF_CID_999",
+            steadfast_consignment_id="SF_CID_999",
+        )
+
+        with patch('apps.online_preorder.courier_services.SteadfastService.get_status') as mock_status:
+            mock_status.return_value = {
+                "success": True,
+                "status": "delivered",
+                "data": {"status": "delivered"}
+            }
+
+            res = CourierManager.get_order_status(order)
+            self.assertTrue(res.get('success'))
+
+            order.refresh_from_db()
+            # Courier status must be updated
+            self.assertEqual(order.courier_status, "delivered")
+            self.assertEqual(order.steadfast_status, "delivered")
+            # Order status must REMAIN unchanged (CONFIRMED, not DELIVERED)
+            self.assertEqual(order.status, "CONFIRMED")
+
+    def test_sync_all_couriers_endpoint_does_not_change_order_status(self):
+        """
+        Calling sync-courier-status endpoint should update courier statuses without altering order.status.
+        """
+        from unittest.mock import patch
+        from apps.online_preorder.models import OnlinePreorder
+
+        order1 = OnlinePreorder.objects.create(
+            customer_name="Sync Batch 1",
+            customer_phone="01711223355",
+            total_amount=1200,
+            status="CONFIRMED",
+            courier_partner="STEADFAST",
+            courier_consignment_id="SF_CID_101",
+            steadfast_consignment_id="SF_CID_101",
+        )
+        order2 = OnlinePreorder.objects.create(
+            customer_name="Sync Batch 2",
+            customer_phone="01711223366",
+            total_amount=1800,
+            status="HOLD",
+            courier_partner="STEADFAST",
+            courier_consignment_id="SF_CID_102",
+            steadfast_consignment_id="SF_CID_102",
+        )
+
+        with patch('apps.online_preorder.courier_services.SteadfastService.get_status') as mock_status:
+            mock_status.return_value = {
+                "success": True,
+                "status": "delivered",
+                "data": {"status": "delivered"}
+            }
+
+            resp = self.client.post(
+                '/api/online-preorder/orders/sync-courier-status/',
+                data={"order_ids": [order1.id, order2.id]},
+                format='json'
+            )
+            self.assertEqual(resp.status_code, status.HTTP_200_OK)
+            self.assertEqual(resp.data.get('synced_count'), 2)
+
+            order1.refresh_from_db()
+            order2.refresh_from_db()
+
+            self.assertEqual(order1.courier_status, "delivered")
+            self.assertEqual(order1.status, "CONFIRMED")  # Must NOT be DELIVERED
+
+            self.assertEqual(order2.courier_status, "delivered")
+            self.assertEqual(order2.status, "HOLD")  # Must NOT be DELIVERED
+
+    def test_single_order_courier_status_endpoint_does_not_change_order_status(self):
+        """
+        Calling /orders/{id}/courier-status/ should not change order.status.
+        """
+        from unittest.mock import patch
+        from apps.online_preorder.models import OnlinePreorder
+
+        order = OnlinePreorder.objects.create(
+            customer_name="Single Sync Order",
+            customer_phone="01711223377",
+            total_amount=2200,
+            status="CONFIRMED",
+            courier_partner="STEADFAST",
+            courier_consignment_id="SF_CID_103",
+            steadfast_consignment_id="SF_CID_103",
+        )
+
+        with patch('apps.online_preorder.courier_services.SteadfastService.get_status') as mock_status:
+            mock_status.return_value = {
+                "success": True,
+                "status": "delivered",
+                "data": {"status": "delivered"}
+            }
+
+            resp = self.client.get(f'/api/online-preorder/orders/{order.id}/courier-status/')
+            self.assertEqual(resp.status_code, status.HTTP_200_OK)
+            self.assertEqual(resp.data.get('status'), "delivered")
+
+            order.refresh_from_db()
+            self.assertEqual(order.courier_status, "delivered")
+            self.assertEqual(order.status, "CONFIRMED")
+
+    def test_distinct_courier_metrics_picked_and_delivered(self):
+        """
+        Verify that /metrics/ and /courier-parcels/ correctly distinguish:
+        - Picked (Sent Today) = Dispatched today with COD value sent today
+        - Delivered = Completed deliveries with COD collected
+        - In-Transit = Active parcels moving with floating COD
+        """
+        from django.utils import timezone
+        import datetime
+        from apps.online_preorder.models import OnlinePreorder
+        now = timezone.now()
+
+        # 1. Parcel dispatched today (Sent today, currently in transit)
+        picked_order = OnlinePreorder.objects.create(
+            customer_name="Today Sent Customer",
+            customer_phone="01711000111",
+            total_amount=1800,
+            status="CONFIRMED",
+            courier_partner="STEADFAST",
+            courier_consignment_id="SF_PICK_001",
+            steadfast_consignment_id="SF_PICK_001",
+            courier_status="in_transit",
+            courier_dispatched_at=now,
+        )
+
+        # 2. Parcel delivered today (Delivery completed today)
+        delivered_order = OnlinePreorder.objects.create(
+            customer_name="Today Delivered Customer",
+            customer_phone="01711000222",
+            total_amount=2400,
+            status="CONFIRMED",
+            courier_partner="PATHAO",
+            courier_consignment_id="PT_DEL_001",
+            courier_status="delivered",
+            courier_dispatched_at=now - datetime.timedelta(days=2),
+            courier_delivered_at=now,
+        )
+
+        # 3. Old parcel delivered 4 days ago - touched/updated today, but delivered in past
+        old_delivered_order = OnlinePreorder.objects.create(
+            customer_name="Past Delivered Customer",
+            customer_phone="01711000333",
+            total_amount=5000,
+            status="DELIVERED",
+            courier_partner="STEADFAST",
+            courier_consignment_id="SF_OLD_001",
+            steadfast_consignment_id="SF_OLD_001",
+            courier_status="delivered",
+            courier_dispatched_at=now - datetime.timedelta(days=5),
+            courier_delivered_at=now - datetime.timedelta(days=4),
+        )
+        OnlinePreorder.objects.filter(id=old_delivered_order.id).update(updated_at=now)
+
+        # Query metrics endpoint
+        metrics_resp = self.client.get('/api/online-preorder/orders/metrics/')
+        self.assertEqual(metrics_resp.status_code, status.HTTP_200_OK)
+        m_data = metrics_resp.data
+
+        self.assertIn('today_picked_count', m_data)
+        self.assertIn('today_picked_cod_amount', m_data)
+        self.assertIn('today_delivered_count', m_data)
+        self.assertIn('today_delivered_cod_amount', m_data)
+        self.assertIn('in_transit_cod_amount', m_data)
+
+        self.assertEqual(m_data['today_picked_count'], 1)
+        self.assertEqual(m_data['today_picked_cod_amount'], 1800.0)
+        # Verify today delivered ONLY includes today's delivery, excluding old delivery despite updated_at
+        self.assertEqual(m_data['today_delivered_count'], 1)
+        self.assertEqual(m_data['today_delivered_cod_amount'], 2400.0)
+
+        # Query courier parcels endpoint
+        parcels_resp = self.client.get('/api/online-preorder/orders/courier-parcels/')
+        self.assertEqual(parcels_resp.status_code, status.HTTP_200_OK)
+        summary = parcels_resp.data.get('summary', {})
+
+        self.assertEqual(summary.get('today_picked_count', 0), 1)
+        self.assertEqual(summary.get('today_picked_cod_amount', 0), 1800.0)
+        self.assertEqual(summary.get('today_delivered_count', 0), 1)
+        self.assertEqual(summary.get('today_delivered_cod_amount', 0), 2400.0)
+        self.assertEqual(summary.get('in_transit_cod_amount', 0), 1800.0)
+
+
 
 
 

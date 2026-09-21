@@ -1,10 +1,12 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   eslint: {
-    ignoreDuringBuilds: true,
+    // Set to false in CI/production-strict pipeline to enforce quality gates
+    ignoreDuringBuilds: process.env.CI !== 'true',
   },
   typescript: {
-    ignoreBuildErrors: true,
+    // Set to false in CI/production-strict pipeline to enforce type safety
+    ignoreBuildErrors: process.env.CI !== 'true',
   },
   images: {
     unoptimized: true,

@@ -79,7 +79,7 @@ export default function PaymentSection({
   setAllowPartialPayment,
 }: PaymentSectionProps) {
   const { toast } = useToast();
-  const { handleCompletePayment } = usePOSStore();
+  const { handleCompletePayment, isProcessingSale } = usePOSStore();
   const [paymentSummary, setPaymentSummary] = useState({
     totalPaid: 0,
     remaining: 0,
@@ -416,11 +416,11 @@ export default function PaymentSection({
         <Button
           onClick={() => handleCompletePayment(toast)}
           className="w-full h-10 text-sm font-medium"
-          disabled={!canCompletePayment()}
+          disabled={!canCompletePayment() || isProcessingSale}
           variant={paymentSummary.isFullPayment ? "default" : "secondary"}
         >
           <Receipt className="mr-2 h-4 w-4" />
-          {getPaymentButtonText()}
+          {isProcessingSale ? "Processing..." : getPaymentButtonText()}
         </Button>
         
         {/* Full Due Button */}
@@ -428,10 +428,10 @@ export default function PaymentSection({
           onClick={() => handleCompletePayment(toast, true)}
           className="w-full h-8 text-sm"
           variant="outline"
-          disabled={cart.length === 0}
+          disabled={cart.length === 0 || isProcessingSale}
         >
           <Clock className="mr-2 h-3 w-3" />
-          Mark as Due (No Payment)
+          {isProcessingSale ? "Processing..." : "Mark as Due (No Payment)"}
         </Button>
       </div>
 

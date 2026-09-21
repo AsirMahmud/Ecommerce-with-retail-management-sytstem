@@ -7,7 +7,8 @@ from datetime import datetime, time, timedelta
 from zoneinfo import ZoneInfo
 from decimal import Decimal
 from .models import DashboardMetrics
-from rest_framework.permissions import AllowAny
+from rest_framework.permissions import AllowAny, IsAuthenticated
+from apps.authentication.permissions import IsManagerOrAdmin
 from apps.sales.models import Sale, SaleItem, Return
 from apps.expenses.models import Expense, ExpenseCategory
 from apps.customer.models import Customer
@@ -646,7 +647,7 @@ class DashboardStatsView(APIView):
 
 
 class ActivityLogView(APIView):
-    permission_classes = [AllowAny]
+    permission_classes = [IsAuthenticated, IsManagerOrAdmin]
 
     def get(self, request):
         limit = int(request.query_params.get('limit', 100))

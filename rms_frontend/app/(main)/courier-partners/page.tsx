@@ -14,6 +14,13 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet";
+import { CourierTimeline } from "@/components/courier/courier-timeline";
+import {
   Select,
   SelectContent,
   SelectItem,
@@ -52,6 +59,7 @@ import {
   Check,
   AlertCircle,
   X,
+  PackageCheck,
 } from "lucide-react";
 import { format } from "date-fns";
 
@@ -101,10 +109,18 @@ export default function CourierPartnersPage() {
   const [summary, setSummary] = useState<CourierParcelSummary>({
     total_booked: 0,
     in_transit: 0,
+    in_transit_cod_amount: 0,
     delivered: 0,
+    delivered_cod_amount: 0,
     cancelled: 0,
+    cancelled_cod_amount: 0,
     total_cod_amount: 0,
+    today_picked_count: 0,
+    today_picked_cod_amount: 0,
+    today_delivered_count: 0,
+    today_delivered_cod_amount: 0,
   });
+  const [selectedParcelForTimeline, setSelectedParcelForTimeline] = useState<OnlinePreorder | null>(null);
 
   const fetchData = async () => {
     try {
@@ -249,72 +265,128 @@ export default function CourierPartnersPage() {
       </div>
 
       {/* KPI Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-        <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+        {/* Card 1: Today Picked (Sent Today) */}
+        <Card 
+          onClick={() => setStatusFilter("today_picked")}
+          className="cursor-pointer hover:shadow-md hover:border-indigo-400 dark:hover:border-indigo-700 transition-all bg-white dark:bg-slate-900 border-indigo-200/80 dark:border-indigo-800 shadow-2xs"
+        >
           <CardContent className="p-4 flex items-center justify-between">
-            <div>
-              <p className="text-xs text-muted-foreground font-medium">Total Booked</p>
-              <h3 className="text-2xl font-bold mt-1 text-slate-900 dark:text-slate-100">
-                {summary.total_booked}
+            <div className="min-w-0 flex-1 pr-2">
+              <p className="text-xs text-muted-foreground font-medium truncate">Today Picked (Sent)</p>
+              <h3 className="text-xl sm:text-2xl font-bold mt-1 text-indigo-600 dark:text-indigo-400 truncate">
+                {summary.today_picked_count ?? 0}
               </h3>
+              <p className="text-[11px] font-semibold text-indigo-700 dark:text-indigo-400 mt-0.5 truncate">
+                ৳{(summary.today_picked_cod_amount ?? 0).toLocaleString()} sent today
+              </p>
             </div>
-            <div className="p-2 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-600">
-              <Package className="h-5 w-5" />
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800">
-          <CardContent className="p-4 flex items-center justify-between">
-            <div>
-              <p className="text-xs text-muted-foreground font-medium">In Transit</p>
-              <h3 className="text-2xl font-bold mt-1 text-blue-600 dark:text-blue-400">
-                {summary.in_transit}
-              </h3>
-            </div>
-            <div className="p-2 rounded-xl bg-blue-500/10 text-blue-600">
+            <div className="p-2 rounded-xl bg-indigo-500/10 text-indigo-600 shrink-0">
               <Truck className="h-5 w-5" />
             </div>
           </CardContent>
         </Card>
 
-        <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800">
+        {/* Card 2: Today Delivered */}
+        <Card 
+          onClick={() => setStatusFilter("today_delivered")}
+          className="cursor-pointer hover:shadow-md hover:border-teal-400 dark:hover:border-teal-700 transition-all bg-white dark:bg-slate-900 border-teal-200/80 dark:border-teal-800 shadow-2xs"
+        >
           <CardContent className="p-4 flex items-center justify-between">
-            <div>
-              <p className="text-xs text-muted-foreground font-medium">Delivered</p>
-              <h3 className="text-2xl font-bold mt-1 text-emerald-600 dark:text-emerald-400">
+            <div className="min-w-0 flex-1 pr-2">
+              <p className="text-xs text-muted-foreground font-medium truncate">Today Delivered</p>
+              <h3 className="text-xl sm:text-2xl font-bold mt-1 text-teal-600 dark:text-teal-400 truncate">
+                {summary.today_delivered_count ?? 0}
+              </h3>
+              <p className="text-[11px] font-semibold text-teal-700 dark:text-teal-400 mt-0.5 truncate">
+                ৳{(summary.today_delivered_cod_amount ?? 0).toLocaleString()} collected
+              </p>
+            </div>
+            <div className="p-2 rounded-xl bg-teal-500/10 text-teal-600 shrink-0">
+              <PackageCheck className="h-5 w-5" />
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Card 3: In Transit / Floating COD */}
+        <Card 
+          onClick={() => setStatusFilter("in_transit")}
+          className="cursor-pointer hover:shadow-md hover:border-blue-400 dark:hover:border-blue-700 transition-all bg-white dark:bg-slate-900 border-blue-200/80 dark:border-blue-800 shadow-2xs"
+        >
+          <CardContent className="p-4 flex items-center justify-between">
+            <div className="min-w-0 flex-1 pr-2">
+              <p className="text-xs text-muted-foreground font-medium truncate">In Transit</p>
+              <h3 className="text-xl sm:text-2xl font-bold mt-1 text-blue-600 dark:text-blue-400 truncate">
+                {summary.in_transit}
+              </h3>
+              <p className="text-[11px] font-semibold text-blue-700 dark:text-blue-400 mt-0.5 truncate">
+                ৳{(summary.in_transit_cod_amount ?? 0).toLocaleString()} floating COD
+              </p>
+            </div>
+            <div className="p-2 rounded-xl bg-blue-500/10 text-blue-600 shrink-0">
+              <Package className="h-5 w-5" />
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Card 4: Total Completed Deliveries */}
+        <Card 
+          onClick={() => setStatusFilter("delivered")}
+          className="cursor-pointer hover:shadow-md hover:border-emerald-400 dark:hover:border-emerald-700 transition-all bg-white dark:bg-slate-900 border-emerald-200/80 dark:border-emerald-800 shadow-2xs"
+        >
+          <CardContent className="p-4 flex items-center justify-between">
+            <div className="min-w-0 flex-1 pr-2">
+              <p className="text-xs text-muted-foreground font-medium truncate">Delivered (All Time)</p>
+              <h3 className="text-xl sm:text-2xl font-bold mt-1 text-emerald-600 dark:text-emerald-400 truncate">
                 {summary.delivered}
               </h3>
+              <p className="text-[11px] font-semibold text-emerald-700 dark:text-emerald-400 mt-0.5 truncate">
+                ৳{(summary.delivered_cod_amount ?? 0).toLocaleString()} collected
+              </p>
             </div>
-            <div className="p-2 rounded-xl bg-emerald-500/10 text-emerald-600">
+            <div className="p-2 rounded-xl bg-emerald-500/10 text-emerald-600 shrink-0">
               <CheckCircle2 className="h-5 w-5" />
             </div>
           </CardContent>
         </Card>
 
-        <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800">
+        {/* Card 5: Cancelled / Returned */}
+        <Card 
+          onClick={() => setStatusFilter("cancelled")}
+          className="cursor-pointer hover:shadow-md hover:border-red-400 dark:hover:border-red-700 transition-all bg-white dark:bg-slate-900 border-red-200/80 dark:border-red-800 shadow-2xs"
+        >
           <CardContent className="p-4 flex items-center justify-between">
-            <div>
-              <p className="text-xs text-muted-foreground font-medium">Cancelled/Returned</p>
-              <h3 className="text-2xl font-bold mt-1 text-red-600 dark:text-red-400">
+            <div className="min-w-0 flex-1 pr-2">
+              <p className="text-xs text-muted-foreground font-medium truncate">Cancelled/Returned</p>
+              <h3 className="text-xl sm:text-2xl font-bold mt-1 text-red-600 dark:text-red-400 truncate">
                 {summary.cancelled}
               </h3>
+              <p className="text-[11px] font-semibold text-red-700 dark:text-red-400 mt-0.5 truncate">
+                ৳{(summary.cancelled_cod_amount ?? 0).toLocaleString()} lost COD
+              </p>
             </div>
-            <div className="p-2 rounded-xl bg-red-500/10 text-red-600">
+            <div className="p-2 rounded-xl bg-red-500/10 text-red-600 shrink-0">
               <XCircle className="h-5 w-5" />
             </div>
           </CardContent>
         </Card>
 
-        <Card className="col-span-2 md:col-span-1 bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800">
+        {/* Card 6: Total Booked Parcels */}
+        <Card 
+          onClick={() => setStatusFilter("all")}
+          className="cursor-pointer hover:shadow-md hover:border-slate-400 dark:hover:border-slate-600 transition-all bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 shadow-2xs"
+        >
           <CardContent className="p-4 flex items-center justify-between">
-            <div>
-              <p className="text-xs text-muted-foreground font-medium">Total COD</p>
-              <h3 className="text-xl font-bold mt-1 text-slate-900 dark:text-slate-100 truncate">
-                ৳{summary.total_cod_amount.toLocaleString()}
+            <div className="min-w-0 flex-1 pr-2">
+              <p className="text-xs text-muted-foreground font-medium truncate">Total Booked</p>
+              <h3 className="text-xl sm:text-2xl font-bold mt-1 text-slate-900 dark:text-slate-100 truncate">
+                {summary.total_booked}
               </h3>
+              <p className="text-[11px] font-semibold text-slate-600 dark:text-slate-400 mt-0.5 truncate">
+                ৳{summary.total_cod_amount.toLocaleString()} total COD
+              </p>
             </div>
-            <div className="p-2 rounded-xl bg-amber-500/10 text-amber-600">
+            <div className="p-2 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-600 shrink-0">
               <Banknote className="h-5 w-5" />
             </div>
           </CardContent>
@@ -406,15 +478,16 @@ export default function CourierPartnersPage() {
                 </div>
 
                 <Select value={statusFilter} onValueChange={setStatusFilter}>
-                  <SelectTrigger className="w-32 h-8 text-xs">
+                  <SelectTrigger className="w-40 h-8 text-xs">
                     <SelectValue placeholder="Status" />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">All Statuses</SelectItem>
-                    <SelectItem value="in_review">In Review</SelectItem>
-                    <SelectItem value="in_transit">In Transit</SelectItem>
-                    <SelectItem value="delivered">Delivered</SelectItem>
-                    <SelectItem value="cancelled">Cancelled</SelectItem>
+                    <SelectItem value="today_picked">Today Picked ({summary.today_picked_count ?? 0})</SelectItem>
+                    <SelectItem value="today_delivered">Today Delivered ({summary.today_delivered_count ?? 0})</SelectItem>
+                    <SelectItem value="in_transit">In Transit ({summary.in_transit ?? 0})</SelectItem>
+                    <SelectItem value="delivered">Delivered (All Time) ({summary.delivered ?? 0})</SelectItem>
+                    <SelectItem value="cancelled">Cancelled/Returned ({summary.cancelled ?? 0})</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -634,6 +707,17 @@ export default function CourierPartnersPage() {
 
                             <Button
                               size="sm"
+                              variant="outline"
+                              className="h-7 px-2 text-[11px] gap-1 text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50 dark:hover:bg-indigo-950 border-indigo-200 dark:border-indigo-800"
+                              onClick={() => setSelectedParcelForTimeline(order)}
+                              title="View Courier Delivery Timeline"
+                            >
+                              <Clock className="h-3 w-3" />
+                              Timeline
+                            </Button>
+
+                            <Button
+                              size="sm"
                               variant="ghost"
                               className="h-7 px-2 text-[11px] gap-1"
                               onClick={() => handleSyncStatus(order.id)}
@@ -658,6 +742,44 @@ export default function CourierPartnersPage() {
           </div>
         </CardContent>
       </Card>
+
+      {/* Interactive Parcel Courier Timeline Sheet */}
+      <Sheet
+        open={!!selectedParcelForTimeline}
+        onOpenChange={(open) => {
+          if (!open) setSelectedParcelForTimeline(null);
+        }}
+      >
+        <SheetContent className="sm:max-w-xl w-full p-4 sm:p-6 overflow-y-auto bg-slate-50 dark:bg-slate-950">
+          <SheetHeader className="pb-4 border-b border-slate-200 dark:border-slate-800">
+            <SheetTitle className="text-xl font-bold flex items-center gap-2">
+              Parcel #{selectedParcelForTimeline?.id} Delivery Journey
+            </SheetTitle>
+            <p className="text-xs text-muted-foreground mt-1">
+              Customer: {selectedParcelForTimeline?.customer_name} ({selectedParcelForTimeline?.customer_phone})
+            </p>
+          </SheetHeader>
+
+          {selectedParcelForTimeline && (
+            <div className="mt-4 space-y-4">
+              <CourierTimeline
+                order={selectedParcelForTimeline}
+                onSyncStatus={async (orderId) => {
+                  await handleSyncStatus(orderId);
+                  try {
+                    const res = await courierApi.getOrderStatus(orderId);
+                    if (res.data?.order) {
+                      setSelectedParcelForTimeline(res.data.order);
+                    }
+                  } catch (e) {}
+                }}
+                isSyncing={refreshingId === selectedParcelForTimeline.id}
+                showCardWrapper={false}
+              />
+            </div>
+          )}
+        </SheetContent>
+      </Sheet>
     </div>
   );
 }

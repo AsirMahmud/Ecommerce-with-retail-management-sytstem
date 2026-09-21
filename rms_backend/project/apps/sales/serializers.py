@@ -267,7 +267,7 @@ class SaleSerializer(serializers.ModelSerializer):
             'date', 'sale_type', 'subtotal', 'tax', 'discount', 'total', 'total_profit', 'total_loss',
             'payment_method', 'status', 'amount_paid', 'amount_due', 'gift_amount',
             'is_fully_paid', 'payment_status', 'notes', 'items', 'payments', 'sale_payments',
-            'due_payments', 'returns', 'payment_data'
+            'due_payments', 'returns', 'payment_data', 'idempotency_key'
         ]
         read_only_fields = ['invoice_number', 'total', 'total_profit', 'total_loss', 
                            'amount_paid', 'amount_due', 'gift_amount', 'is_fully_paid', 'payment_status']

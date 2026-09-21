@@ -81,6 +81,7 @@ export interface Sale {
     total_profit?: number;
     total_loss?: number;
     notes?: string;
+    idempotency_key?: string;
     created_at?: string;
     updated_at?: string;
     items: SaleItem[];

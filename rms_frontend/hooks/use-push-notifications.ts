@@ -104,7 +104,10 @@ export function usePushNotifications() {
   const showNativeNotification = useCallback(
     async (payload: PushNotificationPayload) => {
       if (typeof window === "undefined" || !("Notification" in window)) return;
-      if (Notification.permission !== "granted") return;
+      if (Notification.permission !== "granted") {
+        console.warn("[RMS Push] Cannot show notification - permission is:", Notification.permission);
+        return;
+      }
 
       const title = payload.title || "Raw Stitch RMS";
       const options: NotificationOptions = {
@@ -120,22 +123,45 @@ export function usePushNotifications() {
       };
 
       try {
+        let shownViaSW = false;
         if ("serviceWorker" in navigator) {
-          const reg = await navigator.serviceWorker.ready;
-          if (reg && reg.showNotification) {
-            await reg.showNotification(title, options);
-            return;
+          try {
+            // Wait at most 1.2 seconds for service worker ready to avoid hanging indefinitely
+            const readyPromise = navigator.serviceWorker.ready;
+            const timeoutPromise = new Promise<null>((resolve) =>
+              setTimeout(() => resolve(null), 1200)
+            );
+            const reg =
+              (await Promise.race([readyPromise, timeoutPromise])) ||
+              (await navigator.serviceWorker.getRegistration());
+
+            if (reg && typeof reg.showNotification === "function") {
+              await reg.showNotification(title, options);
+              shownViaSW = true;
+            }
+          } catch (swErr) {
+            console.warn("[RMS Push] SW showNotification failed, trying fallback:", swErr);
           }
         }
-        // Fallback to standard Notification constructor
-        const notif = new Notification(title, options);
-        notif.onclick = () => {
-          window.focus();
-          if (payload.url) {
-            window.location.href = payload.url;
-          }
-          notif.close();
-        };
+
+        // Fallback to standard Notification constructor if SW didn't show it
+        if (!shownViaSW && typeof window.Notification === "function") {
+          const notif = new Notification(title, {
+            body: options.body,
+            icon: options.icon,
+            badge: options.badge,
+            tag: options.tag,
+            requireInteraction: options.requireInteraction,
+            silent: options.silent,
+          });
+          notif.onclick = () => {
+            window.focus();
+            if (payload.url) {
+              window.location.href = payload.url;
+            }
+            notif.close();
+          };
+        }
       } catch (err) {
         console.error("[RMS Push] Failed to trigger notification:", err);
       }
@@ -147,9 +173,20 @@ export function usePushNotifications() {
    * Send a test push notification to verify setup
    */
   const sendTestNotification = useCallback(async () => {
-    if (permission !== "granted") {
+    if (typeof window === "undefined" || !("Notification" in window)) {
+      toast.error("Notifications not supported in this browser environment.");
+      return;
+    }
+
+    const currentPerm = Notification.permission;
+    if (currentPerm !== "granted") {
       const granted = await requestPermission();
-      if (!granted) return;
+      if (!granted) {
+        toast.error("Notification permission was not granted.", {
+          description: "Please allow notifications in your browser's address bar or site settings.",
+        });
+        return;
+      }
     }
 
     await showNativeNotification({
@@ -158,13 +195,14 @@ export function usePushNotifications() {
       icon: "/icons/icon-192x192.png",
       badge: "/icons/badge-72x72.png",
       url: "/",
-      tag: "test-push",
+      tag: "test-push-" + Date.now(),
+      priority: "high",
     });
 
     toast.success("Test notification dispatched!", {
       description: "Check your desktop or device notification center.",
     });
-  }, [permission, requestPermission, showNativeNotification]);
+  }, [requestPermission, showNativeNotification]);
 
   return {
     isSupported,

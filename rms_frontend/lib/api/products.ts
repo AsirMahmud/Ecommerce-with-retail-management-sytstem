@@ -1,6 +1,4 @@
-import axios from 'axios';
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api';
+import apiClient from '../api-client';
 
 export interface Product {
     id: number;
@@ -29,26 +27,27 @@ export interface UpdateProductDTO extends Partial<CreateProductDTO> {
 
 export const productsApi = {
     getAll: async (): Promise<Product[]> => {
-        const { data } = await axios.get(`${API_URL}/products/`);
+        const { data } = await apiClient.get<Product[]>('/products/');
         return data;
     },
 
     getById: async (id: number): Promise<Product> => {
-        const { data } = await axios.get(`${API_URL}/products/${id}/`);
+        const { data } = await apiClient.get<Product>(`/products/${id}/`);
         return data;
     },
 
     create: async (product: CreateProductDTO): Promise<Product> => {
-        const { data } = await axios.post(`${API_URL}/products/`, product);
+        const { data } = await apiClient.post<Product>('/products/', product);
         return data;
     },
 
     update: async ({ id, ...product }: UpdateProductDTO): Promise<Product> => {
-        const { data } = await axios.put(`${API_URL}/products/${id}/`, product);
+        const { data } = await apiClient.put<Product>(`/products/${id}/`, product);
         return data;
     },
 
     delete: async (id: number): Promise<void> => {
-        await axios.delete(`${API_URL}/products/${id}/`);
+        await apiClient.delete(`/products/${id}/`);
     }
-}; 
+};
+ 

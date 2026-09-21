@@ -457,22 +457,40 @@ export function OnlinePreordersAnalyticsDeck({ onSelectStatus, className = "" }:
             </div>
 
             {/* Quick KPI Meters */}
-            <div className="grid grid-cols-3 gap-2 pt-3 border-t border-slate-100 text-center">
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 pt-3 border-t border-slate-100 text-center">
+              <div className="p-2 bg-indigo-50/70 border border-indigo-100 rounded-xl">
+                <span className="text-[10px] text-indigo-700 font-semibold block">Today Picked (Sent)</span>
+                <span className="text-xs font-black text-indigo-800">
+                  {metrics?.today_picked_count || 0} ({formatCurrency(metrics?.today_picked_cod_amount || 0)})
+                </span>
+              </div>
+              <div className="p-2 bg-teal-50/70 border border-teal-100 rounded-xl">
+                <span className="text-[10px] text-teal-700 font-semibold block">Today Delivered</span>
+                <span className="text-xs font-black text-teal-800">
+                  {metrics?.today_delivered_count || 0} ({formatCurrency(metrics?.today_delivered_cod_amount || 0)})
+                </span>
+              </div>
+              <div className="p-2 bg-blue-50/70 border border-blue-100 rounded-xl">
+                <span className="text-[10px] text-blue-700 font-semibold block">In-Transit Floating COD</span>
+                <span className="text-xs font-black text-blue-800">
+                  {formatCurrency(metrics?.in_transit_cod_amount || 0)}
+                </span>
+              </div>
               <div className="p-2 bg-emerald-50/70 border border-emerald-100 rounded-xl">
                 <span className="text-[10px] text-emerald-700 font-semibold block">Fulfillment</span>
-                <span className="text-sm font-black text-emerald-800">
+                <span className="text-xs font-black text-emerald-800">
                   {metrics?.rates?.fulfillment_rate || 0}%
                 </span>
               </div>
               <div className="p-2 bg-purple-50/70 border border-purple-100 rounded-xl">
                 <span className="text-[10px] text-purple-700 font-semibold block">Return Rate</span>
-                <span className="text-sm font-black text-purple-800">
+                <span className="text-xs font-black text-purple-800">
                   {metrics?.rates?.return_rate || 0}%
                 </span>
               </div>
               <div className="p-2 bg-rose-50/70 border border-rose-100 rounded-xl">
                 <span className="text-[10px] text-rose-700 font-semibold block">Cancelled</span>
-                <span className="text-sm font-black text-rose-800">
+                <span className="text-xs font-black text-rose-800">
                   {metrics?.rates?.cancellation_rate || 0}%
                 </span>
               </div>
