@@ -440,6 +440,22 @@ class OnlinePreorderSerializer(serializers.ModelSerializer):
             ret['sale_id'] = None
             ret['invoice_number'] = None
 
+        request = self.context.get('request')
+        is_staff = False
+        if request and hasattr(request, 'user') and request.user and request.user.is_authenticated:
+            is_staff = getattr(request.user, 'is_staff', False) or getattr(request.user, 'role', None) in ['admin', 'manager', 'employee', 'staff']
+
+        if not is_staff:
+            ret.pop('fraud_summary', None)
+            ret.pop('profit', None)
+            ret.pop('cost_price', None)
+            ret.pop('risk_score', None)
+            ret.pop('risk_level', None)
+            ret.pop('ip_address', None)
+            ret.pop('user_agent', None)
+            ret.pop('session_id', None)
+            ret.pop('return_expense_details', None)
+
         return ret
 
 

@@ -2,6 +2,7 @@ from django.test import TestCase
 from rest_framework.test import APIClient
 from rest_framework import status
 from django.contrib.auth import get_user_model
+from decimal import Decimal
 from apps.online_preorder.models import OnlinePreorder, MetaEventLog
 from apps.online_preorder.services.fraud_scoring import calculate_fraud_score
 from apps.online_preorder.services.meta_capi import dispatch_meta_purchase_event
@@ -204,6 +205,26 @@ class OrderTrackingFraudMetaTest(TestCase):
         # Confirm old order without attribution data
         res = dispatch_meta_purchase_event(old_order)
         self.assertEqual(res['status'], 'SUCCESS')
+
+    def test_unauthenticated_public_can_retrieve_order(self):
+        order = OnlinePreorder.objects.create(
+            customer_name="Guest Customer",
+            customer_phone="01799999999",
+            total_amount=1500,
+            status="PENDING",
+            risk_score=25,
+            profit=Decimal("500.00"),
+            items=[{"product_id": 1, "quantity": 1, "unit_price": 1500, "size": "M", "color": "Black"}]
+        )
+        unauthenticated_client = APIClient()
+        resp = unauthenticated_client.get(f'/api/online-preorder/orders/{order.id}/')
+        self.assertEqual(resp.status_code, status.HTTP_200_OK)
+        self.assertEqual(resp.data['id'], order.id)
+        self.assertEqual(resp.data['customer_name'], "Guest Customer")
+        self.assertNotIn('fraud_summary', resp.data)
+        self.assertNotIn('risk_score', resp.data)
+        self.assertNotIn('profit', resp.data)
+        self.assertNotIn('cost_price', resp.data)
 
     def test_completed_status_does_not_trigger_purchase_event(self):
         order = OnlinePreorder.objects.create(

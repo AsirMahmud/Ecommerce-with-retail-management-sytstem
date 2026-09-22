@@ -62,6 +62,11 @@ class OnlinePreorderViewSet(
     permission_classes = [IsAuthenticated]
     pagination_class = OnlinePreorderPagination
 
+    def get_permissions(self):
+        if self.action == 'retrieve':
+            return [AllowAny()]
+        return super().get_permissions()
+
     def paginate_queryset(self, queryset):
         if self.request.query_params.get('no_pagination') == 'true':
             return None

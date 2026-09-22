@@ -59,10 +59,27 @@ export default function OrderCompletePage() {
         return
       }
 
+      // Check sessionStorage first for immediate display and fallback resilience
+      let initialOrder: OnlinePreorder | null = null
+      if (typeof window !== 'undefined') {
+        try {
+          const cached = sessionStorage.getItem(`order_${preorderId}`)
+          if (cached) {
+            initialOrder = JSON.parse(cached)
+            if (initialOrder) {
+              setOrder(initialOrder)
+              setLoading(false)
+            }
+          }
+        } catch (e) {
+          console.warn("Failed to parse cached order", e)
+        }
+      }
+
       try {
         const orderData = await ecommerceApi.getOnlinePreorder(Number(preorderId))
 
-        // Enrich with product names
+        // Enrich with product names if not already present
         try {
           const cartItemsForPricing = orderData.items.map(item => ({
             productId: item.product_id,
@@ -78,7 +95,6 @@ export default function OrderCompletePage() {
             // Map names back to orderData items
             orderData.items = orderData.items.map((item: OrderItem) => {
               const priced = pricingData.items.find(pi => pi.productId === item.product_id); // Simple match by ID
-              // Note: Matching by variant would be more precise but name is usually same for variants
               return {
                 ...item,
                 product_name: item.product_name || priced?.name || undefined,
@@ -91,9 +107,17 @@ export default function OrderCompletePage() {
         }
 
         setOrder(orderData)
+        if (typeof window !== 'undefined') {
+          try {
+            sessionStorage.setItem(`order_${preorderId}`, JSON.stringify(orderData))
+          } catch (e) {}
+        }
       } catch (err: any) {
         console.error("Failed to fetch order:", err)
-        setError(err?.message || "Failed to load order details")
+        // Only show error screen if we have no cached order to display
+        if (!initialOrder) {
+          setError(err?.message || "Failed to load order details")
+        }
       } finally {
         setLoading(false)
       }

@@ -297,6 +297,14 @@ export function CheckoutForm() {
       clearDirectCheckoutItems() // Clear direct checkout items first
       clearCart() // Also clear regular cart
       clearCoupon()
+      // Store created order in sessionStorage for immediate display on order-complete page
+      if (typeof window !== 'undefined' && created && created.id) {
+        try {
+          sessionStorage.setItem(`order_${created.id}`, JSON.stringify(created))
+        } catch (storageErr) {
+          console.warn("Could not cache order in sessionStorage:", storageErr)
+        }
+      }
       router.push(`/order-complete?preorder_id=${created.id}`)
     } catch (err: any) {
       setError(err?.message || "Failed to place order. Please try again.")
