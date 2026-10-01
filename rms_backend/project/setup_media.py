@@ -22,7 +22,7 @@ def setup_media_directory():
         print(f"✅ Permissions set to 755")
         
         # Create subdirectories for different file types
-        subdirs = ['products', 'categories', 'users', 'temp']
+        subdirs = ['products', 'categories', 'users', 'temp', 'hero_slides', 'promo_modals', 'gallery', 'brands', 'site_logo', 'hero', 'uploads']
         for subdir in subdirs:
             subdir_path = os.path.join(media_root, subdir)
             os.makedirs(subdir_path, exist_ok=True)

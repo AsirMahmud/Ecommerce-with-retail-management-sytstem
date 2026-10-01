@@ -222,17 +222,28 @@ USE_TZ = True
 MEDIA_URL = '/media/'
 
 # Production vs Development media root
-if os.getenv('DEBUG', 'True') == 'False':
-    # Production settings
+# Priority: 1. MEDIA_ROOT from .env, 2. /home/rawstitc/public_html/media (if on cPanel server), 3. BASE_DIR/media
+MEDIA_ROOT_ENV = os.getenv('MEDIA_ROOT')
+if MEDIA_ROOT_ENV:
+    MEDIA_ROOT = MEDIA_ROOT_ENV
+elif os.path.exists('/home/rawstitc/public_html'):
     MEDIA_ROOT = '/home/rawstitc/public_html/media'
 else:
-    # Development settings
     MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 
+# Ensure media directory and required subdirectories exist
+try:
+    os.makedirs(MEDIA_ROOT, exist_ok=True)
+    for _sub in ['products', 'hero_slides', 'promo_modals', 'gallery', 'brands', 'site_logo', 'hero', 'temp', 'uploads']:
+        os.makedirs(os.path.join(MEDIA_ROOT, _sub), exist_ok=True)
+except Exception:
+    pass
+
 # File upload settings
-
-
-# Ensure media directory exists in production
+FILE_UPLOAD_PERMISSIONS = 0o644
+FILE_UPLOAD_DIRECTORY_PERMISSIONS = 0o755
+FILE_UPLOAD_MAX_MEMORY_SIZE = 10485760  # 10MB
+DATA_UPLOAD_MAX_MEMORY_SIZE = 10485760  # 10MB
 
 
 # Static files configuration

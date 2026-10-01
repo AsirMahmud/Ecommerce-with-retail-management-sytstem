@@ -28,7 +28,7 @@ def fix_production_media():
         os.chmod(media_root, stat.S_IRWXU | stat.S_IRGRP | stat.S_IXGRP | stat.S_IROTH | stat.S_IXOTH)
         
         # Step 3: Create subdirectories
-        subdirs = ['products', 'categories', 'users', 'temp', 'uploads']
+        subdirs = ['products', 'categories', 'users', 'temp', 'uploads', 'hero_slides', 'promo_modals', 'gallery', 'brands', 'site_logo', 'hero']
         for subdir in subdirs:
             subdir_path = os.path.join(media_root, subdir)
             print(f"📁 Creating subdirectory: {subdir}")

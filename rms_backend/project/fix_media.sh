@@ -25,6 +25,12 @@ mkdir -p "$MEDIA_DIR/categories"
 mkdir -p "$MEDIA_DIR/users"
 mkdir -p "$MEDIA_DIR/temp"
 mkdir -p "$MEDIA_DIR/uploads"
+mkdir -p "$MEDIA_DIR/hero_slides"
+mkdir -p "$MEDIA_DIR/promo_modals"
+mkdir -p "$MEDIA_DIR/gallery"
+mkdir -p "$MEDIA_DIR/brands"
+mkdir -p "$MEDIA_DIR/site_logo"
+mkdir -p "$MEDIA_DIR/hero"
 
 # Set permissions for subdirectories
 echo "🔐 Setting permissions for subdirectories..."
