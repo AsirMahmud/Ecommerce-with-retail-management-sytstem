@@ -16,7 +16,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { DataTable } from "@/components/ui/data-table";
 import type { ColumnDef } from "@tanstack/react-table";
 import { DataExportButton } from "@/components/data-export-button";
@@ -39,11 +38,20 @@ import {
   TrendingUp,
   Target,
   Zap,
+  Upload,
+  Store,
+  Globe,
+  FileSpreadsheet,
+  Sparkles,
 } from "lucide-react";
 import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Progress } from "@/components/ui/progress";
+import {
+  CustomerCsvImportModal,
+  downloadCustomerCsvTemplateFile,
+} from "@/components/customers/customer-csv-import-modal";
 import {
   useCustomers,
   useActiveCustomers,
@@ -84,6 +92,7 @@ type Customer = {
   is_active: boolean;
   ranking?: number;
   is_top_customer?: boolean;
+  customer_type?: "shop" | "online" | "both";
 };
 
 const rankingIcons = [
@@ -285,6 +294,35 @@ const columns: ColumnDef<Customer>[] = [
     },
   },
   {
+    accessorKey: "customer_type",
+    header: "Channel",
+    cell: ({ row }) => {
+      const type = row.original.customer_type || "shop";
+      if (type === "both") {
+        return (
+          <Badge variant="outline" className="bg-purple-50 text-purple-700 border-purple-200 text-xs gap-1 py-0.5 font-medium">
+            <Sparkles className="h-3 w-3 text-purple-600" />
+            Omni (Both)
+          </Badge>
+        );
+      }
+      if (type === "online") {
+        return (
+          <Badge variant="outline" className="bg-indigo-50 text-indigo-700 border-indigo-200 text-xs gap-1 py-0.5 font-medium">
+            <Globe className="h-3 w-3 text-indigo-600" />
+            Online
+          </Badge>
+        );
+      }
+      return (
+        <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200 text-xs gap-1 py-0.5 font-medium">
+          <Store className="h-3 w-3 text-blue-600" />
+          Offline (Shop)
+        </Badge>
+      );
+    },
+  },
+  {
     accessorKey: "is_active",
     header: "Status",
     cell: ({ row }) => {
@@ -372,6 +410,8 @@ export default function CustomersPage() {
   const [filterBy, setFilterBy] = useState("all");
   const [sortBy, setSortBy] = useState("ranking");
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("asc");
+  const [channelTab, setChannelTab] = useState<"all" | "shop" | "online">("all");
+  const [isImportModalOpen, setIsImportModalOpen] = useState(false);
   
   // Debounce search query
   const debouncedQuery = useDebounce(searchQuery, 300);
@@ -384,6 +424,10 @@ export default function CustomersPage() {
   // Prepare filters for API
   const apiFilters = useMemo(() => {
     const filters: any = {};
+
+    if (channelTab !== "all") {
+      filters.customer_type = channelTab;
+    }
     
     if (filterBy !== "all") {
       if (filterBy.startsWith("top-")) {
@@ -401,7 +445,7 @@ export default function CustomersPage() {
     }
     
     return filters;
-  }, [filterBy, sortBy, sortOrder]);
+  }, [channelTab, filterBy, sortBy, sortOrder]);
   
   const { data: customersData, isLoading: isLoadingCustomers } = useCustomers(currentPage, pageSize, apiFilters);
   const { data: searchResults, isLoading: isLoadingSearch } = useSearchCustomers(debouncedSearchQuery, currentPage, pageSize, apiFilters);
@@ -485,12 +529,40 @@ export default function CustomersPage() {
 
   return (
     <div className="container mx-auto py-3 sm:py-6 px-2 sm:px-4 space-y-4 sm:space-y-6 min-w-0">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl sm:text-3xl font-bold">Customer Management</h1>
+          <h1 className="text-2xl sm:text-3xl font-bold flex items-center gap-2">
+            <Users className="h-7 w-7 text-indigo-600" />
+            Customer Portal (Offline &amp; Online)
+          </h1>
           <p className="text-xs sm:text-sm text-muted-foreground mt-1">
-            Manage your customer relationships and track their activity
+            Manage your offline in-store customers and online audience in one unified portal
           </p>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={downloadCustomerCsvTemplateFile}
+            className="text-xs font-semibold gap-1.5 rounded-xl border-slate-200"
+          >
+            <Download className="h-3.5 w-3.5" />
+            CSV Template
+          </Button>
+          <Button
+            size="sm"
+            onClick={() => setIsImportModalOpen(true)}
+            className="text-xs font-semibold gap-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white shadow-sm"
+          >
+            <Upload className="h-3.5 w-3.5" />
+            Import CSV
+          </Button>
+          <Button asChild size="sm" className="text-xs font-semibold rounded-xl">
+            <Link href="/customers/new">
+              <UserPlus className="h-3.5 w-3.5 mr-1.5" />
+              Add Customer
+            </Link>
+          </Button>
         </div>
       </div>
 
@@ -597,6 +669,67 @@ export default function CustomersPage() {
 
       {/* Top Customers Analysis */}
       <TopCustomersAnalysis />
+
+      {/* Channel Switcher */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-1.5 bg-slate-100/80 dark:bg-slate-800/80 rounded-2xl border border-slate-200/80 dark:border-slate-700">
+        <div className="grid grid-cols-3 w-full sm:w-[460px] bg-slate-200/60 dark:bg-slate-800/80 p-1 rounded-xl gap-1">
+          <button
+            type="button"
+            onClick={() => {
+              setChannelTab("all");
+              setCurrentPage(1);
+            }}
+            className={`text-xs font-bold rounded-lg flex items-center justify-center gap-1.5 py-2 transition-all ${
+              channelTab === "all"
+                ? "bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-sm"
+                : "text-slate-600 dark:text-slate-400 hover:text-slate-900"
+            }`}
+          >
+            <Users className="h-3.5 w-3.5" />
+            All Customers ({analytics?.total_customers || totalItems})
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setChannelTab("shop");
+              setCurrentPage(1);
+            }}
+            className={`text-xs font-bold rounded-lg flex items-center justify-center gap-1.5 py-2 transition-all ${
+              channelTab === "shop"
+                ? "bg-white dark:bg-slate-900 text-blue-700 dark:text-blue-400 shadow-sm"
+                : "text-slate-600 dark:text-slate-400 hover:text-slate-900"
+            }`}
+          >
+            <Store className="h-3.5 w-3.5 text-blue-600" />
+            Offline (Shop)
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setChannelTab("online");
+              setCurrentPage(1);
+            }}
+            className={`text-xs font-bold rounded-lg flex items-center justify-center gap-1.5 py-2 transition-all ${
+              channelTab === "online"
+                ? "bg-white dark:bg-slate-900 text-indigo-700 dark:text-indigo-400 shadow-sm"
+                : "text-slate-600 dark:text-slate-400 hover:text-slate-900"
+            }`}
+          >
+            <Globe className="h-3.5 w-3.5 text-indigo-600" />
+            Online
+          </button>
+        </div>
+        <div className="flex items-center gap-2 px-2">
+          <Badge variant="outline" className="text-[11px] font-medium bg-white/80 dark:bg-slate-900/80">
+            Current Filter:{" "}
+            {channelTab === "all"
+              ? "All Channels"
+              : channelTab === "shop"
+              ? "Offline / Shop POS"
+              : "Online Preorders & Web"}
+          </Badge>
+        </div>
+      </div>
 
       <div className="flex items-center justify-between mb-4">
         {Object.keys(rowSelection).length > 0 && (
@@ -784,6 +917,14 @@ export default function CustomersPage() {
               </AlertDialogFooter>
             </AlertDialogContent>
           </AlertDialog>
+          <Button
+            variant="outline"
+            onClick={() => setIsImportModalOpen(true)}
+            className="gap-1.5"
+          >
+            <Upload className="h-4 w-4" />
+            Import CSV
+          </Button>
           <Button asChild>
             <Link href="/customers/new">
               <UserPlus className="h-4 w-4 mr-2" />
@@ -792,6 +933,16 @@ export default function CustomersPage() {
           </Button>
         </div>
       </div>
+
+      {/* CSV Import Modal */}
+      <CustomerCsvImportModal
+        open={isImportModalOpen}
+        onOpenChange={setIsImportModalOpen}
+        defaultCustomerType={channelTab === "online" ? "online" : "shop"}
+        onImportComplete={() => {
+          window.location.reload();
+        }}
+      />
     </div>
   );
 }

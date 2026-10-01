@@ -45,6 +45,7 @@ export const useCustomers = (
         sales_filter?: string;
         recent_filter?: string;
         ordering?: string;
+        customer_type?: string;
     }
 ) => {
     return useQuery({
@@ -57,6 +58,7 @@ export const useCustomers = (
                 if (filters.sales_filter) params.sales_filter = filters.sales_filter;
                 if (filters.recent_filter) params.recent_filter = filters.recent_filter;
                 if (filters.ordering) params.ordering = filters.ordering;
+                if (filters.customer_type) params.customer_type = filters.customer_type;
             }
             
             const response = await axios.get(`${API_URL}/customer/customers/`, { params });
@@ -304,4 +306,55 @@ export function useBulkDeleteCustomers() {
             });
         },
     });
-} 
+}
+
+// Hook for importing customers from CSV
+export function useImportCustomersCSV() {
+    const queryClient = useQueryClient();
+    return useMutation({
+        mutationFn: async ({
+            file,
+            rows,
+            csvText,
+            customerType = 'shop'
+        }: {
+            file?: File;
+            rows?: any[][];
+            csvText?: string;
+            customerType?: 'shop' | 'online' | 'both';
+        }) => {
+            if (file) {
+                const formData = new FormData();
+                formData.append('file', file);
+                formData.append('customer_type', customerType);
+                const response = await axios.post(`${API_URL}/customer/customers/import_csv/`, formData, {
+                    headers: { 'Content-Type': 'multipart/form-data' }
+                });
+                return response.data;
+            } else {
+                const response = await axios.post(`${API_URL}/customer/customers/import_csv/`, {
+                    rows,
+                    csv_text: csvText,
+                    customer_type: customerType
+                });
+                return response.data;
+            }
+        },
+        onSuccess: (data) => {
+            queryClient.invalidateQueries({ queryKey: customerKeys.all });
+            toast({
+                title: 'Import Successful',
+                description: data.message || `Processed ${data.created_count + data.updated_count} customers`,
+            });
+        },
+        onError: (error: any) => {
+            const errorMsg = error?.response?.data?.error || error?.message || 'Failed to import customer CSV';
+            toast({
+                title: 'Import Error',
+                description: errorMsg,
+                variant: 'destructive',
+            });
+        },
+    });
+}
+ 

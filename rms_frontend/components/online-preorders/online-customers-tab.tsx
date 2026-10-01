@@ -29,9 +29,15 @@ import {
   Filter,
   ShieldCheck,
   ShieldAlert,
+  Upload,
+  Download,
 } from "lucide-react";
 import { useOnlinePreorderAnalytics } from "@/hooks/queries/use-reports";
 import { DateRange } from "react-day-picker";
+import {
+  CustomerCsvImportModal,
+  downloadCustomerCsvTemplateFile,
+} from "@/components/customers/customer-csv-import-modal";
 
 interface OnlineCustomersTabProps {
   onFilterCustomerOrders: (customerPhone: string) => void;
@@ -47,6 +53,7 @@ export function OnlineCustomersTab({ onFilterCustomerOrders }: OnlineCustomersTa
   const { data: analyticsData, isLoading } = useOnlinePreorderAnalytics(allTimeDateRange);
   const [searchTerm, setSearchTerm] = useState("");
   const [activeFilter, setActiveFilter] = useState<"all" | "high_risk" | "repeat" | "reliable">("all");
+  const [isImportModalOpen, setIsImportModalOpen] = useState(false);
 
   const customers = useMemo(() => {
     return analyticsData?.top_customers || [];
@@ -201,6 +208,23 @@ export function OnlineCustomersTab({ onFilterCustomerOrders }: OnlineCustomersTa
             </div>
 
             <div className="flex flex-wrap items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={downloadCustomerCsvTemplateFile}
+                className="h-9 px-3 text-xs font-semibold gap-1.5 rounded-xl border-slate-200 text-slate-700 hover:text-slate-900 bg-white shadow-xs"
+              >
+                <Download className="h-3.5 w-3.5 text-slate-500" />
+                Template
+              </Button>
+              <Button
+                size="sm"
+                onClick={() => setIsImportModalOpen(true)}
+                className="h-9 px-3 text-xs font-semibold gap-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white shadow-sm"
+              >
+                <Upload className="h-3.5 w-3.5" />
+                Import Online CSV
+              </Button>
               <div className="relative w-full sm:w-64">
                 <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
                 <Input
@@ -395,6 +419,16 @@ export function OnlineCustomersTab({ onFilterCustomerOrders }: OnlineCustomersTa
           )}
         </CardContent>
       </Card>
+
+      {/* CSV Import Modal for Online Customers */}
+      <CustomerCsvImportModal
+        open={isImportModalOpen}
+        onOpenChange={setIsImportModalOpen}
+        defaultCustomerType="online"
+        onImportComplete={() => {
+          window.location.reload();
+        }}
+      />
     </div>
   );
 }

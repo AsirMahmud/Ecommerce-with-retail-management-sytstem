@@ -39,4 +39,5 @@ export interface Customer {
     is_top_customer?: boolean;
     total_due_amount?: number;
     average_discount?: number;
+    customer_type?: 'shop' | 'online' | 'both';
 } 

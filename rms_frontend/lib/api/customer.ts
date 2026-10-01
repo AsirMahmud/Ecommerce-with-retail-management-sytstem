@@ -35,6 +35,7 @@ export interface Customer {
     purchase_history: PurchaseHistory[];
     ranking?: number;
     is_top_customer?: boolean;
+    customer_type?: 'shop' | 'online' | 'both';
 }
 
 export interface TopCustomer {
@@ -156,3 +157,45 @@ export const lookupCustomerByPhone = async (phone: string): Promise<Customer | n
 export const deleteAllCustomers = async (): Promise<void> => {
     await axiosInstance.delete('/settings/flush-database/?database_type=customers')
 };
+
+export interface ImportCSVResponse {
+    success: boolean;
+    message: string;
+    created_count: number;
+    updated_count: number;
+    skipped_count: number;
+    total_rows: number;
+    errors?: string[];
+}
+
+// Import customers from CSV file or rows
+export const importCustomersCSV = async (
+    fileOrData: File | { csv_text?: string; rows?: any[][]; customer_type?: string },
+    customerType: 'shop' | 'online' | 'both' = 'shop'
+): Promise<ImportCSVResponse> => {
+    if (fileOrData instanceof File) {
+        const formData = new FormData();
+        formData.append('file', fileOrData);
+        formData.append('customer_type', customerType);
+        const response = await axiosInstance.post('/customer/customers/import_csv/', formData, {
+            headers: {
+                'Content-Type': 'multipart/form-data',
+            }
+        });
+        return response.data;
+    } else {
+        const response = await axiosInstance.post('/customer/customers/import_csv/', {
+            ...fileOrData,
+            customer_type: customerType,
+        });
+        return response.data;
+    }
+};
+
+// Download template from backend or fallback to client generator
+export const downloadCustomerCSVTemplate = async (): Promise<Blob> => {
+    const response = await axiosInstance.get('/customer/customers/download_template/', {
+        responseType: 'blob'
+    });
+    return response.data;
+};
