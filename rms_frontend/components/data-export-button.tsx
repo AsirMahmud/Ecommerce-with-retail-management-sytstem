@@ -25,6 +25,7 @@ export interface CustomExportOption {
   description?: string;
   icon?: React.ReactNode;
   badge?: string;
+  group?: string;
   onClick: () => Promise<void> | void;
   className?: string;
 }
@@ -106,7 +107,7 @@ export function DataExportButton({
           <span className="font-semibold text-xs">Export</span>
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className={`${customOptions && customOptions.length > 0 ? "w-64" : "w-48"} p-1.5 rounded-xl border-slate-200 shadow-lg`}>
+      <DropdownMenuContent align="end" className={`${customOptions && customOptions.length > 0 ? "w-72 sm:w-80" : "w-48"} p-1.5 rounded-xl border-slate-200 shadow-xl max-h-[85vh] overflow-y-auto`}>
         <DropdownMenuLabel className="text-[11px] font-bold text-slate-400 uppercase tracking-wider px-2 py-1">
           Export {title}
         </DropdownMenuLabel>
@@ -146,41 +147,52 @@ export function DataExportButton({
 
         {customOptions && customOptions.length > 0 && (
           <>
-            <DropdownMenuSeparator className="my-1 bg-slate-100" />
-            <DropdownMenuLabel className="text-[10px] font-bold text-slate-400 uppercase tracking-wider px-2 py-0.5">
-              Marketing & Ad Audiences
-            </DropdownMenuLabel>
-            {customOptions.map((opt, i) => (
-              <DropdownMenuItem
-                key={i}
-                onClick={async () => {
-                  try {
-                    setLoading(true);
-                    await opt.onClick();
-                  } catch (e) {
-                    console.error("Custom export error:", e);
-                    alert("Failed to export audience data. Please try again.");
-                  } finally {
-                    setLoading(false);
-                  }
-                }}
-                className={`cursor-pointer text-xs rounded-lg flex items-center justify-between gap-2 p-2 hover:bg-indigo-50/80 focus:bg-indigo-50/80 ${opt.className || ""}`}
-              >
-                <div className="flex items-center gap-2 min-w-0">
-                  {opt.icon}
-                  <div className="flex flex-col text-left">
-                    <span className="font-semibold text-xs text-slate-800">{opt.label}</span>
-                    {opt.description && (
-                      <span className="text-[10px] text-slate-400 leading-tight">{opt.description}</span>
+            {Object.entries(
+              customOptions.reduce((acc, opt) => {
+                const grp = opt.group || "Marketing & Ad Audiences";
+                if (!acc[grp]) acc[grp] = [];
+                acc[grp].push(opt);
+                return acc;
+              }, {} as Record<string, CustomExportOption[]>)
+            ).map(([groupTitle, opts], grpIdx) => (
+              <React.Fragment key={grpIdx}>
+                <DropdownMenuSeparator className="my-1 bg-slate-100" />
+                <DropdownMenuLabel className="text-[10px] font-bold text-slate-400 uppercase tracking-wider px-2 py-0.5">
+                  {groupTitle}
+                </DropdownMenuLabel>
+                {opts.map((opt, i) => (
+                  <DropdownMenuItem
+                    key={i}
+                    onClick={async () => {
+                      try {
+                        setLoading(true);
+                        await opt.onClick();
+                      } catch (e) {
+                        console.error("Custom export error:", e);
+                        alert("Failed to export. Please try again.");
+                      } finally {
+                        setLoading(false);
+                      }
+                    }}
+                    className={`cursor-pointer text-xs rounded-lg flex items-center justify-between gap-2 p-2 hover:bg-slate-50/80 focus:bg-slate-50/80 ${opt.className || ""}`}
+                  >
+                    <div className="flex items-center gap-2 min-w-0">
+                      {opt.icon}
+                      <div className="flex flex-col text-left">
+                        <span className="font-semibold text-xs text-slate-800 dark:text-slate-200">{opt.label}</span>
+                        {opt.description && (
+                          <span className="text-[10px] text-slate-400 leading-tight">{opt.description}</span>
+                        )}
+                      </div>
+                    </div>
+                    {opt.badge && (
+                      <span className="text-[9px] px-1.5 py-0.5 rounded-full font-bold bg-slate-100 text-slate-700 shrink-0">
+                        {opt.badge}
+                      </span>
                     )}
-                  </div>
-                </div>
-                {opt.badge && (
-                  <span className="text-[9px] px-1.5 py-0.5 rounded-full font-bold bg-indigo-100 text-indigo-700 shrink-0">
-                    {opt.badge}
-                  </span>
-                )}
-              </DropdownMenuItem>
+                  </DropdownMenuItem>
+                ))}
+              </React.Fragment>
             ))}
           </>
         )}

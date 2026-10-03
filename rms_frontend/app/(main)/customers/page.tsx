@@ -19,7 +19,7 @@ import {
 import { DataTable } from "@/components/ui/data-table";
 import type { ColumnDef } from "@tanstack/react-table";
 import { DataExportButton, type CustomExportOption } from "@/components/data-export-button";
-import { exportToMetaAudienceCSV } from "@/lib/export-utils";
+import { exportToMetaAudienceCSV, exportToExcel, exportToCSV } from "@/lib/export-utils";
 import axiosInstance from "@/lib/api/axios-config";
 import {
   Download,
@@ -602,22 +602,28 @@ export default function CustomersPage() {
     return [];
   };
 
-  const handleExportMetaAudience = async () => {
-    // 1. If rows are selected via table checkboxes, export only selected rows
+  const handleExportMetaAudience = async (targetChannel?: "shop" | "online" | "all") => {
+    const channel = targetChannel || channelTab;
+    const channelLabel = channel === "shop" ? "Offline (Shop)" : channel === "online" ? "Online" : "All";
+
+    // 1. If rows are selected via table checkboxes AND targetChannel is not explicitly specified, export selected rows
     const selectedRowKeys = Object.keys(rowSelection).filter(
       (k) => (rowSelection as Record<string, boolean>)[k]
     );
 
     let recordsToExport: any[] = [];
 
-    if (selectedRowKeys.length > 0 && customers.length > 0) {
+    if (!targetChannel && selectedRowKeys.length > 0 && customers.length > 0) {
       recordsToExport = selectedRowKeys
         .map((idx) => customers[parseInt(idx, 10)])
         .filter(Boolean);
     } else {
-      // Fetch all matching customers from export_data endpoint
+      // Fetch matching customers from export_data endpoint
       try {
-        const params: Record<string, any> = { ...apiFilters };
+        const params: Record<string, any> = {};
+        if (channel !== "all") {
+          params.customer_type = channel;
+        }
         if (debouncedSearchQuery) {
           params.search = debouncedSearchQuery;
         }
@@ -625,7 +631,7 @@ export default function CustomersPage() {
         const res = await axiosInstance.get("/customer/customers/export_data/", { params });
         recordsToExport = Array.isArray(res.data) ? res.data : (res.data?.results || []);
       } catch (err) {
-        console.warn("Failed to fetch full customer list for Meta export:", err);
+        console.warn("Failed to fetch customer list for Meta export:", err);
         recordsToExport = customers;
       }
     }
@@ -633,28 +639,107 @@ export default function CustomersPage() {
     if (!recordsToExport || recordsToExport.length === 0) {
       toast({
         title: "No Data",
-        description: "No customer records available to export for Meta Audience.",
+        description: `No customer records found to export for ${channelLabel} Meta Audience.`,
         variant: "destructive",
       });
       return;
     }
 
-    const filename = `meta_custom_audience_value_based_${channelTab}_${new Date().toISOString().split("T")[0]}`;
+    const filename = `meta_custom_audience_value_based_${channel}_${new Date().toISOString().split("T")[0]}`;
     exportToMetaAudienceCSV(filename, recordsToExport);
 
     toast({
       title: "Meta Audience Export Ready",
-      description: `Exported ${recordsToExport.length} value-based customer records matching Meta Custom Audience template.`,
+      description: `Exported ${recordsToExport.length} ${channelLabel} customer records in Meta Custom Audience format.`,
     });
   };
 
-  const metaAudienceExportOption: CustomExportOption[] = [
+  const handleExportChannelReport = async (channel: "shop" | "online", format: "excel" | "csv") => {
+    const channelLabel = channel === "shop" ? "Offline (Shop)" : "Online";
+    try {
+      const params: Record<string, any> = { customer_type: channel };
+      if (debouncedSearchQuery) {
+        params.search = debouncedSearchQuery;
+      }
+
+      const res = await axiosInstance.get("/customer/customers/export_data/", { params });
+      const records: any[] = Array.isArray(res.data) ? res.data : (res.data?.results || []);
+
+      if (!records || records.length === 0) {
+        toast({
+          title: "No Data",
+          description: `No customer records found for ${channelLabel}.`,
+          variant: "destructive",
+        });
+        return;
+      }
+
+      const rows = records.map(formatCustomerExportRow);
+      const filename = `customers_${channel}_${new Date().toISOString().split("T")[0]}`;
+
+      if (format === "excel") {
+        exportToExcel(filename, `Customers ${channelLabel}`.slice(0, 31), customerExportHeaders, rows);
+      } else {
+        exportToCSV(filename, customerExportHeaders, rows);
+      }
+
+      toast({
+        title: "Export Complete",
+        description: `Exported ${records.length} ${channelLabel} customer records.`,
+      });
+    } catch (err) {
+      console.error(`Failed to export ${channelLabel} customers:`, err);
+      toast({
+        title: "Export Error",
+        description: `Failed to export ${channelLabel} customers.`,
+        variant: "destructive",
+      });
+    }
+  };
+
+  const separateExportOptions: CustomExportOption[] = [
+    // 1. Separate Channel Reports
     {
-      label: "Meta / Facebook Audience (Value-Based CSV)",
-      description: "19-col LTV template for Meta Ad Manager & re-importing",
-      icon: <Target className="w-4 h-4 text-indigo-600 shrink-0" />,
-      badge: "Meta Ads",
-      onClick: handleExportMetaAudience,
+      group: "Separate Channel Reports",
+      label: "Offline (Shop) Directory (.xlsx)",
+      description: "Directory report of in-store POS customers",
+      icon: <Store className="w-4 h-4 text-blue-600 shrink-0" />,
+      badge: "Offline",
+      onClick: () => handleExportChannelReport("shop", "excel"),
+    },
+    {
+      group: "Separate Channel Reports",
+      label: "Online Audience Directory (.xlsx)",
+      description: "Directory report of website & preorder customers",
+      icon: <Globe className="w-4 h-4 text-indigo-600 shrink-0" />,
+      badge: "Online",
+      onClick: () => handleExportChannelReport("online", "excel"),
+    },
+
+    // 2. Meta / Facebook Audiences (Value-Based 19-Col)
+    {
+      group: "Meta / Facebook Audiences (19-Col Value-Based)",
+      label: "Offline (Shop) Audience (Meta CSV)",
+      description: "In-store POS customers with LTV for Meta Ads",
+      icon: <Store className="w-4 h-4 text-blue-600 shrink-0" />,
+      badge: "Offline",
+      onClick: () => handleExportMetaAudience("shop"),
+    },
+    {
+      group: "Meta / Facebook Audiences (19-Col Value-Based)",
+      label: "Online Audience (Meta CSV)",
+      description: "Website & preorder customers with LTV for Meta Ads",
+      icon: <Globe className="w-4 h-4 text-indigo-600 shrink-0" />,
+      badge: "Online",
+      onClick: () => handleExportMetaAudience("online"),
+    },
+    {
+      group: "Meta / Facebook Audiences (19-Col Value-Based)",
+      label: "All Customers Combined (Meta CSV)",
+      description: "Complete omnichannel audience with LTV values",
+      icon: <Users className="w-4 h-4 text-purple-600 shrink-0" />,
+      badge: "Omni / All",
+      onClick: () => handleExportMetaAudience("all"),
     },
   ];
 
@@ -694,7 +779,7 @@ export default function CustomersPage() {
             subtitle={`Rawstitch CRM Customer Export (${channelTab.toUpperCase()} Channel) • Total Records: ${totalItems || customers.length}`}
             headers={customerExportHeaders}
             getData={getCustomerExportData}
-            customOptions={metaAudienceExportOption}
+            customOptions={separateExportOptions}
             orientation="landscape"
           />
           <Button asChild size="sm" className="text-xs font-semibold rounded-xl">
@@ -859,8 +944,8 @@ export default function CustomersPage() {
             Online
           </button>
         </div>
-        <div className="flex items-center gap-2 px-2">
-          <Badge variant="outline" className="text-[11px] font-medium bg-white/80 dark:bg-slate-900/80">
+        <div className="flex items-center gap-2 px-2 flex-wrap">
+          <Badge variant="outline" className="text-[11px] font-medium bg-white/80 dark:bg-slate-900/80 hidden sm:inline-flex">
             Current Filter:{" "}
             {channelTab === "all"
               ? "All Channels"
@@ -868,6 +953,28 @@ export default function CustomersPage() {
               ? "Offline / Shop POS"
               : "Online Preorders & Web"}
           </Badge>
+          <div className="flex items-center gap-1.5">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => handleExportMetaAudience("shop")}
+              className="h-7 px-2 text-[11px] font-semibold rounded-lg bg-white dark:bg-slate-900 border-blue-200 text-blue-700 hover:bg-blue-50 shadow-2xs gap-1"
+              title="Export Offline / In-Store Customers for Meta Ads"
+            >
+              <Store className="w-3 h-3 text-blue-600" />
+              <span>Offline Meta CSV</span>
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => handleExportMetaAudience("online")}
+              className="h-7 px-2 text-[11px] font-semibold rounded-lg bg-white dark:bg-slate-900 border-indigo-200 text-indigo-700 hover:bg-indigo-50 shadow-2xs gap-1"
+              title="Export Online Customers for Meta Ads"
+            >
+              <Globe className="w-3 h-3 text-indigo-600" />
+              <span>Online Meta CSV</span>
+            </Button>
+          </div>
         </div>
       </div>
 
@@ -979,7 +1086,7 @@ export default function CustomersPage() {
                 subtitle={`Rawstitch CRM Customer Export (${channelTab.toUpperCase()} Channel) • Total Records: ${totalItems || customers.length}`}
                 headers={customerExportHeaders}
                 getData={getCustomerExportData}
-                customOptions={metaAudienceExportOption}
+                customOptions={separateExportOptions}
                 orientation="landscape"
                 className="shrink-0"
               />

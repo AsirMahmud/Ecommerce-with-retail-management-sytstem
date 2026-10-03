@@ -66,10 +66,10 @@ class CustomerViewSet(viewsets.ModelViewSet):
                 Q(phone__icontains=search_query)
             )
         
-        # Apply customer_type filter (shop, online, both)
+        # Apply customer_type filter (shop, offline, online, both)
         customer_type = self.request.query_params.get('customer_type', None)
-        if customer_type:
-            if customer_type == 'shop':
+        if customer_type and customer_type.lower() != 'all':
+            if customer_type in ['shop', 'offline']:
                 queryset = queryset.filter(Q(customer_type='shop') | Q(customer_type='both'))
             elif customer_type == 'online':
                 queryset = queryset.filter(Q(customer_type='online') | Q(customer_type='both'))
