@@ -18,9 +18,7 @@ import {
     type UpdateCustomerData,
     type PaginatedResponse,
 } from '@/lib/api/customer';
-import axios from "axios";
-
-const API_URL = process.env.NEXT_PUBLIC_BASEURL || 'http://localhost:8000/api';
+import axiosInstance from "@/lib/api/axios-config";
 
 // Query keys
 export const customerKeys = {
@@ -61,7 +59,7 @@ export const useCustomers = (
                 if (filters.customer_type) params.customer_type = filters.customer_type;
             }
             
-            const response = await axios.get(`${API_URL}/customer/customers/`, { params });
+            const response = await axiosInstance.get('/customer/customers/', { params });
             return response.data;
         },
     });
@@ -72,7 +70,7 @@ export const useActiveCustomers = (page: number = 1, pageSize: number = 20) => {
     return useQuery({
         queryKey: [...customerKeys.active(), page, pageSize],
         queryFn: async () => {
-            const response = await axios.get(`${API_URL}/customer/customers/active_customers/`, {
+            const response = await axiosInstance.get('/customer/customers/active_customers/', {
                 params: { page, page_size: pageSize }
             });
             return response.data;
@@ -85,7 +83,7 @@ export const useTopCustomers = (limit: number = 5) => {
     return useQuery({
         queryKey: [...customerKeys.top(), limit],
         queryFn: async () => {
-            const response = await axios.get(`${API_URL}/customer/customers/top_customers/`, {
+            const response = await axiosInstance.get('/customer/customers/top_customers/', {
                 params: { limit }
             });
             return response.data;
@@ -98,7 +96,7 @@ export const useCustomerAnalytics = () => {
     return useQuery({
         queryKey: customerKeys.analytics(),
         queryFn: async () => {
-            const response = await axios.get(`${API_URL}/customer/customers/customer_analytics/`);
+            const response = await axiosInstance.get('/customer/customers/customer_analytics/');
             return response.data;
         },
     });
@@ -109,7 +107,7 @@ export const useCustomer = (id: number) => {
     return useQuery({
         queryKey: customerKeys.detail(id),
         queryFn: async () => {
-            const response = await axios.get(`${API_URL}/customer/customers/${id}/`);
+            const response = await axiosInstance.get(`/customer/customers/${id}/`);
             return response.data;
         },
     });
@@ -121,7 +119,7 @@ export const useCreateCustomer = () => {
 
     return useMutation({
         mutationFn: async (data: Partial<Customer>) => {
-            const response = await axios.post(`${API_URL}/customer/customers/`, data);
+            const response = await axiosInstance.post('/customer/customers/', data);
             return response.data;
         },
         onSuccess: () => {
@@ -149,7 +147,7 @@ export const useUpdateCustomer = () => {
 
     return useMutation({
         mutationFn: async ({ id, data }: { id: number; data: Partial<Customer> }) => {
-            const response = await axios.patch(`${API_URL}/customer/customers/${id}/`, data);
+            const response = await axiosInstance.patch(`/customer/customers/${id}/`, data);
             return response.data;
         },
         onSuccess: (_, { id }) => {
@@ -178,7 +176,7 @@ export const useDeleteCustomer = () => {
 
     return useMutation({
         mutationFn: async (id: number) => {
-            const response = await axios.delete(`${API_URL}/customer/customers/${id}/`);
+            const response = await axiosInstance.delete(`/customer/customers/${id}/`);
             return response.data;
         },
         onSuccess: () => {
@@ -229,7 +227,7 @@ export const useSearchCustomers = (
                 if (filters.customer_type) params.customer_type = filters.customer_type;
             }
             
-            const response = await axios.get(`${API_URL}/customer/customers/`, { params });
+            const response = await axiosInstance.get('/customer/customers/', { params });
             return response.data;
         },
         enabled: !!query,
@@ -241,7 +239,7 @@ export const useCustomerLookup = () => {
     return useQuery({
         queryKey: customerKeys.lookup(),
         queryFn: async () => {
-            const response = await axios.get(`${API_URL}/customer/customers/`);
+            const response = await axiosInstance.get('/customer/customers/');
             const customers = response.data.results || response.data;
             return customers.map((customer: Customer) => ({
                 value: customer.id,
@@ -255,8 +253,8 @@ export function usePermanentDeleteCustomer() {
     const queryClient = useQueryClient();
     return useMutation({
         mutationFn: async (customerId: number) => {
-            const response = await axios.delete(
-                `${API_URL}/customer/customers/${customerId}/permanent_delete/`
+            const response = await axiosInstance.delete(
+                `/customer/customers/${customerId}/permanent_delete/`
             );
             return response.data;
         },
@@ -283,8 +281,8 @@ export function useBulkDeleteCustomers() {
     const queryClient = useQueryClient();
     return useMutation({
         mutationFn: async (customerIds: number[]) => {
-            const response = await axios.post(
-                `${API_URL}/customer/customers/bulk_delete/`,
+            const response = await axiosInstance.post(
+                '/customer/customers/bulk_delete/',
                 { customer_ids: customerIds }
             );
             return response.data;
@@ -327,12 +325,13 @@ export function useImportCustomersCSV() {
                 const formData = new FormData();
                 formData.append('file', file);
                 formData.append('customer_type', customerType);
-                const response = await axios.post(`${API_URL}/customer/customers/import_csv/`, formData, {
-                    headers: { 'Content-Type': 'multipart/form-data' }
+                if (csvText) formData.append('csv_text', csvText);
+                const response = await axiosInstance.post('/customer/customers/import_csv/', formData, {
+                    headers: { 'Content-Type': undefined }
                 });
                 return response.data;
             } else {
-                const response = await axios.post(`${API_URL}/customer/customers/import_csv/`, {
+                const response = await axiosInstance.post('/customer/customers/import_csv/', {
                     rows,
                     csv_text: csvText,
                     customer_type: customerType

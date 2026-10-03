@@ -18,7 +18,9 @@ import {
 } from "@/components/ui/select";
 import { DataTable } from "@/components/ui/data-table";
 import type { ColumnDef } from "@tanstack/react-table";
-import { DataExportButton } from "@/components/data-export-button";
+import { DataExportButton, type CustomExportOption } from "@/components/data-export-button";
+import { exportToMetaAudienceCSV } from "@/lib/export-utils";
+import axiosInstance from "@/lib/api/axios-config";
 import {
   Download,
   Search,
@@ -527,6 +529,135 @@ export default function CustomersPage() {
     }
   };
 
+  const customerExportHeaders = [
+    "Rank",
+    "Customer Name",
+    "Phone",
+    "Email",
+    "Channel",
+    "Total Spent (BDT)",
+    "Orders Count",
+    "Last Purchase",
+    "Status",
+  ];
+
+  const formatCustomerExportRow = (c: any) => {
+    const name = c.name || `${c.first_name || ""} ${c.last_name || ""}`.trim() || "Customer";
+    const channel = c.customer_type === "online" ? "Online" : c.customer_type === "both" ? "Both" : "Offline";
+    const totalSpent = c.total_sales != null ? `BDT ${Number(c.total_sales).toLocaleString()}` : "BDT 0";
+    const lastPurchase = c.last_sale_date ? new Date(c.last_sale_date).toLocaleDateString() : "No sales";
+    const status = c.is_active ? "Active" : "Inactive";
+
+    return [
+      c.ranking ? `#${c.ranking}` : "-",
+      name,
+      c.phone || "-",
+      c.email || "-",
+      channel,
+      totalSpent,
+      c.sales_count ?? 0,
+      lastPurchase,
+      status,
+    ];
+  };
+
+  const getCustomerExportData = async () => {
+    // If rows are selected with checkboxes, export only selected rows
+    const selectedRowKeys = Object.keys(rowSelection).filter(
+      (k) => (rowSelection as Record<string, boolean>)[k]
+    );
+
+    if (selectedRowKeys.length > 0 && customers.length > 0) {
+      const selectedCustomers = selectedRowKeys
+        .map((idx) => customers[parseInt(idx, 10)])
+        .filter(Boolean);
+
+      if (selectedCustomers.length > 0) {
+        return selectedCustomers.map(formatCustomerExportRow);
+      }
+    }
+
+    // Otherwise, fetch all matching customers using high-performance export endpoint
+    try {
+      const params: Record<string, any> = { ...apiFilters };
+      if (debouncedSearchQuery) {
+        params.search = debouncedSearchQuery;
+      }
+
+      const res = await axiosInstance.get("/customer/customers/export_data/", { params });
+      const records = Array.isArray(res.data) ? res.data : (res.data?.results || []);
+
+      if (records.length > 0) {
+        return records.map(formatCustomerExportRow);
+      }
+    } catch (err) {
+      console.warn("Export endpoint error, falling back to current page data:", err);
+    }
+
+    // Fallback: export current page customers
+    if (customers.length > 0) {
+      return customers.map(formatCustomerExportRow);
+    }
+
+    return [];
+  };
+
+  const handleExportMetaAudience = async () => {
+    // 1. If rows are selected via table checkboxes, export only selected rows
+    const selectedRowKeys = Object.keys(rowSelection).filter(
+      (k) => (rowSelection as Record<string, boolean>)[k]
+    );
+
+    let recordsToExport: any[] = [];
+
+    if (selectedRowKeys.length > 0 && customers.length > 0) {
+      recordsToExport = selectedRowKeys
+        .map((idx) => customers[parseInt(idx, 10)])
+        .filter(Boolean);
+    } else {
+      // Fetch all matching customers from export_data endpoint
+      try {
+        const params: Record<string, any> = { ...apiFilters };
+        if (debouncedSearchQuery) {
+          params.search = debouncedSearchQuery;
+        }
+
+        const res = await axiosInstance.get("/customer/customers/export_data/", { params });
+        recordsToExport = Array.isArray(res.data) ? res.data : (res.data?.results || []);
+      } catch (err) {
+        console.warn("Failed to fetch full customer list for Meta export:", err);
+        recordsToExport = customers;
+      }
+    }
+
+    if (!recordsToExport || recordsToExport.length === 0) {
+      toast({
+        title: "No Data",
+        description: "No customer records available to export for Meta Audience.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const filename = `meta_custom_audience_value_based_${channelTab}_${new Date().toISOString().split("T")[0]}`;
+    exportToMetaAudienceCSV(filename, recordsToExport);
+
+    toast({
+      title: "Meta Audience Export Ready",
+      description: `Exported ${recordsToExport.length} value-based customer records matching Meta Custom Audience template.`,
+    });
+  };
+
+  const metaAudienceExportOption: CustomExportOption[] = [
+    {
+      label: "Meta / Facebook Audience (Value-Based CSV)",
+      description: "19-col LTV template for Meta Ad Manager & re-importing",
+      icon: <Target className="w-4 h-4 text-indigo-600 shrink-0" />,
+      badge: "Meta Ads",
+      onClick: handleExportMetaAudience,
+    },
+  ];
+
   return (
     <div className="container mx-auto py-3 sm:py-6 px-2 sm:px-4 space-y-4 sm:space-y-6 min-w-0">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -557,6 +688,15 @@ export default function CustomersPage() {
             <Upload className="h-3.5 w-3.5" />
             Import CSV
           </Button>
+          <DataExportButton
+            title="Customers Directory"
+            filename={`customers_${channelTab}_${new Date().toISOString().split("T")[0]}`}
+            subtitle={`Rawstitch CRM Customer Export (${channelTab.toUpperCase()} Channel) • Total Records: ${totalItems || customers.length}`}
+            headers={customerExportHeaders}
+            getData={getCustomerExportData}
+            customOptions={metaAudienceExportOption}
+            orientation="landscape"
+          />
           <Button asChild size="sm" className="text-xs font-semibold rounded-xl">
             <Link href="/customers/new">
               <UserPlus className="h-3.5 w-3.5 mr-1.5" />
@@ -835,20 +975,12 @@ export default function CustomersPage() {
               </Button>
               <DataExportButton
                 title="Customer Directory"
-                subtitle={`Showing ${customers.length} customer records`}
-                headers={["Rank", "Customer Name", "Email", "Phone", "Total Spent ($)", "Sales Count", "Last Sale", "Status"]}
-                getData={() =>
-                  customers.map((c: any) => [
-                    c.ranking || "-",
-                    c.name || `${c.first_name || ""} ${c.last_name || ""}`.trim() || "Customer",
-                    c.email || "-",
-                    c.phone || "-",
-                    c.total_sales || 0,
-                    c.sales_count || 0,
-                    c.last_sale_date ? new Date(c.last_sale_date).toLocaleDateString() : "-",
-                    c.is_active ? "Active" : "Inactive",
-                  ])
-                }
+                filename={`customers_${channelTab}_${new Date().toISOString().split("T")[0]}`}
+                subtitle={`Rawstitch CRM Customer Export (${channelTab.toUpperCase()} Channel) • Total Records: ${totalItems || customers.length}`}
+                headers={customerExportHeaders}
+                getData={getCustomerExportData}
+                customOptions={metaAudienceExportOption}
+                orientation="landscape"
                 className="shrink-0"
               />
             </div>

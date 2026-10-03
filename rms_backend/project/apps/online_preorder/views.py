@@ -52,6 +52,7 @@ class PublicCreateOnlinePreorderView(APIView):
 
 
 class OnlinePreorderViewSet(
+    mixins.CreateModelMixin,
     mixins.ListModelMixin,
     mixins.RetrieveModelMixin,
     mixins.UpdateModelMixin,
@@ -61,6 +62,25 @@ class OnlinePreorderViewSet(
     queryset = OnlinePreorder.objects.all().order_by('-created_at')
     permission_classes = [IsAuthenticated]
     pagination_class = OnlinePreorderPagination
+
+    def create(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        online_preorder = serializer.save()
+
+        # Send notifications
+        try:
+            from .email_utils import send_admin_order_notification, send_customer_order_received
+            send_admin_order_notification(online_preorder.id)
+            send_customer_order_received(online_preorder.id)
+        except Exception:
+            pass
+
+        return Response(
+            OnlinePreorderSerializer(online_preorder, context=self.get_serializer_context()).data,
+            status=status.HTTP_201_CREATED
+        )
 
     def get_permissions(self):
         if self.action == 'retrieve':

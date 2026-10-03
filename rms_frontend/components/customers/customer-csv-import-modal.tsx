@@ -314,34 +314,33 @@ export function CustomerCsvImportModal({
     try {
       const res = await importMutation.mutateAsync({
         file: selectedFile || undefined,
-        csvText: !selectedFile ? csvTextContent : undefined,
+        csvText: csvTextContent || undefined,
         rows: parsedRows.length > 0 ? parsedRows : undefined,
         customerType,
       });
 
       setImportResult(res);
-      if (onImportComplete) {
-        onImportComplete();
-      }
     } catch (err) {
       // Handled by mutation onError
     }
   };
 
-  const handleReset = () => {
-    setSelectedFile(null);
-    setCsvTextContent("");
-    setParsedRows([]);
-    setPreviewRows([]);
-    setParseError(null);
-    setImportResult(null);
-    if (fileInputRef.current) {
-      fileInputRef.current.value = "";
+  const handleClose = () => {
+    const wasImported = Boolean(importResult?.success);
+    handleReset();
+    setIsOpen(false);
+    if (wasImported && onImportComplete) {
+      onImportComplete();
     }
   };
 
   return (
-    <Dialog open={isOpen} onOpenChange={setIsOpen}>
+    <Dialog open={isOpen} onOpenChange={(open) => {
+      if (!open && importResult?.success && onImportComplete) {
+        onImportComplete();
+      }
+      setIsOpen(open);
+    }}>
       {trigger && <DialogTrigger asChild>{trigger}</DialogTrigger>}
       <DialogContent className="max-w-2xl sm:max-w-3xl max-h-[90vh] flex flex-col p-0 overflow-hidden bg-white dark:bg-slate-900 border shadow-2xl rounded-2xl">
         <DialogHeader className="p-6 pb-4 border-b bg-slate-50/60 dark:bg-slate-800/40">
@@ -652,10 +651,7 @@ export function CustomerCsvImportModal({
             <Button
               variant="outline"
               size="sm"
-              onClick={() => {
-                handleReset();
-                setIsOpen(false);
-              }}
+              onClick={handleClose}
               className="flex-1 sm:flex-initial"
             >
               {importResult ? "Close" : "Cancel"}

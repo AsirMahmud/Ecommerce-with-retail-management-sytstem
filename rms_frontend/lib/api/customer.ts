@@ -179,7 +179,7 @@ export const importCustomersCSV = async (
         formData.append('customer_type', customerType);
         const response = await axiosInstance.post('/customer/customers/import_csv/', formData, {
             headers: {
-                'Content-Type': 'multipart/form-data',
+                'Content-Type': undefined,
             }
         });
         return response.data;
@@ -196,6 +196,14 @@ export const importCustomersCSV = async (
 export const downloadCustomerCSVTemplate = async (): Promise<Blob> => {
     const response = await axiosInstance.get('/customer/customers/download_template/', {
         responseType: 'blob'
+    });
+    return response.data;
+};
+
+// Export customer records with filters for Excel/CSV/PDF exports
+export const exportCustomerData = async (params: Record<string, any> = {}): Promise<any[]> => {
+    const response = await axiosInstance.get('/customer/customers/export_data/', {
+        params
     });
     return response.data;
 };

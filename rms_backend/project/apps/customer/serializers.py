@@ -61,18 +61,7 @@ class CustomerSerializer(serializers.ModelSerializer):
 
     def get_ranking(self, obj):
         """Get customer ranking based on total sales"""
-        if obj.ranking:
-            return obj.ranking
-        
-        # Calculate ranking if not set
-        customers_with_sales = Customer.objects.annotate(
-            total_sales=Sum('sale__total', filter=Q(sale__status='completed'))
-        ).order_by('-total_sales')
-        
-        for rank, customer in enumerate(customers_with_sales, 1):
-            if customer.id == obj.id:
-                return rank
-        return None
+        return obj.ranking
 
     def get_is_top_customer(self, obj):
         """Check if customer is in top 5"""
@@ -102,6 +91,11 @@ class CustomerSerializer(serializers.ModelSerializer):
         return 0.00
 
     def get_purchase_history(self, obj):
+        # Only compute full purchase history for retrieve/detail view to avoid N+1 queries during list/export
+        view = self.context.get('view')
+        if view and getattr(view, 'action', None) not in [None, 'retrieve']:
+            return []
+
         sales = Sale.objects.filter(
             customer=obj
         ).order_by('-date')

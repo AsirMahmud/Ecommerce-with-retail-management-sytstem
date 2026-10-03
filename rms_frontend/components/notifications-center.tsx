@@ -57,6 +57,10 @@ function playNotificationChime() {
     const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
     if (!AudioCtx) return;
     const ctx = new AudioCtx();
+    if (ctx.state === "suspended") {
+      ctx.close().catch(() => {});
+      return;
+    }
     const now = ctx.currentTime;
 
     const osc1 = ctx.createOscillator();
@@ -203,9 +207,15 @@ export function NotificationsCenter() {
     [notifications]
   );
 
-  // Play audio chime when new unread notifications arrive
+  // Play audio chime when new unread notifications arrive (skip initial load)
+  const isFirstMountRef = useRef(true);
   const prevUnreadRef = useRef(unreadCount);
   useEffect(() => {
+    if (isFirstMountRef.current) {
+      isFirstMountRef.current = false;
+      prevUnreadRef.current = unreadCount;
+      return;
+    }
     if (unreadCount > prevUnreadRef.current && soundOn) {
       playNotificationChime();
     }

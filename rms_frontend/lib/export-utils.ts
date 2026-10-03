@@ -32,6 +32,96 @@ export function exportToCSV(
 }
 
 /**
+ * Export customers in the official Facebook / Meta Custom Audience Value-Based template format.
+ * Matches exact 19-column schema:
+ * email,email,email,phone,phone,phone,madid,fn,ln,zip,ct,st,country,dob,doby,gen,age,uid,value
+ */
+export function exportToMetaAudienceCSV(
+  filename: string,
+  records: Array<{
+    email?: string | null;
+    phone?: string | null;
+    first_name?: string | null;
+    last_name?: string | null;
+    gender?: string | null;
+    date_of_birth?: string | null;
+    id?: number | string | null;
+    total_sales?: number | string | null;
+  }>
+) {
+  const sanitize = (val: any) => {
+    if (val === null || val === undefined) return "";
+    const str = String(val).trim();
+    if (str.includes(",") || str.includes('"') || str.includes("\n")) {
+      return `"${str.replace(/"/g, '""')}"`;
+    }
+    return str;
+  };
+
+  const headerLine = "email,email,email,phone,phone,phone,madid,fn,ln,zip,ct,st,country,dob,doby,gen,age,uid,value";
+
+  const today = new Date();
+  const dataLines = records.map((c) => {
+    let dobStr = "";
+    let dobyStr = "";
+    let ageStr = "";
+
+    if (c.date_of_birth) {
+      const d = new Date(c.date_of_birth);
+      if (!isNaN(d.getTime())) {
+        const mm = String(d.getMonth() + 1).padStart(2, "0");
+        const dd = String(d.getDate()).padStart(2, "0");
+        const yy = String(d.getFullYear()).slice(-2);
+        dobStr = `${mm}/${dd}/${yy}`;
+        dobyStr = String(d.getFullYear());
+
+        let age = today.getFullYear() - d.getFullYear();
+        const m = today.getMonth() - d.getMonth();
+        if (m < 0 || (m === 0 && today.getDate() < d.getDate())) {
+          age--;
+        }
+        if (age >= 0 && age < 120) {
+          ageStr = String(age);
+        }
+      }
+    }
+
+    let phoneClean = String(c.phone || "").replace(/[^\d+]/g, "").trim();
+    if (phoneClean && !phoneClean.startsWith("+")) {
+      if (phoneClean.startsWith("01")) {
+        phoneClean = `+88${phoneClean}`;
+      } else if (phoneClean.startsWith("880")) {
+        phoneClean = `+${phoneClean}`;
+      }
+    }
+
+    const value = c.total_sales != null ? Number(c.total_sales).toFixed(2) : "0.00";
+    const gender = c.gender ? c.gender.toUpperCase().charAt(0) : "";
+
+    const row = [
+      sanitize(c.email || ""), "", "",
+      sanitize(phoneClean), "", "",
+      "", // madid
+      sanitize(c.first_name || ""),
+      sanitize(c.last_name || ""),
+      "", "", "", "BD", // zip, ct, st, country
+      dobStr,
+      dobyStr,
+      gender,
+      ageStr,
+      sanitize(c.id ?? ""),
+      value,
+    ];
+
+    return row.join(",");
+  });
+
+  const csvContent = "\uFEFF" + [headerLine, ...dataLines].join("\r\n");
+  const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+  saveAs(blob, filename.endsWith(".csv") ? filename : `${filename}.csv`);
+}
+
+/**
  * Native .xlsx export using SheetJS
  */
 export function exportToExcel(

@@ -8,7 +8,7 @@ from rest_framework.response import Response
 from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 from rest_framework.pagination import PageNumberPagination
 from django_filters.rest_framework import DjangoFilterBackend
-from django.db.models import Sum, Count, Q
+from django.db.models import Sum, Count, Max, Q
 from django.http import HttpResponse
 from .models import Customer
 from .serializers import CustomerSerializer, TopCustomerSerializer
@@ -31,6 +31,11 @@ class CustomerViewSet(viewsets.ModelViewSet):
     search_fields = ['first_name', 'last_name', 'email', 'phone']
     ordering_fields = ['created_at', 'first_name', 'last_name', 'ranking', 'total_sales', 'sales_count', 'last_sale_date']
     ordering = ['-created_at']
+
+    def paginate_queryset(self, queryset):
+        if self.request.query_params.get('no_pagination') == 'true':
+            return None
+        return super().paginate_queryset(queryset)
 
     def get_queryset(self):
         """Override to add ranking calculation and filtering"""
@@ -200,6 +205,150 @@ class CustomerViewSet(viewsets.ModelViewSet):
         return Response(analytics)
 
     @action(detail=False, methods=['get'])
+    def export_data(self, request):
+        """
+        Fast JSON export endpoint for customers directory.
+        Supports search, customer_type, ranking_filter, sales_filter, recent_filter, ordering.
+        """
+        queryset = self.filter_queryset(self.get_queryset())
+        annotated_qs = queryset.annotate(
+            total_sales_val=Sum('sale__total', filter=Q(sale__status='completed')),
+            sales_count_val=Count('sale', filter=Q(sale__status='completed')),
+            last_sale_date_val=Max('sale__date', filter=Q(sale__status='completed'))
+        )
+
+        data = []
+        for c in annotated_qs:
+            data.append({
+                'id': c.id,
+                'ranking': c.ranking,
+                'first_name': c.first_name or '',
+                'last_name': c.last_name or '',
+                'name': f"{c.first_name or ''} {c.last_name or ''}".strip() or "Customer",
+                'phone': c.phone or '',
+                'email': c.email or '',
+                'address': c.address or '',
+                'gender': c.gender or '',
+                'date_of_birth': c.date_of_birth.isoformat() if c.date_of_birth else None,
+                'customer_type': c.customer_type or 'shop',
+                'is_active': c.is_active,
+                'total_sales': float(c.total_sales_val or 0.0),
+                'sales_count': int(c.sales_count_val or 0),
+                'last_sale_date': c.last_sale_date_val.isoformat() if c.last_sale_date_val else None,
+                'created_at': c.created_at.isoformat() if c.created_at else None,
+            })
+
+        return Response(data)
+
+    @action(detail=False, methods=['get'])
+    def export_csv(self, request):
+        """
+        Export filtered customers directly as downloadable CSV file.
+        Supports format='meta' to output Facebook/Meta Custom Audience Value-Based template.
+        """
+        queryset = self.filter_queryset(self.get_queryset())
+        annotated_qs = queryset.annotate(
+            total_sales_val=Sum('sale__total', filter=Q(sale__status='completed')),
+            sales_count_val=Count('sale', filter=Q(sale__status='completed')),
+            last_sale_date_val=Max('sale__date', filter=Q(sale__status='completed'))
+        )
+
+        export_type = (
+            request.query_params.get('template') or 
+            request.query_params.get('export_type') or 
+            request.query_params.get('mode') or 
+            ''
+        ).lower()
+
+        response = HttpResponse(content_type='text/csv; charset=utf-8-sig')
+
+        if export_type in ['meta', 'meta_audience', 'value_based']:
+            filename = f"meta_custom_audience_value_based_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
+            response['Content-Disposition'] = f'attachment; filename="{filename}"'
+
+            writer = csv.writer(response)
+            # Exact Meta Custom Audience header
+            writer.writerow([
+                'email', 'email', 'email',
+                'phone', 'phone', 'phone',
+                'madid', 'fn', 'ln',
+                'zip', 'ct', 'st', 'country',
+                'dob', 'doby', 'gen', 'age',
+                'uid', 'value'
+            ])
+
+            today = datetime.now().date()
+            for c in annotated_qs:
+                dob_str = c.date_of_birth.strftime('%m/%d/%y') if c.date_of_birth else ''
+                doby_str = str(c.date_of_birth.year) if c.date_of_birth else ''
+                age_str = ''
+                if c.date_of_birth:
+                    age = today.year - c.date_of_birth.year - ((today.month, today.day) < (c.date_of_birth.month, c.date_of_birth.day))
+                    age_str = str(age) if age >= 0 else ''
+
+                val_str = f"{float(c.total_sales_val or 0):.2f}"
+                phone_raw = str(c.phone or '').strip()
+                phone_clean = re.sub(r'[^\d+]', '', phone_raw)
+                if phone_clean and not phone_clean.startswith('+'):
+                    if phone_clean.startswith('01'):
+                        phone_clean = f"+88{phone_clean}"
+                    elif phone_clean.startswith('880'):
+                        phone_clean = f"+{phone_clean}"
+
+                writer.writerow([
+                    c.email or '', '', '',
+                    phone_clean, '', '',
+                    '', # madid
+                    c.first_name or '',
+                    c.last_name or '',
+                    '', '', '', 'BD', # zip, ct, st, country
+                    dob_str,
+                    doby_str,
+                    c.gender or '',
+                    age_str,
+                    c.id,
+                    val_str
+                ])
+
+            return response
+
+        # Standard CRM human-readable report
+        filename = f"customers_export_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
+        response['Content-Disposition'] = f'attachment; filename="{filename}"'
+
+        writer = csv.writer(response)
+        writer.writerow([
+            'Rank',
+            'First Name',
+            'Last Name',
+            'Phone',
+            'Email',
+            'Channel',
+            'Total Sales (BDT)',
+            'Orders Count',
+            'Last Purchase Date',
+            'Status'
+        ])
+
+        for c in annotated_qs:
+            last_date_str = c.last_sale_date_val.strftime('%Y-%m-%d') if c.last_sale_date_val else 'No sales'
+            ch_label = 'Online' if c.customer_type == 'online' else 'Both' if c.customer_type == 'both' else 'Offline (Shop)'
+            writer.writerow([
+                c.ranking or '-',
+                c.first_name or '',
+                c.last_name or '',
+                c.phone or '',
+                c.email or '',
+                ch_label,
+                f"{float(c.total_sales_val or 0):.2f}",
+                c.sales_count_val or 0,
+                last_date_str,
+                'Active' if c.is_active else 'Inactive'
+            ])
+
+        return response
+
+    @action(detail=False, methods=['get'])
     def download_template(self, request):
         """Return CSV template formatted according to the Meta/standard customer import specifications"""
         template_content = (
@@ -259,11 +408,11 @@ class CustomerViewSet(viewsets.ModelViewSet):
 
         header = [str(col).strip().lower() for col in rows[0]]
         
-        # Identify indices
-        email_indices = [i for i, h in enumerate(header) if h == 'email']
-        phone_indices = [i for i, h in enumerate(header) if h in ('phone', 'phone_number', 'mobile', 'cell')]
-        fn_indices = [i for i, h in enumerate(header) if h in ('fn', 'first_name', 'firstname', 'name')]
-        ln_indices = [i for i, h in enumerate(header) if h in ('ln', 'last_name', 'lastname', 'surname')]
+        # Identify indices with flexible matching
+        email_indices = [i for i, h in enumerate(header) if any(k in h for k in ('email', 'e-mail', 'mail'))]
+        phone_indices = [i for i, h in enumerate(header) if any(k in h for k in ('phone', 'mobile', 'cell', 'contact', 'tel'))]
+        fn_indices = [i for i, h in enumerate(header) if any(k in h for k in ('fn', 'first_name', 'firstname', 'customer_name', 'client_name', 'full_name')) or h == 'name']
+        ln_indices = [i for i, h in enumerate(header) if any(k in h for k in ('ln', 'last_name', 'lastname', 'surname'))]
         zip_indices = [i for i, h in enumerate(header) if h in ('zip', 'zipcode', 'zip_code', 'postal_code', 'postcode')]
         ct_indices = [i for i, h in enumerate(header) if h in ('ct', 'city', 'town')]
         st_indices = [i for i, h in enumerate(header) if h in ('st', 'state', 'province', 'division')]
@@ -282,6 +431,9 @@ class CustomerViewSet(viewsets.ModelViewSet):
             s = str(raw).strip()
             if not s:
                 return ""
+            # Strip Meta's p: or p:+ prefix
+            if s.lower().startswith('p:'):
+                s = s[2:].strip()
             has_plus = s.startswith('+')
             digits = re.sub(r'\D', '', s)
             if not digits:
@@ -446,7 +598,10 @@ class CustomerViewSet(viewsets.ModelViewSet):
                 # Database matching
                 existing = None
                 if phone:
-                    existing = Customer.objects.filter(phone=phone).first()
+                    last_10 = phone[-10:] if len(phone) >= 10 else phone
+                    existing = Customer.objects.filter(
+                        Q(phone=phone) | Q(phone__endswith=last_10)
+                    ).first()
                 if not existing and email:
                     existing = Customer.objects.filter(email__iexact=email).first()
 
@@ -480,19 +635,31 @@ class CustomerViewSet(viewsets.ModelViewSet):
                     if save_email and Customer.objects.filter(email__iexact=save_email).exists():
                         save_email = None
 
-                    Customer.objects.create(
-                        first_name=fn or (email.split('@')[0] if email else "Customer"),
-                        last_name=ln,
-                        phone=phone,
-                        email=save_email,
-                        address=address,
-                        gender=gender,
-                        date_of_birth=date_of_birth,
-                        customer_type=target_customer_type,
-                        fake_notes=extra_note or None,
-                        is_active=True
-                    )
-                    created_count += 1
+                    try:
+                        from django.db import IntegrityError
+                        Customer.objects.create(
+                            first_name=fn or (email.split('@')[0] if email else "Customer"),
+                            last_name=ln,
+                            phone=phone,
+                            email=save_email,
+                            address=address,
+                            gender=gender,
+                            date_of_birth=date_of_birth,
+                            customer_type=target_customer_type,
+                            fake_notes=extra_note or None,
+                            is_active=True
+                        )
+                        created_count += 1
+                    except IntegrityError:
+                        # Fallback if phone already exists
+                        existing = Customer.objects.filter(phone=phone).first()
+                        if existing:
+                            if target_customer_type in ['both', 'online'] and existing.customer_type != target_customer_type:
+                                existing.customer_type = 'both'
+                                existing.save(update_fields=['customer_type'])
+                            updated_count += 1
+                        else:
+                            skipped_count += 1
 
             except Exception as row_err:
                 errors.append(f"Row {idx}: {str(row_err)}")

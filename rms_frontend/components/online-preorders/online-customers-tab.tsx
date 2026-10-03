@@ -38,6 +38,7 @@ import {
   CustomerCsvImportModal,
   downloadCustomerCsvTemplateFile,
 } from "@/components/customers/customer-csv-import-modal";
+import { DataExportButton } from "@/components/data-export-button";
 
 interface OnlineCustomersTabProps {
   onFilterCustomerOrders: (customerPhone: string) => void;
@@ -118,6 +119,42 @@ export function OnlineCustomersTab({ onFilterCustomerOrders }: OnlineCustomersTa
     const parts = [addr.district, addr.division].filter(Boolean);
     if (parts.length > 0) return parts.join(", ");
     return addr.address || "Address Provided";
+  };
+
+  const onlineCustomerExportHeaders = [
+    "Customer Name",
+    "Phone",
+    "Email",
+    "Total Orders",
+    "Delivered",
+    "Cancelled",
+    "Total Spent (BDT)",
+    "Fulfillment Rate",
+    "Risk Profile",
+  ];
+
+  const getOnlineCustomerExportData = () => {
+    return filteredCustomers.map((c) => {
+      const delivered = c.completed_orders || 0;
+      const cancelled = c.cancelled_orders || 0;
+      const total = c.total_orders || (delivered + cancelled);
+      const rate = total > 0 ? `${((delivered / total) * 100).toFixed(0)}%` : "0%";
+      const isHighRisk = cancelled >= 2 || Number(c.cancellation_rate) >= 30;
+      const isReliable = cancelled === 0 && delivered > 0;
+      const riskProfile = isHighRisk ? "High Risk" : isReliable ? "Reliable" : "Standard";
+
+      return [
+        c.customer_name || "Customer",
+        c.customer_phone || "-",
+        c.customer_email || "-",
+        total,
+        delivered,
+        cancelled,
+        c.total_spent != null ? `BDT ${Number(c.total_spent).toLocaleString()}` : "BDT 0",
+        rate,
+        riskProfile,
+      ];
+    });
   };
 
   return (
@@ -225,6 +262,16 @@ export function OnlineCustomersTab({ onFilterCustomerOrders }: OnlineCustomersTa
                 <Upload className="h-3.5 w-3.5" />
                 Import Online CSV
               </Button>
+              <DataExportButton
+                title="Online Customers Directory"
+                filename={`online_customers_${new Date().toISOString().split("T")[0]}`}
+                subtitle={`Rawstitch Online Preorders Customer Export • Total Records: ${filteredCustomers.length}`}
+                headers={onlineCustomerExportHeaders}
+                getData={getOnlineCustomerExportData}
+                orientation="landscape"
+                size="sm"
+                className="h-9"
+              />
               <div className="relative w-full sm:w-64">
                 <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
                 <Input
